@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos base opcionales para que se vea más limpio */
+body {
+  background-color: #f8fafc; /* Slate-50 */
+  color: #0f172a; /* Slate-900 */
+}
