@@ -33,7 +33,7 @@ export default function ReporteIngresosMedicos() {
     });
   }, []);
 
-  // 2. Generar Reporte (Versión Optimizada con Promise.all y Facturas)
+  // 2. Generar Reporte (Versión Corregida)
   const generarCorte = async () => {
     if (!medicoId) return toast.warning("Selecciona un médico");
     
@@ -43,7 +43,7 @@ export default function ReporteIngresosMedicos() {
 
     try {
       const medicoSelected = medicos.find(m => m.id === medicoId);
-      // Limpieza del porcentaje (quita el % y convierte a decimal)
+      // Limpieza del porcentaje
       const porcentaje = parseFloat((medicoSelected?.porcentajeComision || "0").toString().replace('%', '')) / 100;
 
       const start = new Date(`${fechaInicio}T00:00:00`);
@@ -60,12 +60,20 @@ export default function ReporteIngresosMedicos() {
       const snapshot = await getDocs(q);
       let totalCobrado = 0;
 
-      // Procesamiento PARALELO (Más rápido que el bucle for original)
+      // Procesamiento
       const promesas = snapshot.docs.map(async (docOp) => {
         const data = docOp.data();
         
-        // Filtro: ¿El servicio incluye el nombre del médico?
-        if (data.servicioNombre && data.servicioNombre.includes(medicoSelected.nombre)) {
+        // 👇👇 LÓGICA DE FILTRADO ROBUSTA 👇👇
+        // 1. Coincidencia exacta por ID (Lo ideal)
+        const coincideID = data.doctorId === medicoSelected.id;
+        // 2. Coincidencia por Nombre Exacto (Respaldo)
+        const coincideNombre = data.doctorNombre === medicoSelected.nombre;
+        // 3. Coincidencia "Fuzzy" en el nombre del servicio (Legacy)
+        const coincideServicio = data.servicioNombre && data.servicioNombre.includes(medicoSelected.nombre);
+
+        // Si CUALQUIERA es verdadera, la venta es de este médico
+        if (coincideID || coincideNombre || coincideServicio) {
             
             // --- LÓGICA DE FACTURA ---
             let pideFactura = "No";
@@ -75,14 +83,12 @@ export default function ReporteIngresosMedicos() {
                     const pacSnap = await getDoc(pacRef);
                     if (pacSnap.exists()) {
                         const pData = pacSnap.data();
-                        // Si tiene RFC largo, asumimos que factura
                         if (pData.datosFiscales?.rfc && pData.datosFiscales.rfc.length > 10) {
                             pideFactura = "Sí";
                         }
                     }
-                } catch (e) { console.warn("Error verificando factura light", e); }
+                } catch (e) { console.warn("Error verificando factura", e); }
             }
-            // -------------------------
 
             const monto = Number(data.monto) || 0;
             totalCobrado += monto;
@@ -97,10 +103,9 @@ export default function ReporteIngresosMedicos() {
                 monto: monto
             };
         }
-        return null; // Si no es de este médico
+        return null; 
       });
 
-      // Esperamos que todas las verificaciones de factura terminen
       const resultados = await Promise.all(promesas);
       const filtrados = resultados.filter(r => r !== null);
 
@@ -114,7 +119,7 @@ export default function ReporteIngresosMedicos() {
         aPagarMedico: aPagar
       });
 
-      if (filtrados.length === 0) toast.info("No se encontraron movimientos para este médico en el periodo.");
+      if (filtrados.length === 0) toast.info("No se encontraron movimientos para este médico.");
 
     } catch (error) {
       console.error(error);
