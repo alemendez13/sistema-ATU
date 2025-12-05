@@ -1,19 +1,21 @@
+/* components/AgendaBoard.tsx */
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"; // updateDoc agregado
 import { db } from "../lib/firebase";
 import ModalReserva from "./ModalReserva";
+import CitaDetalleModal from "./CitaDetalleModal"; // 👈 IMPORTAMOS EL NUEVO MODAL
 import WaitingList from "./agenda/WaitingList";
 import { getBloqueosAction } from "../lib/actions"; 
+import { toast } from "sonner"; // Para avisar cambios
 
-// Definición de tipos
 interface Medico {
   id: string;
   nombre: string;
   especialidad: string;
   color: string;
   reglasHorario: string; 
-  calendarId: string; // ⬅️ CAMPO FALTANTE CRUCIAL
+  calendarId: string;
 }
 
 interface Cita {
@@ -22,13 +24,15 @@ interface Cita {
   fecha: string;
   hora: string;
   paciente: string;
+  pacienteId?: string;
+  confirmada?: boolean; // 👈 NUEVO CAMPO
 }
 
 interface AgendaBoardProps {
   medicos: Medico[];
 }
 
-// --- PARSER INTELIGENTE DE HORARIOS ---
+// --- PARSER DE HORARIOS (Sin cambios) ---
 const parsearReglas = (reglaStr: string) => {
     const mapa: Record<number, string> = {};
     if (!reglaStr) return mapa;
@@ -37,9 +41,7 @@ const parsearReglas = (reglaStr: string) => {
         const [diasStr, horario] = regla.split('|');
         if (diasStr && horario) {
             const dias = diasStr.split(',').map(d => parseInt(d.trim()));
-            dias.forEach(dia => {
-                if (!isNaN(dia)) mapa[dia] = horario.trim(); 
-            });
+            dias.forEach(dia => { if (!isNaN(dia)) mapa[dia] = horario.trim(); });
         }
     });
     return mapa;
@@ -48,19 +50,15 @@ const parsearReglas = (reglaStr: string) => {
 const generarBloques = (inicio: string, fin: string) => {
     const bloques = [];
     if (!inicio || !fin) return [];
-    
     const [hIni, mIni] = inicio.split(':').map(Number);
     const [hFin, mFin] = fin.split(':').map(Number);
-    
     let actual = new Date();
     actual.setHours(hIni, mIni, 0, 0);
     const limite = new Date();
     limite.setHours(hFin, mFin, 0, 0);
-
     let count = 0;
     while (actual < limite && count < 48) {
-        const horaStr = actual.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-        bloques.push(horaStr);
+        bloques.push(actual.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
         actual.setMinutes(actual.getMinutes() + 30);
         count++;
     }
@@ -71,21 +69,21 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [citas, setCitas] = useState<Cita[]>([]);
   const [bloqueos, setBloqueos] = useState<string[]>([]); 
+  const [mensajesHoy, setMensajesHoy] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<{doctor: Medico, hora: string, fecha: string, prefilledName?: string, waitingListId?: string} | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [pacienteEnEspera, setPacienteEnEspera] = useState<{nombre: string, id: string} | null>(null);
+  // 👇 INICIO MODIFICACIÓN
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [citaDetalle, setCitaDetalle] = useState<any>(null);
+  // 👆 FIN MODIFICACIÓN
 
-  // Truco de Estabilidad: Creamos un string único que representa a los médicos.
-  // Si este string no cambia, React sabe que no debe recargar la BD.
   const medicosHash = medicos.map(m => m.id).join(",");
 
-  // --- 1. CÁLCULO DE RANGO GLOBAL ---
   const timeSlots = useMemo(() => {
-    let minHora = "09:00"; 
-    let maxHora = "18:00";
-
+    let minHora = "09:00"; let maxHora = "18:00";
     medicos.forEach(m => {
         const mapa = parsearReglas(m.reglasHorario);
         Object.values(mapa).forEach(rangoDia => {
@@ -93,67 +91,60 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
             subRangos.forEach(rango => {
                 const partes = rango.trim().split('-');
                 if (partes.length === 2) {
-                    const [ini, fin] = partes;
-                    if (ini < minHora) minHora = ini;
-                    if (fin > maxHora) maxHora = fin;
+                    if (partes[0] < minHora) minHora = partes[0];
+                    if (partes[1] > maxHora) maxHora = partes[1];
                 }
             });
         });
     });
     return generarBloques(minHora, maxHora);
-  }, [medicosHash]); // Usamos el Hash en lugar del objeto completo
+  }, [medicosHash]);
 
-  // --- 2. VERIFICACIÓN EXACTA POR DÍA ---
   const verificarHorarioMedico = (medico: Medico, fechaStr: string, horaStr: string) => {
     const fecha = new Date(fechaStr + "T12:00:00"); 
     const diaSemana = fecha.getDay(); 
     const mapaHorarios = parsearReglas(medico.reglasHorario);
     const rangosHoy = mapaHorarios[diaSemana]; 
-
     if (!rangosHoy) return false; 
-    const intervalos = rangosHoy.split(',');
-    return intervalos.some(intervalo => {
+    return rangosHoy.split(',').some(intervalo => {
         const [inicio, fin] = intervalo.trim().split('-');
-        if (!inicio || !fin) return false;
-        return horaStr >= inicio && horaStr < fin;
+        return inicio && fin && horaStr >= inicio && horaStr < fin;
     });
   };
 
-  // --- 3. EFECTO DE CARGA (Aquí estaba el error del bucle) ---
   useEffect(() => {
     setLoading(true);
     
-    // A. Suscripción a Firebase (Citas Locales)
-    const q = query(collection(db, "citas"), where("fecha", "==", selectedDate));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const citasCargadas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Cita[];
-        setCitas(citasCargadas);
-        // Quitamos setLoading(false) de aquí para evitar parpadeos si Google tarda más
+    const qCitas = query(collection(db, "citas"), where("fecha", "==", selectedDate));
+    const unsubCitas = onSnapshot(qCitas, (snapshot) => {
+        setCitas(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Cita[]);
     });
 
-    // B. Carga de Google Calendar (Externo)
+    const hoyLegible = new Date().toLocaleDateString('es-MX');
+    const qMensajes = query(collection(db, "historial_mensajes"), where("fechaLegible", "==", hoyLegible));
+    const unsubMensajes = onSnapshot(qMensajes, (snap) => {
+        setMensajesHoy(snap.docs.map(d => d.data())); 
+    });
+
     const cargarBloqueos = async () => {
         try {
-            // Solo llamamos a Google si hay médicos
             if (medicos.length > 0) {
                 const bloqueosGoogle = await getBloqueosAction(selectedDate, medicos);
                 setBloqueos(bloqueosGoogle || []);
             }
         } catch (error) {
-            console.error("Error cargando bloqueos Google:", error);
+            console.error(error);
         } finally {
             setLoading(false);
         }
     };
-    
     cargarBloqueos();
 
-    // Limpieza al desmontar
-    return () => unsubscribe();
-    
-    // 🛑 IMPORTANTE: Dependemos de 'medicosHash', no de 'medicos'.
-    // Esto evita que el useEffect se dispare infinitamente.
-  }, [selectedDate, medicosHash]); 
+    return () => {
+        unsubCitas();
+        unsubMensajes();
+    };
+  }, [selectedDate, medicosHash]);
 
   const handleSlotClick = (medico: Medico, hora: string) => {
     setSelectedSlot({
@@ -167,14 +158,51 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
     setPacienteEnEspera(null);
   };
 
+  // 👇 NUEVA FUNCIÓN: Alternar confirmación
+  const toggleConfirmacion = async (cita: Cita) => {
+      try {
+          const nuevoEstado = !cita.confirmada;
+          await updateDoc(doc(db, "citas", cita.id), {
+              confirmada: nuevoEstado
+          });
+          toast.success(nuevoEstado ? "Paciente confirmado 👍" : "Confirmación retirada");
+      } catch (e) {
+          console.error(e);
+          toast.error("Error al actualizar");
+      }
+  };
+
   const getCitaOcupada = (medicoId: string, hora: string) => {
     const citaLocal = citas.find(c => c.doctorId === medicoId && c.hora === hora);
-    if (citaLocal) return { tipo: 'local', data: citaLocal };
+    
+    if (citaLocal) {
+        // Lógica de checks:
+        // 1. ¿Ya se le envió mensaje hoy?
+        const mensajeEnviado = mensajesHoy.find(m => m.pacienteNombre === citaLocal.paciente);
+        
+        return { 
+            tipo: 'local', 
+            data: citaLocal, 
+            mensajeEnviado: !!mensajeEnviado,
+            confirmado: citaLocal.confirmada // Leemos de la BD
+        };
+    }
 
     const bloqueadoGoogle = bloqueos.includes(`${medicoId}|${hora}`);
     if (bloqueadoGoogle) return { tipo: 'google', data: { paciente: 'Google Calendar' } };
 
     return null;
+  };
+
+  const handleVerDetalle = (cita: Cita) => {
+      // Buscamos al médico dueño de la cita
+      const medicoDueño = medicos.find(m => m.id === cita.doctorId);
+      
+      setCitaDetalle({
+          ...cita,
+          doctorCalendarId: medicoDueño?.calendarId // Inyectamos el ID necesario
+      });
+      setIsDetailOpen(true);
   };
 
   return (
@@ -186,7 +214,14 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
             </a>
             <div>
                 <h1 className="text-3xl font-bold text-slate-900">Agenda Médica</h1>
-                <p className="text-slate-500 text-sm">Mostrando disponibilidad para {medicos.length} especialistas.</p>
+                <div className="flex gap-4 mt-1 text-xs">
+                    <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100">
+                        📩 = Mensaje Enviado
+                    </span>
+                    <span className="flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded border border-green-100">
+                        👍 = Confirmado (Clic para activar)
+                    </span>
+                </div>
             </div>
         </header>
 
@@ -225,7 +260,6 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
                     <div className="p-2 space-y-1 flex-1 overflow-y-auto max-h-[600px]">
                         {timeSlots.map(hora => {
                             const trabaja = verificarHorarioMedico(medico, selectedDate, hora);
-                            
                             if (!trabaja) {
                                 return (
                                     <div key={hora} className="flex justify-between items-center text-xs p-1 opacity-40">
@@ -242,13 +276,25 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
                                     <span className="text-slate-600 font-mono w-10 font-bold">{hora}</span>
                                     
                                     {ocupacion ? (
-                                        <div className={`flex-1 px-2 py-1 rounded text-xs border truncate ml-1 cursor-not-allowed ${
-                                            ocupacion.tipo === 'local' 
-                                            ? "bg-red-100 text-red-800 border-red-200" 
-                                            : "bg-gray-200 text-gray-600 border-gray-300 italic"
-                                        }`} title={ocupacion.data.paciente}>
-                                            {ocupacion.tipo === 'local' ? `⛔ ${ocupacion.data.paciente}` : `📅 Google`}
-                                        </div>
+                                                <button 
+                                                        onClick={() => ocupacion.tipo === 'local' && handleVerDetalle(ocupacion.data as Cita)}
+                                                        className={`flex-1 px-2 py-1 rounded text-xs border truncate ml-1 flex items-center justify-between text-left transition-all hover:opacity-80 ${
+                                                            ocupacion.tipo === 'local' 
+                                                            ? "bg-blue-50 text-blue-800 border-blue-200 cursor-pointer shadow-sm" 
+                                                            : "bg-gray-200 text-gray-600 border-gray-300 italic cursor-not-allowed"
+                                                        }`} 
+                                                        title={ocupacion.tipo === 'local' ? "Ver detalles / Gestionar" : "Evento de Google Calendar"}
+                                                    >
+                                                        <span className="truncate flex-1 font-bold text-[11px]">
+                                                            {ocupacion.tipo === 'local' ? ocupacion.data.paciente : `📅 Google`}
+                                                        </span>
+                                                        
+                                                        <div className="flex gap-1">
+                                                            {/* Iconos de estado (Solo visuales, la acción está en el modal) */}
+                                                            {ocupacion.mensajeEnviado && <span>📩</span>}
+                                                            {ocupacion.confirmado && <span>✅</span>}
+                                                        </div>
+                                                    </button>
                                     ) : (
                                         <button 
                                             onClick={() => handleSlotClick(medico, hora)}
@@ -269,16 +315,15 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
             ))}
         </div>
 
-        <ModalReserva 
-            isOpen={isModalOpen} 
-            onClose={() => setIsModalOpen(false)} 
-            data={selectedSlot} 
+        <ModalReserva isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} data={selectedSlot} />
+        {/* 👇 INICIO MODIFICACIÓN: El nuevo modal */}
+        <CitaDetalleModal 
+            isOpen={isDetailOpen}
+            onClose={() => setIsDetailOpen(false)}
+            cita={citaDetalle}
         />
-        
-        <WaitingList onAsignar={(p: any) => {
-            setPacienteEnEspera({ nombre: p.paciente, id: p.id });
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}/>
+        {/* 👆 FIN MODIFICACIÓN */}
+        <WaitingList onAsignar={(p: any) => { setPacienteEnEspera({ nombre: p.paciente, id: p.id }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}/>
       </div>
     </div>
   );

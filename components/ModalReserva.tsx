@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { agendarCitaGoogle } from "../lib/actions";
+import { toast } from "sonner";
 
 interface ModalProps {
   isOpen: boolean;
@@ -93,61 +94,83 @@ export default function ModalReserva({ isOpen, onClose, data }: ModalProps) {
   if (!isOpen || !data) return null;
 
   const handleGuardar = async () => {
-    // 1. Determinar Datos Finales del Paciente
+    // 1. Validaciones iniciales
     let nombreFinal = "";
-    let idFinal = "EXTERNO"; // Default si es nuevo
+    let idFinal = "EXTERNO"; 
 
     if (modo === 'nuevo') {
       if (!nombreNuevo) return alert("Escribe el nombre del paciente");
       nombreFinal = nombreNuevo.toUpperCase();
     } else {
-      if (!pacienteSeleccionado) return alert("Debes seleccionar un paciente de la lista o cambiar a 'Nuevo'");
+      if (!pacienteSeleccionado) return alert("Debes seleccionar un paciente de la lista");
       nombreFinal = pacienteSeleccionado.nombreCompleto;
-      idFinal = pacienteSeleccionado.id; // ¡AQUÍ ESTÁ LA MAGIA! Vinculamos el ID real.
+      idFinal = pacienteSeleccionado.id; 
     }
     
     setLoading(true);
     try {
 
-      // --- NUEVO: VALIDACIÓN DE BLOQUEO ---
+      // 2. Validación de Bloqueo (Cita Doble)
       if (esDoble) {
           const siguienteBloque = sumar30Minutos(data.hora);
           const estaLibre = await verificarDisponibilidadSiguiente(data.doctor.id, data.fecha, siguienteBloque);
           
           if (!estaLibre) {
-              alert(`⛔ NO SE PUEDE AGENDAR.\n\nEstás intentando reservar 1 hora, pero el bloque de las ${siguienteBloque} ya está ocupado por otra cita.\n\nPor favor desmarca la opción de "Cita Doble" o elige otro horario.`);
+              alert(`⛔ NO SE PUEDE AGENDAR.\n\nEl bloque de las ${siguienteBloque} ya está ocupado.`);
               setLoading(false);
-              return; // Detiene todo el proceso
+              return; 
           }
       }
-      // ------------------------------------
 
+      // 3. ⚡️ PRIMERO: Sincronizar Google Calendar (Para obtener el ID) ⚡️
+      const duracion = esDoble ? 60 : 30;
+      const resultadoGoogle = await agendarCitaGoogle({
+          doctorId: data.doctor.id,
+          doctorNombre: data.doctor.nombre,
+          calendarId: data.doctor.calendarId,
+          pacienteNombre: nombreFinal,
+          motivo: motivo,
+          fecha: data.fecha,
+          hora: data.hora,
+          duracionMinutos: duracion
+      });
+
+      // Capturamos el ID (Si Google falla, será null pero la app no truena)
+      const googleId = resultadoGoogle.googleEventId || null;
+
+      // 4. Preparar Objeto Base
       const citaBase = {
         doctorId: data.doctor.id,
         doctorNombre: data.doctor.nombre,
         paciente: nombreFinal,
+        // Si tenemos ID real del paciente, lo guardamos para el "Check Verde" de la agenda
+        pacienteId: idFinal !== "EXTERNO" ? idFinal : null, 
         motivo: motivo,
         fecha: data.fecha,
         creadoEn: new Date()
       };
 
-      // 2. Guardar CITA 1
+      // 5. Guardar CITA 1 en Firebase
       await addDoc(collection(db, "citas"), {
         ...citaBase,
-        hora: data.hora
+        hora: data.hora,
+        googleEventId: googleId, // ✅ Coma agregada
+        confirmada: false        
       });
 
-      // 3. Guardar CITA 2 (Si aplica)
+      // 6. Guardar CITA 2 (Si es doble)
       if (esDoble) {
         const siguienteBloque = sumar30Minutos(data.hora);
         await addDoc(collection(db, "citas"), {
           ...citaBase,
           hora: siguienteBloque,
-          motivo: `${motivo} (Continuación)`
+          motivo: `${motivo} (Continuación)`,
+          googleEventId: googleId, // ✅ Coma agregada
+          confirmada: false
         });
       }
 
-      // 4. Crear OPERACIÓN
+      // 7. Crear OPERACIÓN Financiera
       await addDoc(collection(db, "operaciones"), {
         pacienteNombre: nombreFinal, 
         pacienteId: idFinal, 
@@ -159,35 +182,14 @@ export default function ModalReserva({ isOpen, onClose, data }: ModalProps) {
         origen: "Agenda"
       });
 
-      // 5. Sincronizar Google Calendar
-      const duracion = esDoble ? 60 : 30;
-      await agendarCitaGoogle({
-          doctorId: data.doctor.id,
-          doctorNombre: data.doctor.nombre,
-          // 👇 AQUÍ PASAMOS EL DATO DINÁMICO
-          calendarId: data.doctor.calendarId, 
-          // -------------------------------
-          pacienteNombre: nombreFinal,
-          motivo: motivo,
-          fecha: data.fecha,
-          hora: data.hora,
-          duracionMinutos: duracion
-      });
-
-      // 👇 BLOQUE NUEVO: ELIMINAR DE LISTA DE ESPERA 👇
+      // 8. Eliminar de Lista de Espera (Si aplica)
       if (data.waitingListId) {
         try {
           await deleteDoc(doc(db, "lista_espera", data.waitingListId));
-          console.log("Paciente removido de lista de espera");
-        } catch (e) {
-          console.error("No se pudo borrar de lista de espera", e);
-        }
+        } catch (e) { console.error("Error borrando espera", e); }
       }
-      // 👆 FIN DEL BLOQUE NUEVO 👆
 
-      alert("✅ Cita agendada correctamente.");
-      
-      // Limpieza
+      // Limpieza y Cierre (Esto estaba perfecto)
       setNombreNuevo("");
       setBusqueda("");
       setResultados([]);
@@ -195,10 +197,13 @@ export default function ModalReserva({ isOpen, onClose, data }: ModalProps) {
       setMotivo("");
       setEsDoble(false);
       onClose(); 
+      
+      // ✅ AQUÍ ESTÁ EL CAMBIO SOLICITADO
+      toast.success("✅ Cita agendada correctamente."); 
 
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al guardar la cita.");
+      toast.error("Error al guardar la cita.");
     } finally {
       setLoading(false);
     }
