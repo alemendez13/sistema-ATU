@@ -2,13 +2,13 @@
 
 import { calendar } from './calendarAPI';
 import { unstable_cache } from 'next/cache';
-import nodemailer from 'nodemailer'; // Necesario para el requerimiento de correos
+import nodemailer from 'nodemailer'; 
 import { v4 as uuidv4 } from 'uuid';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase'; 
 import { getMedicos } from "./googleSheets";
 
-// --- ACCIÓN 1: AGENDAR (Escritura) ---
+// --- ACCIÓN 1: AGENDAR (Ahora devuelve el ID de Google) ---
 export async function agendarCitaGoogle(cita: { 
     calendarId: string;
     doctorNombre: string;
@@ -17,12 +17,11 @@ export async function agendarCitaGoogle(cita: {
     duracionMinutos?: number;
     pacienteNombre: string;
     motivo: string;
-    doctorId?: string; // 👈 ESTO FALTABA y causaba el error en VentaForm/ModalReserva
+    doctorId?: string;
 }) {
     const calendarId = cita.calendarId;
     
     if (!calendarId) {
-        console.warn(`⚠️ El médico ${cita.doctorNombre} no tiene configurado un Calendar ID.`);
         return { success: true, warning: "Sin calendario vinculado" };
     }
 
@@ -38,12 +37,15 @@ export async function agendarCitaGoogle(cita: {
     };
 
     try {
-        await calendar.events.insert({
+        const respuesta = await calendar.events.insert({
             calendarId: calendarId,
             requestBody: evento,
         });
-        return { success: true };
-    } catch (error: any) { // 👈 Corregido: Agregamos ': any' para quitar el error de TypeScript
+
+        // 👇 ¡ESTO ES LO NUEVO! Devolvemos el ID que nos dio Google
+        return { success: true, googleEventId: respuesta.data.id };
+
+    } catch (error: any) { 
         console.error("Error creando evento en Google:", error);
         return { success: false, error: error.message };
     }
@@ -242,3 +244,34 @@ export async function enviarCorteMedicoAction(datos: {
         return { success: false, error: error.message };
     }
 }
+
+// --- INICIO DE MODIFICACIÓN: Reemplazo de función cancelarCitaGoogle ---
+
+// --- ACCIÓN 4: CANCELAR CITA (Lógica Real) ---
+export async function cancelarCitaGoogle(datos: {
+    calendarId: string;
+    eventId: string; // 👈 Ahora es obligatorio para poder borrar
+}) {
+    // Validación de seguridad
+    if (!datos.calendarId || !datos.eventId) {
+        return { success: false, error: "Faltan datos (ID de calendario o evento) para borrar en Google." };
+    }
+
+    try {
+        // Ejecutamos el borrado en la API de Google
+        await calendar.events.delete({
+            calendarId: datos.calendarId,
+            eventId: datos.eventId
+        });
+        
+        return { success: true, message: "Evento eliminado correctamente de Google Calendar." };
+
+    } catch (error: any) {
+        console.error("Error borrando en Google:", error);
+        
+        // Si el evento ya no existe en Google (404) o hay otro error, 
+        // devolvemos success: true con advertencia para permitir que se borre en Firebase de todos modos.
+        return { success: true, warning: "Se borró localmente, pero Google reportó error o ya no existía." };
+    }
+}
+// --- FIN DE MODIFICACIÓN ---
