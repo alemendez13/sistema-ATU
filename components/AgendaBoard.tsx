@@ -115,6 +115,8 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
   useEffect(() => {
     setLoading(true);
     
+    console.log("🔥 LECTURA EJECUTADA EN: [NOMBRE_DEL_ARCHIVO] - " + new Date().toLocaleTimeString());
+
     const qCitas = query(collection(db, "citas"), where("fecha", "==", selectedDate));
     const unsubCitas = onSnapshot(qCitas, (snapshot) => {
         setCitas(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Cita[]);

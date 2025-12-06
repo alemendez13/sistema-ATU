@@ -27,6 +27,9 @@ export default function InventoryManager({ productos }: InventoryProps) {
   }, []);
 
   const cargarInventario = async () => {
+
+      console.log("🔥 LECTURA EJECUTADA EN: [NOMBRE_DEL_ARCHIVO] - " + new Date().toLocaleTimeString());
+
     const q = query(collection(db, "inventarios"), orderBy("fechaCaducidad", "asc"));
     const snapshot = await getDocs(q);
     setLotes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
