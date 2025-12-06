@@ -49,12 +49,14 @@ export default function ReporteIngresosMedicos() {
       const start = new Date(`${fechaInicio}T00:00:00`);
       const end = new Date(`${fechaFin}T23:59:59`);
 
+      // 🟢 CONSULTA OPTIMIZADA (Arpón)
       const q = query(
         collection(db, "operaciones"),
-        where("estatus", "==", "Pagado"),
-        where("fechaPago", ">=", start),
-        where("fechaPago", "<=", end),
-        orderBy("fechaPago", "desc")
+        where("estatus", "==", "Pagado"),       // Solo pagados
+        where("doctorId", "==", medicoId),      // 👈 ¡ESTA ES LA LÍNEA MÁGICA! (Filtra por médico)
+        where("fechaPago", ">=", start),        // Desde fecha X
+        where("fechaPago", "<=", end),          // Hasta fecha Y
+        orderBy("fechaPago", "desc")            // Ordenar por fecha
       );
 
       const snapshot = await getDocs(q);
