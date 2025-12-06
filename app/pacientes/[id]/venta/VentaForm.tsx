@@ -55,14 +55,30 @@ export default function VentaForm({ pacienteId, servicios, medicos }: Props) {
     setLoading(true);
 
     try {
+      // 👉 1. Obtenemos DATOS COMPLETOS del Paciente (incluyendo RFC)
       const pDoc = await getDoc(doc(db, "pacientes", pacienteId));
-      const pNombre = pDoc.exists() ? pDoc.data().nombreCompleto : "Desconocido";
+      let pNombre = "Desconocido";
+      let necesitaFactura = false; // Por defecto no
+
+      if (pDoc.exists()) {
+          const dataPac = pDoc.data();
+          pNombre = dataPac.nombreCompleto;
+          
+          // 👉 Verificamos si tiene RFC válido para marcar la venta
+          if (dataPac.datosFiscales?.rfc && dataPac.datosFiscales.rfc.length > 10) {
+              necesitaFactura = true;
+          }
+      }
+
       const medicoElegido = medicos.find(m => m.id === medicoId);
 
-      // 1. Crear OPERACIÓN (Deuda)
+      // 2. Crear OPERACIÓN (Deuda)
       await addDoc(collection(db, "operaciones"), {
         pacienteId,
         pacienteNombre: pNombre,
+        // 👉 GUARDAMOS EL SELLO AQUÍ (Ahorra miles de consultas futuras)
+        requiereFactura: necesitaFactura, 
+        
         servicioSku: servicioSeleccionado.sku,
         servicioNombre: servicioSeleccionado.nombre,
         monto: servicioSeleccionado.precio,
@@ -77,21 +93,21 @@ export default function VentaForm({ pacienteId, servicios, medicos }: Props) {
       });
 
       // Si NO es servicio (es decir, es producto tangible), descontamos inventario
-if (!esServicio) {
-    try {
-        await descontarStockPEPS(
-            servicioSeleccionado.sku, 
-            servicioSeleccionado.nombre, 
-            1 // O la cantidad que se venda
-        );
-        toast.success("Inventario actualizado");
-    } catch (stockError) {
-        console.error(stockError);
-        toast.warning("Venta registrada pero hubo error al descontar stock.");
-    }
-}
+      if (!esServicio) {
+        try {
+            await descontarStockPEPS(
+                servicioSeleccionado.sku, 
+                servicioSeleccionado.nombre, 
+                1 // O la cantidad que se venda
+            );
+            toast.success("Inventario actualizado");
+        } catch (stockError) {
+            console.error(stockError);
+            toast.warning("Venta registrada pero hubo error al descontar stock.");
+        }
+      }
 
-      // 2. Si es servicio, AGENDAR EN GOOGLE Y FIREBASE (Citas)
+      // 3. Si es servicio, AGENDAR EN GOOGLE Y FIREBASE (Citas)
       if (esServicio && medicoElegido) {
         // a. Guardar en colección 'citas' (Agenda Interna)
         await addDoc(collection(db, "citas"), {
