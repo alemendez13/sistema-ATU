@@ -33,7 +33,7 @@ export default function ReporteIngresosMedicos() {
     });
   }, []);
 
-  // 2. Generar Reporte (Versión Corregida)
+  // 2. Generar Reporte (Versión "Experiencia 5 Estrellas" ⭐)
   const generarCorte = async () => {
     if (!medicoId) return toast.warning("Selecciona un médico");
     
@@ -49,66 +49,69 @@ export default function ReporteIngresosMedicos() {
       const start = new Date(`${fechaInicio}T00:00:00`);
       const end = new Date(`${fechaFin}T23:59:59`);
 
-      // 🟢 CONSULTA OPTIMIZADA (Arpón)
+      console.log("🔥 LECTURA EJECUTADA EN: [NOMBRE_DEL_ARCHIVO] - " + new Date().toLocaleTimeString());
+
+      // 🟢 1. CONSULTA "ARPÓN" (Ya optimizada con índice)
       const q = query(
         collection(db, "operaciones"),
-        where("estatus", "==", "Pagado"),       // Solo pagados
-        where("doctorId", "==", medicoId),      // 👈 ¡ESTA ES LA LÍNEA MÁGICA! (Filtra por médico)
-        where("fechaPago", ">=", start),        // Desde fecha X
-        where("fechaPago", "<=", end),          // Hasta fecha Y
-        orderBy("fechaPago", "desc")            // Ordenar por fecha
+        where("estatus", "==", "Pagado"),
+        where("doctorId", "==", medicoId), // Filtro directo en servidor
+        where("fechaPago", ">=", start),
+        where("fechaPago", "<=", end),
+        orderBy("fechaPago", "desc")
       );
 
       const snapshot = await getDocs(q);
       let totalCobrado = 0;
 
+      // 🧠 MEMORIA TEMPORAL (Caché de Pacientes)
+      // Esto evita buscar al mismo paciente múltiples veces
+      const cachePacientes: Record<string, any> = {};
+
       // Procesamiento
       const promesas = snapshot.docs.map(async (docOp) => {
         const data = docOp.data();
         
-        // 👇👇 LÓGICA DE FILTRADO ROBUSTA 👇👇
-        // 1. Coincidencia exacta por ID (Lo ideal)
-        const coincideID = data.doctorId === medicoSelected.id;
-        // 2. Coincidencia por Nombre Exacto (Respaldo)
-        const coincideNombre = data.doctorNombre === medicoSelected.nombre;
-        // 3. Coincidencia "Fuzzy" en el nombre del servicio (Legacy)
-        const coincideServicio = data.servicioNombre && data.servicioNombre.includes(medicoSelected.nombre);
-
-        // Si CUALQUIERA es verdadera, la venta es de este médico
-        if (coincideID || coincideNombre || coincideServicio) {
+        // Nota: Como ya filtramos por doctorId en la query, 
+        // ya no necesitamos los "if (coincideID...)" aquí. Todos son de este médico.
             
-            // --- LÓGICA DE FACTURA ---
-            let pideFactura = "No";
-            if (data.pacienteId && data.pacienteId !== "EXTERNO") {
-                try {
+        // --- LÓGICA DE FACTURA OPTIMIZADA ---
+        let pideFactura = "No";
+        
+        if (data.pacienteId && data.pacienteId !== "EXTERNO") {
+            try {
+                // VERIFICAMOS SI YA LO BUSCAMOS ANTES (Caché)
+                if (!cachePacientes[data.pacienteId]) {
+                    // Si no está en memoria, lo buscamos y guardamos la promesa
                     const pacRef = doc(db, "pacientes", data.pacienteId);
-                    const pacSnap = await getDoc(pacRef);
-                    if (pacSnap.exists()) {
-                        const pData = pacSnap.data();
-                        if (pData.datosFiscales?.rfc && pData.datosFiscales.rfc.length > 10) {
-                            pideFactura = "Sí";
-                        }
-                    }
-                } catch (e) { console.warn("Error verificando factura", e); }
-            }
+                    cachePacientes[data.pacienteId] = getDoc(pacRef).then(snap => snap.exists() ? snap.data() : null);
+                }
 
-            const monto = Number(data.monto) || 0;
-            totalCobrado += monto;
-            
-            return {
-                id: docOp.id,
-                fecha: data.fechaPago?.seconds ? new Date(data.fechaPago.seconds * 1000).toLocaleDateString('es-MX') : "S/F",
-                paciente: data.pacienteNombre,
-                concepto: data.servicioNombre,
-                formaPago: data.metodoPago || "No especificado",
-                factura: pideFactura,
-                monto: monto
-            };
+                // Usamos el dato de la memoria (Instantáneo si ya se cargó)
+                const pData = await cachePacientes[data.pacienteId];
+                
+                if (pData?.datosFiscales?.rfc && pData.datosFiscales.rfc.length > 10) {
+                    pideFactura = "Sí";
+                }
+            } catch (e) { console.warn("Error verificando factura", e); }
         }
-        return null; 
+
+        const monto = Number(data.monto) || 0;
+        totalCobrado += monto;
+        
+        return {
+            id: docOp.id,
+            fecha: data.fechaPago?.seconds ? new Date(data.fechaPago.seconds * 1000).toLocaleDateString('es-MX') : "S/F",
+            paciente: data.pacienteNombre,
+            concepto: data.servicioNombre,
+            formaPago: data.metodoPago || "No especificado",
+            factura: pideFactura,
+            monto: monto
+        };
       });
 
       const resultados = await Promise.all(promesas);
+      // Filtramos nulos por si acaso (aunque con la nueva query no debería haber)
       const filtrados = resultados.filter(r => r !== null);
 
       const comision = totalCobrado * porcentaje;
@@ -121,7 +124,7 @@ export default function ReporteIngresosMedicos() {
         aPagarMedico: aPagar
       });
 
-      if (filtrados.length === 0) toast.info("No se encontraron movimientos para este médico.");
+      if (filtrados.length === 0) toast.info("No se encontraron movimientos para este médico en el periodo.");
 
     } catch (error) {
       console.error(error);

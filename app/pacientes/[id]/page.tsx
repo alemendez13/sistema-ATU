@@ -18,12 +18,28 @@ function calcularEdad(fechaNacimiento?: string) {
   return edad >= 0 ? edad : "?";
 }
 
+// --- NUEVA FUNCIÓN HELPER: LIMPIAR DATOS PARA EL CLIENTE ---
+function serializarPaciente(data: any): Paciente {
+  return {
+    ...data,
+    // Convertimos Timestamps de Firebase a String ISO, o null si no existen
+    fechaNacimiento: typeof data.fechaNacimiento === 'string' ? data.fechaNacimiento : data.fechaNacimiento?.toDate?.().toISOString() || null,
+    fechaRegistro: data.fechaRegistro?.toDate?.().toISOString() || null,
+    // Aseguramos que datosFiscales exista aunque sea vacío
+    datosFiscales: data.datosFiscales || null
+  };
+}
+
 // Función de Servidor para traer datos
 async function getPacienteData(id: string) {
   const docRef = doc(db, "pacientes", id);
   const docSnap = await getDoc(docRef);
   
   if (!docSnap.exists()) return null;
+
+  const rawData = { id: docSnap.id, ...docSnap.data() };
+  // APLICAMOS LA LIMPIEZA AQUÍ 👇
+  const datosLimpios = serializarPaciente(rawData);
 
   const qPagos = query(
     collection(db, "operaciones"),
@@ -37,12 +53,14 @@ async function getPacienteData(id: string) {
     return {
         id: d.id,
         ...data,
+        // Limpiamos la fecha de la operación también
+        fecha: data.fecha?.toDate ? { seconds: data.fecha.seconds } : null, // Mantenemos formato compatible con tu tabla
         monto: data.monto,
     };
   }) as Operacion[];
 
   return { 
-    datos: { id: docSnap.id, ...docSnap.data() } as Paciente,
+    datos: datosLimpios,
     historial 
   };
 }
@@ -94,7 +112,7 @@ export default async function ExpedientePage({ params }: { params: { id: string 
                         </button>
                     </Link>
                     
-                    {/* Pasa el objeto 'datos' directamente, ya que ambos son del tipo 'Paciente' */}
+                    {/* Pasa el objeto 'datos' directamente, ya limpio */}
                       <PatientActions 
                         pacienteId={params.id} 
                         datosActuales={datos} 
@@ -193,7 +211,6 @@ export default async function ExpedientePage({ params }: { params: { id: string 
                                             <div className="flex justify-center">
                                                 <DownloadReciboButton 
                                                     datos={{
-                                                        // 2. CORRECCIÓN ID: Agregamos el paréntesis y el fallback "000"
                                                         folio: (pago.id || "000").slice(0,8).toUpperCase(),
                                                         fecha: pago.fecha?.seconds ? new Date(pago.fecha.seconds * 1000).toLocaleDateString() : new Date().toLocaleDateString(),
                                                         paciente: datos.nombreCompleto,
