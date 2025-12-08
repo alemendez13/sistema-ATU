@@ -1,13 +1,13 @@
 /* components/AgendaBoard.tsx */
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"; // updateDoc agregado
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"; 
 import { db } from "../lib/firebase";
 import ModalReserva from "./ModalReserva";
-import CitaDetalleModal from "./CitaDetalleModal"; // 👈 IMPORTAMOS EL NUEVO MODAL
+import CitaDetalleModal from "./CitaDetalleModal"; 
 import WaitingList from "./agenda/WaitingList";
 import { getBloqueosAction } from "../lib/actions"; 
-import { toast } from "sonner"; // Para avisar cambios
+import { toast } from "sonner"; 
 
 interface Medico {
   id: string;
@@ -25,14 +25,16 @@ interface Cita {
   hora: string;
   paciente: string;
   pacienteId?: string;
-  confirmada?: boolean; // 👈 NUEVO CAMPO
+  confirmada?: boolean; 
 }
 
+// 👇 MODIFICACIÓN: Agregamos servicios a las props
 interface AgendaBoardProps {
   medicos: Medico[];
+  servicios: any[]; 
 }
 
-// --- PARSER DE HORARIOS (Sin cambios) ---
+// ... (Las funciones auxiliares parsearReglas y generarBloques se quedan IGUAL) ...
 const parsearReglas = (reglaStr: string) => {
     const mapa: Record<number, string> = {};
     if (!reglaStr) return mapa;
@@ -65,7 +67,8 @@ const generarBloques = (inicio: string, fin: string) => {
     return bloques;
 };
 
-export default function AgendaBoard({ medicos }: AgendaBoardProps) {
+// 👇 RECIBIMOS SERVICIOS AQUÍ
+export default function AgendaBoard({ medicos, servicios }: AgendaBoardProps) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [citas, setCitas] = useState<Cita[]>([]);
   const [bloqueos, setBloqueos] = useState<string[]>([]); 
@@ -75,10 +78,10 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [pacienteEnEspera, setPacienteEnEspera] = useState<{nombre: string, id: string} | null>(null);
-  // 👇 INICIO MODIFICACIÓN
+  
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [citaDetalle, setCitaDetalle] = useState<any>(null);
-  // 👆 FIN MODIFICACIÓN
+  
 
   const medicosHash = medicos.map(m => m.id).join(",");
 
@@ -114,8 +117,7 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
 
   useEffect(() => {
     setLoading(true);
-    
-    console.log("🔥 LECTURA EJECUTADA EN: [NOMBRE_DEL_ARCHIVO] - " + new Date().toLocaleTimeString());
+    // console.log("🔥 LECTURA EJECUTADA..."); // (Ya limpiamos esto)
 
     const qCitas = query(collection(db, "citas"), where("fecha", "==", selectedDate));
     const unsubCitas = onSnapshot(qCitas, (snapshot) => {
@@ -160,7 +162,6 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
     setPacienteEnEspera(null);
   };
 
-  // 👇 NUEVA FUNCIÓN: Alternar confirmación
   const toggleConfirmacion = async (cita: Cita) => {
       try {
           const nuevoEstado = !cita.confirmada;
@@ -178,15 +179,12 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
     const citaLocal = citas.find(c => c.doctorId === medicoId && c.hora === hora);
     
     if (citaLocal) {
-        // Lógica de checks:
-        // 1. ¿Ya se le envió mensaje hoy?
         const mensajeEnviado = mensajesHoy.find(m => m.pacienteNombre === citaLocal.paciente);
-        
         return { 
             tipo: 'local', 
             data: citaLocal, 
             mensajeEnviado: !!mensajeEnviado,
-            confirmado: citaLocal.confirmada // Leemos de la BD
+            confirmado: citaLocal.confirmada 
         };
     }
 
@@ -197,12 +195,10 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
   };
 
   const handleVerDetalle = (cita: Cita) => {
-      // Buscamos al médico dueño de la cita
       const medicoDueño = medicos.find(m => m.id === cita.doctorId);
-      
       setCitaDetalle({
           ...cita,
-          doctorCalendarId: medicoDueño?.calendarId // Inyectamos el ID necesario
+          doctorCalendarId: medicoDueño?.calendarId 
       });
       setIsDetailOpen(true);
   };
@@ -292,7 +288,6 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
                                                         </span>
                                                         
                                                         <div className="flex gap-1">
-                                                            {/* Iconos de estado (Solo visuales, la acción está en el modal) */}
                                                             {ocupacion.mensajeEnviado && <span>📩</span>}
                                                             {ocupacion.confirmado && <span>✅</span>}
                                                         </div>
@@ -317,14 +312,20 @@ export default function AgendaBoard({ medicos }: AgendaBoardProps) {
             ))}
         </div>
 
-        <ModalReserva isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} data={selectedSlot} />
-        {/* 👇 INICIO MODIFICACIÓN: El nuevo modal */}
+        {/* 👇 MODIFICACIÓN CRÍTICA: Pasamos 'bloqueos' al modal para que sepa qué está ocupado en Google */}
+        <ModalReserva 
+            isOpen={isModalOpen} 
+            onClose={() => setIsModalOpen(false)} 
+            data={selectedSlot}
+            catalogoServicios={servicios} 
+            bloqueos={bloqueos} // 👈 ¡ESTA ES LA LÍNEA NUEVA!
+        />
+        
         <CitaDetalleModal 
             isOpen={isDetailOpen}
             onClose={() => setIsDetailOpen(false)}
             cita={citaDetalle}
         />
-        {/* 👆 FIN MODIFICACIÓN */}
         <WaitingList onAsignar={(p: any) => { setPacienteEnEspera({ nombre: p.paciente, id: p.id }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}/>
       </div>
     </div>

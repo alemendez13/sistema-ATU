@@ -12,89 +12,124 @@ interface ModalProps {
     doctor: any;
     hora: string;
     fecha: string;
-    prefilledName?: string; // <--- AGREGAR ESTO
-    waitingListId?: string; // <--- AGREGAR ESTO
+    prefilledName?: string;
+    waitingListId?: string;
   } | null;
+  catalogoServicios: any[];
+  bloqueos: string[]; // 👈 NUEVO: Recibimos la lista de bloqueos de Google
 }
 
-const sumar30Minutos = (hora: string) => {
+const sumarMinutos = (hora: string, minutos: number) => {
   const [h, m] = hora.split(':').map(Number);
-  let newM = m + 30;
-  let newH = h;
-  if (newM >= 60) {
-    newM -= 60;
-    newH += 1;
-  }
+  const totalMinutos = h * 60 + m + minutos;
+  const newH = Math.floor(totalMinutos / 60);
+  const newM = totalMinutos % 60;
   return `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
-}
+};
 
-export default function ModalReserva({ isOpen, onClose, data }: ModalProps) {
+export default function ModalReserva({ isOpen, onClose, data, catalogoServicios, bloqueos }: ModalProps) {
   // Estados Generales
-  const [motivo, setMotivo] = useState("");
-  const [esDoble, setEsDoble] = useState(false);
+  const [servicioSku, setServicioSku] = useState(""); 
   const [loading, setLoading] = useState(false);
-
-  // --- NUEVO: Cargar nombre si viene de Lista de Espera ---
-  useEffect(() => {
-    if (isOpen && data?.prefilledName) {        // Opcional: Si quieres forzar modo "Nuevo" o "Buscar" según tu lógica
-        setModo('nuevo'); 
-        setNombreNuevo(data.prefilledName);
-    }
-  }, [isOpen, data]);
-
-  // Estados para Selección de Paciente
-  const [modo, setModo] = useState<'nuevo' | 'buscar'>('buscar'); // Por defecto buscar
-  const [nombreNuevo, setNombreNuevo] = useState("");
   
-  // Estados de Búsqueda
+  const [precioFinal, setPrecioFinal] = useState<number | "">(""); 
+  const [notaInterna, setNotaInterna] = useState(""); 
+  const [historialCitas, setHistorialCitas] = useState<number>(0); 
+
+  // Estados Paciente
+  const [modo, setModo] = useState<'nuevo' | 'buscar'>('buscar');
+  const [nombreNuevo, setNombreNuevo] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [resultados, setResultados] = useState<any[]>([]);
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<any>(null);
 
+  // Reset al abrir
+  useEffect(() => {
+    if (isOpen) {
+        setServicioSku("");
+        setPrecioFinal("");
+        setNotaInterna("");
+        setHistorialCitas(0);
+        if (data?.prefilledName) {
+            setModo('nuevo'); 
+            setNombreNuevo(data.prefilledName);
+        }
+    }
+  }, [isOpen, data]);
+
+  // Lógica de Precios e Historial
+  useEffect(() => {
+    const calcularDatosInteligentes = async () => {
+        if (!servicioSku) return;
+        const servicio = catalogoServicios.find(s => s.sku === servicioSku);
+        if (servicio) setPrecioFinal(servicio.precio || 0);
+
+        if (pacienteSeleccionado && pacienteSeleccionado.id && servicioSku) {
+            try {
+                const qHistorial = query(collection(db, "operaciones"), where("pacienteId", "==", pacienteSeleccionado.id), where("servicioSku", "==", servicioSku));
+                const snap = await getDocs(qHistorial);
+                setHistorialCitas(snap.size);
+            } catch (e) { console.error("Error historial", e); }
+        } else {
+            setHistorialCitas(0);
+        }
+    };
+    calcularDatosInteligentes();
+  }, [servicioSku, pacienteSeleccionado, catalogoServicios]);
 
 
-  // --- NUEVO: Función para verificar si el siguiente bloque está libre ---
-  const verificarDisponibilidadSiguiente = async (doctorId: string, fecha: string, horaSiguiente: string) => {
-    // Consultamos si YA existe una cita para ese doctor, en esa fecha y a la hora siguiente
-    const q = query(
-        collection(db, "citas"),
-        where("doctorId", "==", doctorId),
-        where("fecha", "==", fecha),
-        where("hora", "==", horaSiguiente)
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.empty; // Retorna TRUE si está vacío (libre), FALSE si ya hay algo
+  // --- 🛡️ FUNCIÓN BLINDADA V2: Firebase + Google ---
+  const verificarDisponibilidadMultiples = async (doctorId: string, fecha: string, horaInicio: string, cantidadBloques30min: number) => {
+    let horaCheck = horaInicio;
+    
+    for (let i = 0; i < cantidadBloques30min; i++) {
+        
+        // 1. CHEQUEO RÁPIDO: ¿Está en la lista de bloqueos de Google?
+        // El formato en 'bloqueos' es "ID_MEDICO|HH:MM"
+        const llaveBloqueo = `${doctorId}|${horaCheck}`;
+        if (bloqueos.includes(llaveBloqueo)) {
+            console.warn(`⛔ Choque con Google Calendar a las ${horaCheck}`);
+            return false; // Ocupado por Google
+        }
+
+        // 2. CHEQUEO BASE DE DATOS: ¿Está en Firebase?
+        const q = query(
+            collection(db, "citas"),
+            where("doctorId", "==", doctorId),
+            where("fecha", "==", fecha),
+            where("hora", "==", horaCheck)
+        );
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+            console.warn(`⛔ Choque con Cita Interna a las ${horaCheck}`);
+            return false; // Ocupado por Firebase
+        }
+
+        horaCheck = sumarMinutos(horaCheck, 30); 
+    }
+    return true; 
   };
 
-
-  // Efecto para buscar mientras escribes (tipo Google)
+  // Buscador
   useEffect(() => {
     const buscarPacientes = async () => {
-      if (busqueda.length < 3) {
-        setResultados([]);
-        return;
-      }
-
-      // Buscamos pacientes que empiecen con el texto (convertido a mayúsculas)
-      const q = query(
-        collection(db, "pacientes"),
-        where("nombreCompleto", ">=", busqueda.toUpperCase()),
-        where("nombreCompleto", "<=", busqueda.toUpperCase() + '\uf8ff'),
-        limit(5)
-      );
-
+      if (busqueda.length < 3) { setResultados([]); return; }
+      const q = query(collection(db, "pacientes"), where("nombreCompleto", ">=", busqueda.toUpperCase()), where("nombreCompleto", "<=", busqueda.toUpperCase() + '\uf8ff'), limit(5));
       const snap = await getDocs(q);
       setResultados(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     };
-
-    const timer = setTimeout(buscarPacientes, 300); // Pequeña pausa para no saturar
+    const timer = setTimeout(buscarPacientes, 300);
     return () => clearTimeout(timer);
   }, [busqueda]);
 
   if (!isOpen || !data) return null;
 
+  const serviciosOrdenados = [...(catalogoServicios || [])].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const servicioDetalle = serviciosOrdenados.find(s => s.sku === servicioSku);
+
   const handleGuardar = async () => {
-    // 1. Validaciones iniciales
+    // Validaciones
     let nombreFinal = "";
     let idFinal = "EXTERNO"; 
 
@@ -106,104 +141,78 @@ export default function ModalReserva({ isOpen, onClose, data }: ModalProps) {
       nombreFinal = pacienteSeleccionado.nombreCompleto;
       idFinal = pacienteSeleccionado.id; 
     }
+
+    if (!servicioSku) return alert("⚠️ Selecciona un servicio.");
+    if (precioFinal === "" || Number(precioFinal) < 0) return alert("⚠️ Define un precio válido.");
     
     setLoading(true);
     try {
+      const duracionMinutos = parseInt(servicioDetalle?.duracion || "30");
+      const bloquesNecesarios = Math.ceil(duracionMinutos / 30); 
 
-      // 2. Validación de Bloqueo (Cita Doble)
-      if (esDoble) {
-          const siguienteBloque = sumar30Minutos(data.hora);
-          const estaLibre = await verificarDisponibilidadSiguiente(data.doctor.id, data.fecha, siguienteBloque);
-          
-          if (!estaLibre) {
-              alert(`⛔ NO SE PUEDE AGENDAR.\n\nEl bloque de las ${siguienteBloque} ya está ocupado.`);
-              setLoading(false);
-              return; 
-          }
+      // 🛡️ VERIFICACIÓN BLINDADA (Google + Firebase)
+      const hayEspacio = await verificarDisponibilidadMultiples(data.doctor.id, data.fecha, data.hora, bloquesNecesarios);
+      
+      if (!hayEspacio) {
+          alert(`⛔ AGENDA OCUPADA.\n\nUno de los espacios necesarios (${duracionMinutos} min) ya está ocupado (por otra cita o Google Calendar).`);
+          setLoading(false);
+          return;
       }
 
-      // 3. ⚡️ PRIMERO: Sincronizar Google Calendar (Para obtener el ID) ⚡️
-      const duracion = esDoble ? 60 : 30;
+      // ... (Resto del guardado igual) ...
+      const tituloCita = notaInterna ? `${servicioDetalle?.nombre} (${notaInterna})` : servicioDetalle?.nombre;
+
       const resultadoGoogle = await agendarCitaGoogle({
           doctorId: data.doctor.id,
           doctorNombre: data.doctor.nombre,
           calendarId: data.doctor.calendarId,
           pacienteNombre: nombreFinal,
-          motivo: motivo,
+          motivo: tituloCita, 
           fecha: data.fecha,
           hora: data.hora,
-          duracionMinutos: duracion
+          duracionMinutos: duracionMinutos
       });
-
-      // Capturamos el ID (Si Google falla, será null pero la app no truena)
       const googleId = resultadoGoogle.googleEventId || null;
 
-      // 4. Preparar Objeto Base
-      const citaBase = {
-        doctorId: data.doctor.id,
-        doctorNombre: data.doctor.nombre,
-        paciente: nombreFinal,
-        // Si tenemos ID real del paciente, lo guardamos para el "Check Verde" de la agenda
-        pacienteId: idFinal !== "EXTERNO" ? idFinal : null, 
-        motivo: motivo,
-        fecha: data.fecha,
-        creadoEn: new Date()
-      };
-
-      // 5. Guardar CITA 1 en Firebase
-      await addDoc(collection(db, "citas"), {
-        ...citaBase,
-        hora: data.hora,
-        googleEventId: googleId, // ✅ Coma agregada
-        confirmada: false        
-      });
-
-      // 6. Guardar CITA 2 (Si es doble)
-      if (esDoble) {
-        const siguienteBloque = sumar30Minutos(data.hora);
-        await addDoc(collection(db, "citas"), {
-          ...citaBase,
-          hora: siguienteBloque,
-          motivo: `${motivo} (Continuación)`,
-          googleEventId: googleId, // ✅ Coma agregada
-          confirmada: false
-        });
+      let horaActual = data.hora;
+      for (let i = 0; i < bloquesNecesarios; i++) {
+          await addDoc(collection(db, "citas"), {
+            doctorId: data.doctor.id,
+            doctorNombre: data.doctor.nombre,
+            paciente: nombreFinal,
+            pacienteId: idFinal !== "EXTERNO" ? idFinal : null,
+            motivo: i === 0 ? tituloCita : "(Continuación)", 
+            fecha: data.fecha,
+            hora: horaActual,
+            creadoEn: new Date(),
+            googleEventId: googleId,
+            confirmada: false        
+          });
+          horaActual = sumarMinutos(horaActual, 30);
       }
 
-      // 7. Crear OPERACIÓN Financiera
       await addDoc(collection(db, "operaciones"), {
         pacienteNombre: nombreFinal, 
         pacienteId: idFinal, 
-        servicioSku: "CONSULTA",
-        servicioNombre: `Consulta con ${data.doctor.nombre}`,
-        monto: 0, 
+        servicioSku: servicioDetalle?.sku,
+        servicioNombre: tituloCita, 
+        monto: Number(precioFinal), 
         estatus: "Pendiente de Pago",
         fecha: serverTimestamp(),
-        origen: "Agenda"
+        origen: "Agenda",
+        doctorId: data.doctor.id,
+        doctorNombre: data.doctor.nombre
       });
 
-      // 8. Eliminar de Lista de Espera (Si aplica)
-      if (data.waitingListId) {
-        try {
-          await deleteDoc(doc(db, "lista_espera", data.waitingListId));
-        } catch (e) { console.error("Error borrando espera", e); }
-      }
+      if (data.waitingListId) { try { await deleteDoc(doc(db, "lista_espera", data.waitingListId)); } catch (e) {} }
 
-      // Limpieza y Cierre (Esto estaba perfecto)
-      setNombreNuevo("");
-      setBusqueda("");
-      setResultados([]);
-      setPacienteSeleccionado(null);
-      setMotivo("");
-      setEsDoble(false);
+      setNombreNuevo(""); setBusqueda(""); setResultados([]); setPacienteSeleccionado(null);
       onClose(); 
-      
-      // ✅ AQUÍ ESTÁ EL CAMBIO SOLICITADO
       toast.success("✅ Cita agendada correctamente."); 
 
     } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al guardar la cita.");
+      console.error(error);
+      toast.error("Error al guardar.");
     } finally {
       setLoading(false);
     }
@@ -211,116 +220,116 @@ export default function ModalReserva({ isOpen, onClose, data }: ModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold text-slate-800 mb-1">Confirmar Cita</h2>
+      <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <h2 className="text-xl font-bold text-slate-800 mb-1">Nueva Cita</h2>
         <p className="text-sm text-slate-500 mb-4">
-          {data.doctor.nombre} - {data.fecha} a las {data.hora} hrs.
+          {data.doctor.nombre} - {data.fecha} {data.hora}
         </p>
 
-        {/* --- SELECTOR DE MODO --- */}
+        {/* SELECTOR MODO */}
         <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
-          <button 
-            onClick={() => setModo('buscar')}
-            className={`flex-1 py-1 text-sm font-bold rounded-md transition-all ${modo === 'buscar' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
-          >
-            🔍 Buscar Paciente
-          </button>
-          <button 
-            onClick={() => setModo('nuevo')}
-            className={`flex-1 py-1 text-sm font-bold rounded-md transition-all ${modo === 'nuevo' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
-          >
-            ✨ Nuevo
-          </button>
+          <button onClick={() => setModo('buscar')} className={`flex-1 py-1 text-sm font-bold rounded-md transition-all ${modo === 'buscar' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>🔍 Buscar</button>
+          <button onClick={() => setModo('nuevo')} className={`flex-1 py-1 text-sm font-bold rounded-md transition-all ${modo === 'nuevo' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>✨ Nuevo</button>
         </div>
 
         <div className="space-y-4">
-          
-          {/* MODO BUSCAR */}
+          {/* BUSCADOR */}
           {modo === 'buscar' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Buscar en Directorio</label>
+            <div className="relative">
               <input 
                 type="text" 
-                className="w-full border rounded p-2 mt-1 uppercase"
-                placeholder="Escribe nombre..."
+                className="w-full border rounded p-2 uppercase"
+                placeholder="BUSCAR PACIENTE..."
                 value={busqueda}
-                onChange={(e) => {
-                  setBusqueda(e.target.value);
-                  setPacienteSeleccionado(null); // Reset al escribir
-                }}
+                onChange={(e) => { setBusqueda(e.target.value); setPacienteSeleccionado(null); }}
               />
-              
-              {/* Resultados de Búsqueda */}
               {resultados.length > 0 && !pacienteSeleccionado && (
                 <ul className="mt-1 border rounded bg-white shadow-lg max-h-40 overflow-y-auto absolute w-full max-w-xs z-10">
                   {resultados.map(p => (
-                    <li 
-                      key={p.id}
-                      className="p-2 hover:bg-blue-50 cursor-pointer text-sm border-b"
-                      onClick={() => {
-                        setPacienteSeleccionado(p);
-                        setBusqueda(p.nombreCompleto);
-                        setResultados([]);
-                      }}
-                    >
+                    <li key={p.id} className="p-2 hover:bg-blue-50 cursor-pointer text-sm border-b" onClick={() => { setPacienteSeleccionado(p); setBusqueda(p.nombreCompleto); setResultados([]); }}>
                       <span className="font-bold block">{p.nombreCompleto}</span>
-                      <span className="text-xs text-gray-500">Cel: {p.telefonoCelular}</span>
                     </li>
                   ))}
                 </ul>
               )}
-
-              {pacienteSeleccionado && (
-                <div className="mt-2 bg-green-50 text-green-800 p-2 rounded text-xs border border-green-200 flex justify-between items-center">
-                  <span>✅ Seleccionado: <strong>{pacienteSeleccionado.nombreCompleto}</strong></span>
-                  <button onClick={() => {setPacienteSeleccionado(null); setBusqueda("");}} className="text-red-500 font-bold">X</button>
-                </div>
-              )}
             </div>
           )}
 
-          {/* MODO NUEVO */}
           {modo === 'nuevo' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Nombre del Nuevo Paciente</label>
-              <input 
-                type="text" 
-                className="w-full border rounded p-2 mt-1 uppercase"
-                placeholder="Ej. JUAN PEREZ"
-                value={nombreNuevo}
-                onChange={(e) => setNombreNuevo(e.target.value)}
-              />
-              <p className="text-xs text-orange-500 mt-1">⚠️ Este paciente no tendrá historial vinculado hasta que lo registres formalmente.</p>
-            </div>
+            <input type="text" className="w-full border rounded p-2 uppercase" placeholder="NOMBRE COMPLETO" value={nombreNuevo} onChange={(e) => setNombreNuevo(e.target.value)} />
           )}
           
+          {/* SELECTOR SERVICIO */}
           <div>
-            <label className="block text-sm font-medium text-slate-700">Motivo (Opcional)</label>
-            <input 
-              type="text" 
-              className="w-full border rounded p-2 mt-1"
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-            />
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Cita / Servicio</label>
+            <select 
+                className="w-full border border-blue-300 bg-blue-50 rounded p-2 text-slate-700 font-medium"
+                value={servicioSku}
+                onChange={(e) => setServicioSku(e.target.value)}
+            >
+                <option value="">-- Selecciona --</option>
+                {serviciosOrdenados.map(s => (
+                    <option key={s.sku} value={s.sku}>
+                        {s.nombre} ({s.duracion} min)
+                    </option>
+                ))}
+            </select>
           </div>
 
-          <div className="flex items-center gap-2 bg-blue-50 p-3 rounded border border-blue-100">
-            <input 
-              type="checkbox" 
-              id="checkDoble"
-              className="w-5 h-5 text-blue-600 rounded"
-              checked={esDoble}
-              onChange={(e) => setEsDoble(e.target.checked)}
-            />
-            <label htmlFor="checkDoble" className="text-sm font-bold text-blue-800 cursor-pointer">
-              Reservar 1 Hora
-            </label>
-          </div>
+          {/* PANEL DE CONTROL DE PAQUETES Y COBRO */}
+          {servicioDetalle && (
+             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm space-y-3 animate-fade-in">
+                
+                {pacienteSeleccionado && (
+                    <div className="flex justify-between items-center text-xs text-blue-600 bg-blue-100 p-2 rounded">
+                        <span>📊 Historial de este servicio:</span>
+                        <span className="font-bold">{historialCitas} veces anteriores</span>
+                    </div>
+                )}
+
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Monto a Cobrar Hoy:</label>
+                    <div className="flex items-center gap-2">
+                        <span className="text-slate-400">$</span>
+                        <input 
+                            type="number" 
+                            className="w-full border rounded p-2 font-bold text-slate-800"
+                            value={precioFinal}
+                            onChange={e => setPrecioFinal(e.target.value === "" ? "" : Number(e.target.value))}
+                        />
+                    </div>
+                    <div className="flex gap-2 mt-1">
+                        <button onClick={() => setPrecioFinal(0)} className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200">
+                            🎁 Cortesía / Paquete ($0)
+                        </button>
+                        <button onClick={() => setPrecioFinal(servicioDetalle.precio)} className="text-[10px] bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300">
+                            🏷️ Precio Lista (${servicioDetalle.precio})
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Nota / Num. Sesión:</label>
+                    <input 
+                        type="text" 
+                        placeholder="Ej: Sesión 2 de 4" 
+                        className="w-full border rounded p-2 text-xs"
+                        value={notaInterna}
+                        onChange={e => setNotaInterna(e.target.value)}
+                    />
+                </div>
+
+                <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-slate-500 text-xs">
+                    <span>Duración: <strong>{servicioDetalle.duracion} min</strong></span>
+                    <span>Ocupa: <strong>{Math.ceil(parseInt(servicioDetalle.duracion)/30)} bloques</strong></span>
+                </div>
+             </div>
+          )}
 
           <div className="flex gap-3 mt-6">
             <button onClick={onClose} className="flex-1 px-4 py-2 border rounded hover:bg-slate-50">Cancelar</button>
-            <button onClick={handleGuardar} disabled={loading} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-              {loading ? "..." : "Confirmar"}
+            <button onClick={handleGuardar} disabled={loading || !servicioSku} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+              {loading ? "Agendando..." : "Confirmar Cita"}
             </button>
           </div>
         </div>
