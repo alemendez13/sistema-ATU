@@ -15,7 +15,7 @@ const ESTADO_CIVIL = ["Soltero", "Casado", "Divorciado", "Viudo", "Concubinato"]
 const RELIGIONES = ["Ninguna", "Catolicismo", "Cristianismo", "Testigo de Jehová", "Judaísmo", "Islam", "Budismo", "Hinduismo", "Otra"];
 const ESCOLARIDAD = ["Analfabeta", "Sabe leer y escribir", "Preescolar", "Primaria", "Secundaria", "Preparatoria", "Licenciatura", "Postgrado", "Otro"];
 const OCUPACIONES = ["Empleado", "Empresario", "Comerciante", "Profesional de la salud", "Oficinista", "Obrero", "Ama de casa", "Desempleado", "Estudiante", "Jubilado", "Otro"];
-const MEDIOS_MARKETING = ["Doctoralia", "Facebook", "Instagram", "Página Web", "WhatsApp", "Recomendación Familiar", "Recomendación Profesional Salud", "Otro"];
+const MEDIOS_MARKETING = ["Google", "Doctoralia", "Facebook", "Instagram", "Página Web", "WhatsApp", "Recomendación Familiar", "Recomendación Profesional Salud", "Otro"];
 const REGIMENES_FISCALES = [
   "601 - General de Ley Personas Morales",
   "603 - Personas Morales con Fines no Lucrativos",
@@ -287,7 +287,7 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
 
         {/* === SECCIÓN 3: MARKETING === */}
         <section className="bg-gray-50 p-6 rounded-lg">
-            <h2 className={sectionTitle}>📢 Marketing (Origen)</h2>
+            <h2 className={sectionTitle}>📢 ¿Cómo se enteró de nosotros?</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label className={labelStyle}>¿Cómo se enteró de SANSCE?</label>
