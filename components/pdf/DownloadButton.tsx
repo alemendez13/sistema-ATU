@@ -1,14 +1,10 @@
 "use client";
-import { usePDF } from "@react-pdf/renderer"; // Usamos el hook avanzado
-import CartaResponsivaPDF from "../documents/CartaResponsivaPDF";
-import { useEffect, useState } from "react";
+import { pdf } from "@react-pdf/renderer"; // 👈 CAMBIO CLAVE: Usamos 'pdf' en vez de 'usePDF'
+import CartaResponsivaPDF from "../documents/CartaResponsivaPDF"; // 👈 SE QUEDA: Es tu plantilla
+import { useState } from "react"; // 👈 SE QUEDA: Para el estado de loading
 
 export default function DownloadButton({ pacienteNombre, fecha }: { pacienteNombre: string, fecha: string }) {
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const [loading, setLoading] = useState(false); // Estado para saber si estamos generando
 
   const datosMock = {
     paciente: pacienteNombre,
@@ -18,29 +14,45 @@ export default function DownloadButton({ pacienteNombre, fecha }: { pacienteNomb
     folio: "R-001"
   };
 
-  // Generamos la instancia del PDF manualmente
-  const [instance, updateInstance] = usePDF({ document: <CartaResponsivaPDF {...datosMock} /> });
+  // 👇 ESTA ES LA MAGIA: Función que solo corre al hacer CLIC
+  const handleDownload = async () => {
+    setLoading(true);
+    try {
+      // 1. Generamos el PDF manualmente en memoria
+      const blob = await pdf(<CartaResponsivaPDF {...datosMock} />).toBlob();
+      
+      // 2. Creamos una URL temporal para ese blob
+      const url = URL.createObjectURL(blob);
+      
+      // 3. Forzamos la descarga creando un enlace invisible y haciéndole clic
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Carta_Responsiva_${pacienteNombre}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // 4. Limpiamos
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error al generar PDF:", error);
+      alert("Hubo un error generando el documento.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  if (!isClient) return <div className="text-gray-400 text-sm font-bold px-4 py-2">Cargando...</div>;
-
-  // 🚨 AQUÍ ESTÁ EL DETECTIVE DE ERRORES
-  if (instance.error) {
-    console.error("Error generando PDF:", instance.error); // Mándalo a la consola
-    return <div className="text-red-500 text-xs border border-red-200 p-2 rounded">Error en PDF: {instance.error.toString()}</div>;
-  }
-
-  if (instance.loading) {
-    return <div className="bg-gray-200 text-gray-500 px-4 py-2 rounded-lg text-sm font-bold cursor-wait">Generando documento...</div>;
-  }
-
-  // Si todo sale bien, mostramos el botón real con el link ya generado
   return (
-    <a 
-      href={instance.url || "#"} 
-      download={`Carta_Responsiva_${pacienteNombre}.pdf`}
-      className="bg-purple-600 text-white px-4 py-2 rounded-lg shadow hover:bg-purple-700 flex items-center gap-2 text-sm font-bold transition-all"
+    <button 
+      onClick={handleDownload} // Ejecuta la función al hacer clic
+      disabled={loading}
+      className={`px-4 py-2 rounded-lg shadow flex items-center gap-2 text-sm font-bold transition-all ${
+        loading 
+          ? "bg-gray-300 text-gray-500 cursor-wait" 
+          : "bg-purple-600 text-white hover:bg-purple-700"
+      }`}
     >
-      📄 Descargar Responsiva
-    </a>
+      {loading ? "Generando..." : "📄 Descargar Responsiva"}
+    </button>
   );
 }
