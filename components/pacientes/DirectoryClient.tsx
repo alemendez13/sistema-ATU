@@ -1,22 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, startAfter, where } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import Link from "next/link";
 import WhatsAppButton from "../ui/WhatsAppButton";
 import { MENSAJES } from "../../lib/whatsappTemplates";
+import { toast } from "sonner";
 
 interface Paciente {
   id: string;
   nombreCompleto: string;
   telefonoCelular: string;
-  celular?: string; // Soporte para ambos nombres de campo
+  celular?: string; // Soporte legacy
   email: string;
   edad: number;
   curp?: string;
   genero?: string;
-  fechaRegistro?: any;
+  fechaRegistro?: any; // ✅ CONSERVADO: Importante para referencia interna
 }
 
 interface MensajeConfig {
@@ -29,81 +30,153 @@ export default function DirectoryClient({ mensajesPredefinidos }: { mensajesPred
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
+  const [ultimoDoc, setUltimoDoc] = useState<any>(null);
+  const [hayMas, setHayMas] = useState(true);
+  const [buscando, setBuscando] = useState(false);
 
-  // Cargar pacientes en TIEMPO REAL (Lógica original conservada)
-  useEffect(() => {
-    const q = query(collection(db, "pacientes"), orderBy("fechaRegistro", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data() 
-      })) as Paciente[];
+  // 1. CARGA INICIAL (Solo 20 pacientes)
+  const cargarPacientesIniciales = async () => {
+    setLoading(true);
+    try {
+      const q = query(
+        collection(db, "pacientes"), 
+        orderBy("fechaRegistro", "desc"), 
+        limit(20) // Protección de lectura
+      );
+      
+      const snapshot = await getDocs(q);
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Paciente[];
+      
       setPacientes(docs);
+      setUltimoDoc(snapshot.docs[snapshot.docs.length - 1]);
+      setHayMas(snapshot.docs.length === 20); 
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error cargando directorio");
+    } finally {
       setLoading(false);
-    }, (error) => {
-      console.error("Error cargando pacientes:", error);
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    }
+  };
+
+  useEffect(() => {
+    cargarPacientesIniciales();
   }, []);
 
-  // Filtrado (Funcionalidad original + Búsqueda)
-  const pacientesFiltrados = pacientes.filter(p => 
-    p.nombreCompleto.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  // 2. PAGINACIÓN
+  const cargarMas = async () => {
+    if (!ultimoDoc) return;
+    
+    try {
+      const q = query(
+        collection(db, "pacientes"), 
+        orderBy("fechaRegistro", "desc"),
+        startAfter(ultimoDoc),
+        limit(20)
+      );
+
+      const snapshot = await getDocs(q);
+      const nuevos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Paciente[];
+
+      setPacientes(prev => [...prev, ...nuevos]);
+      setUltimoDoc(snapshot.docs[snapshot.docs.length - 1]);
+      
+      if (snapshot.docs.length < 20) setHayMas(false);
+
+    } catch (error) {
+      toast.error("Error cargando más pacientes");
+    }
+  };
+
+  // 3. BUSCADOR EN SERVIDOR (Reemplaza al filtro local)
+  const realizarBusqueda = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!busqueda.trim()) {
+        cargarPacientesIniciales();
+        setBuscando(false);
+        return;
+    }
+
+    setLoading(true);
+    setBuscando(true);
+    setHayMas(false);
+    
+    try {
+        const termino = busqueda.toUpperCase();
+        
+        const q = query(
+            collection(db, "pacientes"),
+            orderBy("nombreCompleto"), // Requiere índice simple (automático en Firebase)
+            where("nombreCompleto", ">=", termino),
+            where("nombreCompleto", "<=", termino + '\uf8ff'),
+            limit(20)
+        );
+
+        const snapshot = await getDocs(q);
+        const resultados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Paciente[];
+        setPacientes(resultados);
+
+        if (resultados.length === 0) toast.info("No se encontraron pacientes con ese nombre.");
+
+    } catch (error) {
+        console.error(error);
+        toast.error("Error en la búsqueda");
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  // Reset al borrar búsqueda
+  useEffect(() => {
+      if (busqueda === "" && buscando) {
+          cargarPacientesIniciales();
+          setBuscando(false);
+      }
+  }, [busqueda]);
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         
-        {/* Botón Volver (Original) */}
-        {/* ENCABEZADO UNIFICADO IZQUIERDA */}
-        <div className="flex flex-col items-start gap-4 mb-8">
-          <Link href="/" className="text-slate-500 hover:text-blue-600 text-sm flex items-center gap-1 font-medium">
-            <span>←</span> Volver al Panel Principal
-          </Link>
-
-          <div className="w-full flex justify-between items-end">
+        {/* HEADER */}
+        <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-6">
             <div>
+              <Link href="/" className="text-slate-400 hover:text-slate-600 text-sm mb-2 inline-block font-medium">← Volver al Panel Principal</Link>
               <h1 className="text-3xl font-bold text-slate-900">Directorio de Pacientes</h1>
-              <p className="text-slate-500">Gestión de expedientes y comunicación.</p>
+              <p className="text-slate-500 text-sm">Gestión de expedientes y comunicación.</p>
             </div>
-            {/* El botón de Nuevo Paciente se queda a la derecha o lo puedes mover abajo si prefieres */}
-            <Link href="/pacientes/registro" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold shadow-md">
-              + Nuevo Paciente
+            <Link href="/pacientes/registro" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all flex items-center gap-2">
+              <span>+</span> Nuevo Paciente
             </Link>
-          </div>
         </div>
 
-        {/* Barra de Búsqueda (Mejora Agregada) */}
-        <input 
-          type="text" 
-          placeholder="🔍 Buscar por nombre..." 
-          className="w-full p-3 border border-slate-300 rounded-lg mb-6 shadow-sm outline-none focus:ring-2 focus:ring-blue-500"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
+        {/* BARRA DE BÚSQUEDA */}
+        <form onSubmit={realizarBusqueda} className="mb-8 relative">
+            <input 
+              type="text" 
+              placeholder="🔍 Buscar por APELLIDOS o NOMBRE..." 
+              className="w-full p-4 border border-slate-300 rounded-xl shadow-sm outline-none focus:ring-2 focus:ring-blue-500 text-lg uppercase placeholder:normal-case"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+            <button type="submit" className="absolute right-3 top-3 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-1.5 rounded-lg font-bold text-sm transition">
+                Buscar
+            </button>
+        </form>
 
-        {/* Lógica de Renderizado */}
-        {loading ? (
-          <div className="text-center py-10">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-slate-500">Cargando directorio...</p>
+        {/* CONTENIDO PRINCIPAL */}
+        {loading && pacientes.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-slate-400">Consultando base de datos...</p>
           </div>
         ) : pacientes.length === 0 ? (
-          // Estado Vacío (Original RECUPERADO)
-          <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-slate-200">
-            <p className="text-4xl mb-4">📭</p>
-            <h3 className="text-xl font-bold text-slate-700">No hay pacientes registrados</h3>
-            <p className="text-slate-500 mb-6">Comienza registrando el primero.</p>
-            <Link href="/pacientes/registro" className="text-blue-600 font-bold hover:underline">
-              Ir al Registro &rarr;
-            </Link>
+          <div className="text-center py-16 bg-white rounded-xl border border-dashed border-slate-300">
+            <p className="text-2xl mb-2">🤷‍♂️</p>
+            <p className="text-slate-500 font-medium">No se encontraron resultados.</p>
           </div>
         ) : (
-          // Grid de Tarjetas
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {pacientesFiltrados.map((paciente) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+            {pacientes.map((paciente) => (
               <PacienteCard 
                 key={paciente.id} 
                 paciente={paciente} 
@@ -112,83 +185,79 @@ export default function DirectoryClient({ mensajesPredefinidos }: { mensajesPred
             ))}
           </div>
         )}
+
+        {/* PAGINACIÓN */}
+        {!buscando && hayMas && !loading && (
+            <div className="mt-8 text-center">
+                <button 
+                    onClick={cargarMas}
+                    className="bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 hover:text-slate-900 px-6 py-2 rounded-full font-bold shadow-sm transition-all text-sm"
+                >
+                    ⬇️ Cargar siguientes 20
+                </button>
+            </div>
+        )}
       </div>
     </div>
   );
 }
 
-// Sub-componente de Tarjeta (Lógica Visual Original + Select de WhatsApp)
 function PacienteCard({ paciente, opcionesMensajes }: { paciente: Paciente, opcionesMensajes: MensajeConfig[] }) {
   const [mensajeSeleccionado, setMensajeSeleccionado] = useState("");
-  
-  // Combinamos: Si hay selección usa esa, si no, usa Ubicación (Default)
   const mensajeFinal = mensajeSeleccionado || MENSAJES.UBICACION();
-
-  // Determinar color de avatar (Lógica Original)
-  const avatarClass = paciente.genero === 'Femenino' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600';
-
-  // Unificar campos de teléfono (Soporte legacy)
+  const avatarClass = paciente.genero === 'Femenino' ? 'bg-pink-50 text-pink-600' : 'bg-blue-50 text-blue-600';
   const telefono = paciente.telefonoCelular || paciente.celular || "";
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex flex-col justify-between">
+    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group">
       <div>
-        {/* Cabecera Tarjeta */}
-        <div className="flex justify-between items-start mb-4">
-          <div className={`h-10 w-10 rounded-full flex items-center justify-center text-lg font-bold ${avatarClass}`}>
+        <div className="flex justify-between items-start mb-3">
+          <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold ${avatarClass}`}>
             {paciente.nombreCompleto ? paciente.nombreCompleto.charAt(0) : '?'}
           </div>
-          <span className="text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-1 rounded">
-            {paciente.edad} años
-          </span>
+          {paciente.edad > 0 && (
+             <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full">
+                {paciente.edad} AÑOS
+             </span>
+          )}
         </div>
         
-        {/* Datos Principales */}
-        <h3 className="font-bold text-slate-800 text-lg mb-1 truncate" title={paciente.nombreCompleto}>
+        <h3 className="font-bold text-slate-800 text-sm mb-1 leading-tight group-hover:text-blue-700 transition-colors truncate" title={paciente.nombreCompleto}>
           {paciente.nombreCompleto}
         </h3>
-        <p className="text-sm text-slate-500 mb-1 flex items-center gap-1">
-          📞 {telefono || "Sin teléfono"}
+        <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
+          📱 {telefono || "S/N"}
         </p>
       </div>
 
-      {/* Zona Inferior (Acciones) */}
-      <div className="mt-4 pt-4 border-t border-slate-100 space-y-3">
+      <div className="pt-3 border-t border-slate-50 space-y-3">
          <div className="flex justify-between items-center">
-            {/* Dato CURP/ID (Recuperado del original) */}
-            <span className="text-xs text-slate-400">
-               {paciente.curp ? `CURP: ${paciente.curp.slice(0, 10)}...` : `ID: ${paciente.id.slice(0,6)}`}
+            <span className="text-[10px] text-slate-300 font-mono tracking-tighter">
+               ID: {paciente.id.slice(0,6)}...
             </span>
-            
-            <Link href={`/pacientes/${paciente.id}`} className="text-blue-600 text-sm font-bold hover:bg-blue-50 px-3 py-1 rounded transition-colors">
-              Ver Expediente →
+            <Link href={`/pacientes/${paciente.id}`} className="text-blue-600 text-xs font-bold hover:underline">
+              Abrir Expediente →
             </Link>
          </div>
 
-         {/* SELECTOR DE MENSAJES (MEJORA FASE 1.5) */}
-         <div>
-           <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Enviar WhatsApp:</label>
-           <div className="flex gap-2">
+         <div className="bg-slate-50 p-2 rounded-lg">
+           <div className="flex gap-2 items-center mb-2">
              <select 
-               className="flex-1 text-xs p-2 border rounded bg-slate-50 outline-none focus:border-green-500"
+               className="w-full text-[10px] p-1 border rounded bg-white outline-none cursor-pointer"
                onChange={(e) => setMensajeSeleccionado(e.target.value)}
-               defaultValue=""
              >
-               <option value="">📍 Ubicación (Default)</option>
+               <option value="">📍 Enviar Ubicación</option>
                {opcionesMensajes.map(m => (
-                 <option key={m.id} value={m.texto}>💬 {m.etiqueta}</option>
+                 <option key={m.id} value={m.texto}>{m.etiqueta}</option>
                ))}
              </select>
            </div>
-           
-           <div className="mt-2">
-             <WhatsAppButton 
+           <WhatsAppButton 
                telefono={telefono} 
                mensaje={mensajeFinal} 
-               label="Enviar Mensaje"
-               compact={false}
+               label="Enviar"
+               compact={true} 
              />
-           </div>
          </div>
       </div>
     </div>
