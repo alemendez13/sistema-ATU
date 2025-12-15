@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -83,6 +83,7 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
             ...formData.datosFiscales,
             razonSocial: formData.datosFiscales.razonSocial.toUpperCase(),
             rfc: formData.datosFiscales.rfc.toUpperCase(),
+            ultimaEdicionAdmin: serverTimestamp() // Esto ayuda a rastrear quién hizo el cambio
         } : null // Si no tiene RFC, asumimos que no quiere facturar o borró los datos
       };
 
