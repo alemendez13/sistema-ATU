@@ -1,11 +1,16 @@
+"use client"; // 👈 ESTO ES LA CLAVE: Le dice a Next.js que esto corre en el navegador
+
+import { useState, useEffect } from "react";
 import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
-import { Paciente, Operacion } from "../../../types";
+// Ajusta esta importación si tus tipos están en otro lado, según tu estructura es correcto:
+import { Paciente, Operacion } from "../../../types"; 
 import Link from "next/link";
 import DownloadReciboButton from "../../../components/pdf/DownloadReciboButton";
 import PatientActions from "../../../components/pacientes/PatientActions";
+import { toast } from "sonner"; // Opcional: para notificar errores
 
-// --- FUNCIÓN HELPER: CALCULAR EDAD ---
+// --- HELPERS (Conservados igual) ---
 function calcularEdad(fechaNacimiento?: string) {
   if (!fechaNacimiento) return "?";
   const hoy = new Date();
@@ -18,69 +23,111 @@ function calcularEdad(fechaNacimiento?: string) {
   return edad >= 0 ? edad : "?";
 }
 
-// --- NUEVA FUNCIÓN HELPER: LIMPIAR DATOS PARA EL CLIENTE ---
 function serializarPaciente(data: any): Paciente {
   return {
     ...data,
-    // Convertimos Timestamps de Firebase a String ISO, o null si no existen
     fechaNacimiento: typeof data.fechaNacimiento === 'string' ? data.fechaNacimiento : data.fechaNacimiento?.toDate?.().toISOString() || null,
     fechaRegistro: data.fechaRegistro?.toDate?.().toISOString() || null,
-    // Aseguramos que datosFiscales exista aunque sea vacío
     datosFiscales: data.datosFiscales || null
   };
 }
 
-// Función de Servidor para traer datos
-async function getPacienteData(id: string) {
-  const docRef = doc(db, "pacientes", id);
-  const docSnap = await getDoc(docRef);
-  
-  if (!docSnap.exists()) return null;
+// --- COMPONENTE PRINCIPAL (Ahora es Client Component) ---
+export default function ExpedientePage({ params }: { params: { id: string } }) {
+  // 1. Manejo de Estado (Loading, Datos, Error)
+  const [datos, setDatos] = useState<Paciente | null>(null);
+  const [historial, setHistorial] = useState<Operacion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const rawData = { id: docSnap.id, ...docSnap.data() };
-  // APLICAMOS LA LIMPIEZA AQUÍ 👇
-  const datosLimpios = serializarPaciente(rawData);
+  // 2. Efecto de Carga (Se ejecuta al montar el componente en el navegador)
+  useEffect(() => {
+    const cargarExpediente = async () => {
+      try {
+        setLoading(true);
+        const id = params.id;
 
-  const qPagos = query(
-    collection(db, "operaciones"),
-    where("pacienteId", "==", id),
-    orderBy("fecha", "desc")
-  );
-  const snapPagos = await getDocs(qPagos);
-  
-  const historial = snapPagos.docs.map(d => {
-    const data = d.data();
-    return {
-        id: d.id,
-        ...data,
-        // Limpiamos la fecha de la operación también
-        fecha: data.fecha?.toDate ? { seconds: data.fecha.seconds } : null, // Mantenemos formato compatible con tu tabla
-        monto: data.monto,
+        // A. Cargar Paciente
+        const docRef = doc(db, "pacientes", id);
+        const docSnap = await getDoc(docRef);
+        
+        if (!docSnap.exists()) {
+          setError(true);
+          setLoading(false);
+          return;
+        }
+
+        const rawData = { id: docSnap.id, ...docSnap.data() };
+        const datosLimpios = serializarPaciente(rawData);
+        setDatos(datosLimpios);
+
+        // B. Cargar Historial (Pagos)
+        const qPagos = query(
+          collection(db, "operaciones"),
+          where("pacienteId", "==", id),
+          orderBy("fecha", "desc")
+        );
+        const snapPagos = await getDocs(qPagos);
+        
+        const historialData = snapPagos.docs.map(d => {
+          const data = d.data();
+          return {
+              id: d.id,
+              ...data,
+              fecha: data.fecha?.toDate ? { seconds: data.fecha.seconds } : null,
+              monto: data.monto,
+          };
+        }) as Operacion[];
+        
+        setHistorial(historialData);
+
+      } catch (err) {
+        console.error("Error cargando expediente:", err);
+        setError(true);
+        toast.error("No tienes permiso para ver este expediente o no existe.");
+      } finally {
+        setLoading(false);
+      }
     };
-  }) as Operacion[];
 
-  return { 
-    datos: datosLimpios,
-    historial 
-  };
-}
+    cargarExpediente();
+  }, [params.id]);
 
-export default async function ExpedientePage({ params }: { params: { id: string } }) {
-  const data = await getPacienteData(params.id);
+  // 3. Renderizado Condicional (Loading / Error)
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 pt-28 flex justify-center">
+        <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-slate-500 font-medium">Cargando expediente seguro...</p>
+        </div>
+      </div>
+    );
+  }
 
-  if (!data) return <div className="p-8 text-center text-red-500">❌ Paciente no encontrado</div>;
+  if (error || !datos) {
+    return (
+      <div className="min-h-screen bg-slate-50 pt-28 flex justify-center">
+         <div className="text-center p-8 bg-white rounded-xl shadow border border-red-100">
+            <p className="text-4xl mb-2">🔒</p>
+            <h3 className="text-xl font-bold text-red-600 mb-2">Acceso Restringido</h3>
+            <p className="text-slate-500 mb-4">No se pudo cargar el paciente. Verifica tu conexión o permisos.</p>
+            <Link href="/pacientes" className="text-blue-600 hover:underline">Volver al Directorio</Link>
+         </div>
+      </div>
+    );
+  }
 
-  const { datos, historial } = data;
+  // --- VARIABLES DERIVADAS ---
   const edadReal = calcularEdad(datos.fechaNacimiento);
-
-  // Estilos auxiliares
   const labelStyle = "text-xs font-bold text-slate-400 uppercase";
   const valueStyle = "text-slate-700 font-medium";
   const sectionTitle = "text-lg font-bold text-slate-800 border-b pb-2 mb-4";
 
+  // 4. UI PRINCIPAL (Idéntica a tu diseño original)
   return (
     <div className="min-h-screen bg-slate-50 p-6 pt-28">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto animate-fade-in">
         
         {/* ENCABEZADO */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -112,11 +159,11 @@ export default async function ExpedientePage({ params }: { params: { id: string 
                         </button>
                     </Link>
                     
-                    {/* Pasa el objeto 'datos' directamente, ya limpio */}
-                      <PatientActions 
+                    {/* ACCIONES: EDITAR / ELIMINAR */}
+                    <PatientActions 
                         pacienteId={params.id} 
                         datosActuales={datos} 
-                      />
+                    />
                 </div>
             </div>
 
