@@ -94,9 +94,16 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
       }
 
       // 2. Preparar datos COMPLETOS del Paciente
+      
+      // LOGICA NUEVA: Construcción de nombre
+      const nombreConstruido = `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno || ''}`.trim().toUpperCase();
+
       const patientData = {
         // Identidad
-        nombreCompleto: data.nombreCompleto ? data.nombreCompleto.toUpperCase() : "SIN NOMBRE",
+        nombres: data.nombres.toUpperCase(),
+        apellidoPaterno: data.apellidoPaterno.toUpperCase(),
+        apellidoMaterno: data.apellidoMaterno ? data.apellidoMaterno.toUpperCase() : "",
+        nombreCompleto: nombreConstruido, // Se guarda unido para búsquedas y compatibilidad
         fechaNacimiento: data.fechaNacimiento,
         edad: age || 0,
         genero: data.genero,
@@ -201,11 +208,25 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
         <section>
             <h2 className={sectionTitle}>👤 Identidad y Contacto</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-2">
-                    <label className={labelStyle}>Nombre Completo (Mayúsculas)</label>
-                    <input type="text" className={inputStyle} {...register("nombreCompleto", { required: true })} 
-                           onChange={(e) => setValue('nombreCompleto', e.target.value.toUpperCase())} placeholder="APELLIDOS NOMBRES" />
+                {/* INICIO MODIFICACIÓN: Nombres Separados */}
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label className={labelStyle}>Nombre(s)</label>
+                        <input type="text" className={inputStyle} {...register("nombres", { required: true })}
+                               onChange={(e) => setValue('nombres', e.target.value.toUpperCase())} placeholder="EJ. JUAN" />
+                    </div>
+                    <div>
+                        <label className={labelStyle}>Apellido Paterno</label>
+                        <input type="text" className={inputStyle} {...register("apellidoPaterno", { required: true })}
+                               onChange={(e) => setValue('apellidoPaterno', e.target.value.toUpperCase())} placeholder="EJ. PÉREZ" />
+                    </div>
+                    <div>
+                        <label className={labelStyle}>Apellido Materno</label>
+                        <input type="text" className={inputStyle} {...register("apellidoMaterno")}
+                               onChange={(e) => setValue('apellidoMaterno', e.target.value.toUpperCase())} placeholder="EJ. LÓPEZ" />
+                    </div>
                 </div>
+                {/* FIN MODIFICACIÓN */}
                 <div>
                     <label className={labelStyle}>Fecha Nacimiento</label>
                     <input type="date" className={inputStyle} {...register("fechaNacimiento", { required: true })} />
