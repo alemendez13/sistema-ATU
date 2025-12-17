@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { verificarStock, descontarStockPEPS } from "../../lib/inventoryController";
 import Button from "../ui/Button"; // Ajusta la ruta si es necesario (puede ser ../../components/ui/Button)
 import { toast } from 'sonner';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "../../lib/firebase"; // Asegúrate de importar storage
 
 // --- CATÁLOGOS ESTÁTICOS (Basados en tu PDF) ---
 const ESTADOS_MX = ["Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango", "Estado de México", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas", "Extranjero"];
@@ -53,7 +55,17 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
   const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null);
   const [requiereFactura, setRequiereFactura] = useState(false);
   const router = useRouter();
+  // FOTO DEL PACIENTE
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setFotoFile(file);
+      setFotoPreview(URL.createObjectURL(file));
+    }
+  };
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm();
   const fechaNacimiento = watch("fechaNacimiento");
 
@@ -93,7 +105,21 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
         await descontarStockPEPS(servicioSeleccionado.sku, servicioSeleccionado.nombre, 1);
       }
 
-      // 2. Preparar datos COMPLETOS del Paciente
+      // 2.1 SUBIDA DE FOTO (Nueva Lógica)
+      let fotoUrl = null;
+      if (fotoFile) {
+        try {
+          // Crea una referencia única: pacientes/fecha_nombrearchivo
+          const storageRef = ref(storage, `pacientes/${Date.now()}_${fotoFile.name}`);
+          const snapshot = await uploadBytes(storageRef, fotoFile);
+          fotoUrl = await getDownloadURL(snapshot.ref);
+        } catch (uploadError) {
+          console.error("Error subiendo foto:", uploadError);
+          toast.warning("No se pudo subir la foto, pero se guardará el texto.");
+        }
+      }
+
+      // 2.2 Preparar datos COMPLETOS del Paciente
       
       // LOGICA NUEVA: Construcción de nombre
       const nombreConstruido = `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno || ''}`.trim().toUpperCase();
@@ -108,6 +134,7 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
         edad: age || 0,
         genero: data.genero,
         tutor: (age !== null && age < 18) ? (data.tutor || null) : null,
+        fotoUrl: fotoUrl,
         
         // Contacto
         telefonoCelular: data.telefonoCelular,
@@ -208,7 +235,25 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
         <section>
             <h2 className={sectionTitle}>👤 Identidad y Contacto</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* INICIO MODIFICACIÓN: Nombres Separados */}
+                
+                <div className="flex justify-center mb-6">
+          <div className="relative group">
+            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-100 shadow-md bg-slate-50 flex items-center justify-center">
+              {fotoPreview ? (
+                <img src={fotoPreview} alt="Preview" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-4xl text-slate-300">📷</span>
+              )}
+            </div>
+            <label className="absolute bottom-0 right-0 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full cursor-pointer shadow-lg transition-all">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+            </label>
+          </div>
+        </div>
+
                 <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className={labelStyle}>Nombre(s)</label>
@@ -226,7 +271,6 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
                                onChange={(e) => setValue('apellidoMaterno', e.target.value.toUpperCase())} placeholder="EJ. LÓPEZ" />
                     </div>
                 </div>
-                {/* FIN MODIFICACIÓN */}
                 <div>
                     <label className={labelStyle}>Fecha Nacimiento</label>
                     <input type="date" className={inputStyle} {...register("fechaNacimiento", { required: true })} />
