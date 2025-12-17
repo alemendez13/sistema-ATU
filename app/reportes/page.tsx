@@ -17,6 +17,7 @@ const reportesMenu = [
   { id: 'j', titulo: "Archivo Muerto", icono: "🗄️", ruta: "/reportes/archivo-muerto", desc: "Expedientes inactivos" },
   { id: 'k', titulo: "Radar Estratégico", icono: "📡", ruta: "/reportes/radar", desc: "Retención y pacientes en riesgo" },
   { id: 'l', titulo: "Control Facturación", icono: "📑", ruta: "/reportes/facturacion", desc: "Solicitudes y datos fiscales" },
+  { id: 'm', titulo: "Respaldo Google", icono: "☁️", ruta: "/reportes/google-contacts", desc: "Exportar a contactos.google.com" },
 ];
 
 export default function PanelReportesPage() {
