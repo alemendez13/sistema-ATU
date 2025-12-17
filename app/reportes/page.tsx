@@ -15,8 +15,8 @@ const reportesMenu = [
   { id: 'h', titulo: "Conciliación Lab", icono: "🤝", ruta: "/reportes/conciliacion-lab", desc: "Cruce mensual de estudios" },
   { id: 'i', titulo: "Corte Factura Global", icono: "🧾", ruta: "/reportes/factura-global", desc: "Cierre de mes fiscal" },
   { id: 'j', titulo: "Archivo Muerto", icono: "🗄️", ruta: "/reportes/archivo-muerto", desc: "Expedientes inactivos" },
-  // 👇 AQUÍ ESTÁ LA NUEVA PUERTA AL RADAR
   { id: 'k', titulo: "Radar Estratégico", icono: "📡", ruta: "/reportes/radar", desc: "Retención y pacientes en riesgo" },
+  { id: 'l', titulo: "Control Facturación", icono: "📑", ruta: "/reportes/facturacion", desc: "Solicitudes y datos fiscales" },
 ];
 
 export default function PanelReportesPage() {
