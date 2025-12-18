@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../../lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
+import { db, storage } from "../../lib/firebase"; 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Paciente } from "../../types"; // Importamos el tipo oficial
+import { Paciente } from "../../types"; 
+import SmartAvatarUploader from "../ui/SmartAvatarUploader";
 
-// --- CATÁLOGOS (Copiados de tu PatientFormClient para consistencia) ---
+// --- CATÁLOGOS COMPLETOS ---
 const ESTADOS_MX = ["Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango", "Estado de México", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas", "Extranjero"];
 const GENEROS = ["Masculino", "Femenino", "Transgénero", "No binario", "Prefiero no decir"];
 const ESTADO_CIVIL = ["Soltero", "Casado", "Divorciado", "Viudo", "Concubinato"];
@@ -29,7 +31,7 @@ const USOS_CFDI = ["G01 - Adquisición de mercancías", "G03 - Gastos en general
 
 interface Props {
   pacienteId: string;
-  datosActuales: Paciente; // Ahora recibimos el objeto COMPLETO
+  datosActuales: Paciente;
 }
 
 export default function PatientActions({ pacienteId, datosActuales }: Props) {
@@ -37,11 +39,13 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<"general" | "demo" | "fiscal">("general");
+  
+  // Estado para capturar la nueva foto si el usuario decide cambiarla
+  const [newFotoFile, setNewFotoFile] = useState<File | null>(null);
 
-  // Inicializamos el formulario con TODOS los datos actuales
+  // Inicializamos el formulario con los datos actuales
   const [formData, setFormData] = useState<Paciente>({
     ...datosActuales,
-    // Aseguramos que datosFiscales exista aunque sea vacío para poder editar
     datosFiscales: datosActuales.datosFiscales || {
       tipoPersona: "Fisica",
       razonSocial: "",
@@ -74,17 +78,34 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
     try {
       const docRef = doc(db, "pacientes", pacienteId);
       
-      // Limpiamos datos antes de enviar
+      // 1. Lógica de Subida de Imagen (Solo si hay un archivo nuevo)
+      // Usamos 'as any' como medida de seguridad por si types.ts no se ha actualizado aún
+      let finalFotoUrl = (formData as any).fotoUrl || null; 
+
+      if (newFotoFile) {
+         try {
+            // Referencia única con timestamp para evitar caché
+            const storageRef = ref(storage, `pacientes/${Date.now()}_${newFotoFile.name}`);
+            const snapshot = await uploadBytes(storageRef, newFotoFile);
+            finalFotoUrl = await getDownloadURL(snapshot.ref);
+         } catch (err) {
+            console.error("Error subiendo imagen:", err);
+            toast.warning("No se pudo actualizar la foto, guardando resto de datos...");
+         }
+      }
+
+      // 2. Preparar objeto para actualizar
       const dataToUpdate = {
         ...formData,
+        fotoUrl: finalFotoUrl, // Guardamos la URL actualizada
         nombreCompleto: formData.nombreCompleto.toUpperCase(),
-        // Si el usuario llenó datos fiscales, los guardamos en mayúsculas
+        // Lógica Fiscal: Si tiene RFC se guarda, si no, se pone null
         datosFiscales: formData.datosFiscales?.rfc ? {
             ...formData.datosFiscales,
             razonSocial: formData.datosFiscales.razonSocial.toUpperCase(),
             rfc: formData.datosFiscales.rfc.toUpperCase(),
-            ultimaEdicionAdmin: serverTimestamp() // Esto ayuda a rastrear quién hizo el cambio
-        } : null // Si no tiene RFC, asumimos que no quiere facturar o borró los datos
+            ultimaEdicionAdmin: serverTimestamp()
+        } : null 
       };
 
       await updateDoc(docRef, dataToUpdate);
@@ -100,7 +121,7 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
     }
   };
 
-  // Helpers para inputs
+  // Clases de estilo reutilizables
   const inputClass = "w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none";
   const labelClass = "block text-xs font-bold text-slate-500 mb-1 uppercase";
 
@@ -115,18 +136,18 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
           </button>
       </div>
 
-      {/* --- MODAL INTEGRAL --- */}
+      {/* --- MODAL DE EDICIÓN --- */}
       {isEditing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             
-            {/* Header del Modal */}
+            {/* Header */}
             <div className="p-4 border-b flex justify-between items-center bg-slate-50">
                 <h2 className="text-xl font-bold text-slate-800">Editar Expediente</h2>
                 <button onClick={() => setIsEditing(false)} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
 
-            {/* Pestañas de Navegación */}
+            {/* Pestañas */}
             <div className="flex border-b">
                 <button 
                     onClick={() => setActiveTab("general")}
@@ -148,12 +169,21 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
                 </button>
             </div>
             
-            {/* Cuerpo del Formulario (Scrollable) */}
+            {/* Formulario con Scroll */}
             <form onSubmit={handleUpdate} className="overflow-y-auto p-6 space-y-6 flex-1">
               
               {/* --- PESTAÑA GENERAL --- */}
               {activeTab === "general" && (
                 <div className="space-y-4 animate-fade-in">
+                    
+                    {/* Componente de Foto Integrado */}
+                    <div className="flex justify-center pb-4 border-b border-slate-100">
+                        <SmartAvatarUploader 
+                            currentImageUrl={(formData as any).fotoUrl}
+                            onImageSelected={(file) => setNewFotoFile(file)}
+                        />
+                    </div>
+
                     <div>
                         <label className={labelClass}>Nombre Completo</label>
                         <input className={inputClass} value={formData.nombreCompleto} onChange={e => setFormData({...formData, nombreCompleto: e.target.value})} />
@@ -180,7 +210,6 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
                             <input className={inputClass} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                         </div>
                     </div>
-                    {/* Campos opcionales */}
                     <div>
                         <label className={labelClass}>Tutor (Si es menor)</label>
                         <input className={inputClass} value={formData.tutor || ""} onChange={e => setFormData({...formData, tutor: e.target.value})} />
