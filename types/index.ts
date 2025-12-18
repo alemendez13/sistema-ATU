@@ -83,3 +83,11 @@ export interface Medico {
   reglasHorario: string; // Ej: "1,2,3,4|11:00-19:00; 6|09:00-14:00"
   calendarId?: string; // <--- AGREGAR ESTA LÍNEA (El ? significa que es opcional)
 }
+
+export interface Descuento {
+  id: string;
+  nombre: string;
+  tipo: "Porcentaje" | "Monto";
+  valor: number;
+  activo: boolean;
+}
