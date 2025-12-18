@@ -4,30 +4,53 @@ import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/fires
 import { db } from "../../../../lib/firebase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import Button from "../../../../components/ui/Button";
-import { agendarCitaGoogle } from "../../../../lib/actions"; // Importar función de agenda
+import Button from "../../../../components/ui/Button"; // Ajusta ruta si es necesario
+import { agendarCitaGoogle } from "../../../../lib/actions"; 
 import { descontarStockPEPS } from "../../../../lib/inventoryController";
+// Importamos el tipo Descuento (Asegúrate de haber hecho el Paso 2)
+import { Descuento } from "../../../../types"; 
 
 interface Props {
   pacienteId: string;
   servicios: any[];
-  medicos: any[]; // <--- AHORA RECIBIMOS MÉDICOS TAMBIÉN
+  medicos: any[]; 
+  descuentos: Descuento[]; // 👈 Recibimos los descuentos
 }
 
-export default function VentaForm({ pacienteId, servicios, medicos }: Props) {
-  const [servicioSku, setServicioSku] = useState("");
-  const [loading, setLoading] = useState(false);
+export default function VentaForm({ pacienteId, servicios, medicos, descuentos }: Props) {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
   
-  // Estados para Agenda (Solo si es servicio)
+  // Estados del Formulario
+  const [servicioSku, setServicioSku] = useState("");
+  const [descuentoId, setDescuentoId] = useState(""); // 👈 Nuevo Estado
+  
+  // Estados para Agenda
   const [esServicio, setEsServicio] = useState(false);
   const [medicoId, setMedicoId] = useState("");
   const [fechaCita, setFechaCita] = useState("");
   const [horaCita, setHoraCita] = useState("");
 
-  // Buscar detalles del servicio seleccionado
+  // 1. Encontrar objetos seleccionados
   const servicioSeleccionado = servicios.find(s => s.sku === servicioSku);
+  const descuentoSeleccionado = descuentos.find(d => d.id === descuentoId);
 
+  // 2. Lógica de Precios
+  const precioOriginal = servicioSeleccionado ? parseFloat(servicioSeleccionado.precio) : 0;
+  let montoDescuento = 0;
+  let precioFinal = precioOriginal;
+
+  if (descuentoSeleccionado && precioOriginal > 0) {
+    if (descuentoSeleccionado.tipo === "Porcentaje") {
+      montoDescuento = (precioOriginal * descuentoSeleccionado.valor) / 100;
+    } else {
+      montoDescuento = descuentoSeleccionado.valor;
+    }
+    // Evitar negativos
+    precioFinal = Math.max(0, precioOriginal - montoDescuento);
+  }
+
+  // Efecto para detectar tipo de servicio
   useEffect(() => {
     if (servicioSeleccionado?.tipo === 'Servicio') {
         setEsServicio(true);
@@ -37,7 +60,7 @@ export default function VentaForm({ pacienteId, servicios, medicos }: Props) {
     }
   }, [servicioSku, servicioSeleccionado]);
 
-  // Filtrar médicos por el área del servicio seleccionado
+  // Filtrar médicos
   const medicosDisponibles = medicos.filter(m => 
     !servicioSeleccionado?.area || m.especialidad === servicioSeleccionado.area || m.especialidad === "General"
   );
@@ -45,46 +68,48 @@ export default function VentaForm({ pacienteId, servicios, medicos }: Props) {
   const handleVenta = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!servicioSku) return;
-    
-    // Validación de Agenda
     if (esServicio && (!medicoId || !fechaCita || !horaCita)) {
-        toast.error("Para servicios médicos, debes seleccionar doctor, fecha y hora.");
+        toast.error("Faltan datos de la cita.");
         return;
     }
 
     setLoading(true);
 
     try {
-      // 👉 1. Obtenemos DATOS COMPLETOS del Paciente (incluyendo RFC)
       const pDoc = await getDoc(doc(db, "pacientes", pacienteId));
       let pNombre = "Desconocido";
-      let necesitaFactura = false; // Por defecto no
+      let requiereFactura = false;
 
       if (pDoc.exists()) {
           const dataPac = pDoc.data();
           pNombre = dataPac.nombreCompleto;
-          
-          // 👉 Verificamos si tiene RFC válido para marcar la venta
-          if (dataPac.datosFiscales?.rfc && dataPac.datosFiscales.rfc.length > 10) {
-              necesitaFactura = true;
-          }
+          if (dataPac.datosFiscales?.rfc) requiereFactura = true;
       }
 
       const medicoElegido = medicos.find(m => m.id === medicoId);
 
-      // 2. Crear OPERACIÓN (Deuda)
+      // 3. Crear OPERACIÓN con Descuentos
       await addDoc(collection(db, "operaciones"), {
         pacienteId,
         pacienteNombre: pNombre,
-        // 👉 GUARDAMOS EL SELLO AQUÍ (Ahorra miles de consultas futuras)
-        requiereFactura: necesitaFactura, 
+        requiereFactura, 
         
-        servicioSku: servicioSeleccionado.sku,
-        servicioNombre: servicioSeleccionado.nombre,
-        monto: servicioSeleccionado.precio,
+        servicioSku: servicioSeleccionado?.sku,
+        servicioNombre: servicioSeleccionado?.nombre,
+        
+        // --- INICIO BLOQUE FINANCIERO DETALLADO ---
+        montoOriginal: precioOriginal,
+        descuentoAplicado: descuentoSeleccionado ? {
+            id: descuentoSeleccionado.id,
+            nombre: descuentoSeleccionado.nombre,
+            monto: montoDescuento
+        } : null,
+        monto: precioFinal, // Este es el que se cobra
+        // --- FIN BLOQUE FINANCIERO ---
+
         fecha: serverTimestamp(),
-        estatus: "Pendiente de Pago",
-        // Datos extra si es cita
+        estatus: precioFinal === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago", // Autopagar si es cortesía
+        
         esCita: esServicio,
         doctorId: medicoId || null,
         doctorNombre: medicoElegido?.nombre || null,
@@ -92,49 +117,39 @@ export default function VentaForm({ pacienteId, servicios, medicos }: Props) {
         horaCita: horaCita || null
       });
 
-      // Si NO es servicio (es decir, es producto tangible), descontamos inventario
-      if (!esServicio) {
+      // Descontar Stock si aplica
+      if (!esServicio && servicioSeleccionado) {
         try {
-            await descontarStockPEPS(
-                servicioSeleccionado.sku, 
-                servicioSeleccionado.nombre, 
-                1 // O la cantidad que se venda
-            );
-            toast.success("Inventario actualizado");
-        } catch (stockError) {
-            console.error(stockError);
-            toast.warning("Venta registrada pero hubo error al descontar stock.");
-        }
+            await descontarStockPEPS(servicioSeleccionado.sku, servicioSeleccionado.nombre, 1);
+        } catch (err) { console.error(err); }
       }
 
-      // 3. Si es servicio, AGENDAR EN GOOGLE Y FIREBASE (Citas)
+      // Agendar Google si aplica
       if (esServicio && medicoElegido) {
-        // a. Guardar en colección 'citas' (Agenda Interna)
         await addDoc(collection(db, "citas"), {
             doctorId: medicoId,
             doctorNombre: medicoElegido.nombre,
             paciente: pNombre,
-            motivo: servicioSeleccionado.nombre,
+            motivo: servicioSeleccionado?.nombre,
             fecha: fechaCita,
             hora: horaCita,
             creadoEn: new Date()
         });
 
-        // b. Guardar en Google Calendar
-        const duracion = parseInt(servicioSeleccionado.duracion || "30");
+        const duracion = parseInt(servicioSeleccionado?.duracion || "30");
         await agendarCitaGoogle({
             doctorId: medicoId,
             doctorNombre: medicoElegido.nombre,
             calendarId: medicoElegido.calendarId,
             pacienteNombre: pNombre,
-            motivo: servicioSeleccionado.nombre,
+            motivo: servicioSeleccionado?.nombre,
             fecha: fechaCita,
             hora: horaCita,
             duracionMinutos: duracion
         });
       }
 
-      toast.success(esServicio ? "✅ Cita agendada y cargo generado." : "✅ Venta registrada.");
+      toast.success("✅ Operación registrada correctamente.");
       router.push("/finanzas"); 
 
     } catch (error) {
@@ -163,34 +178,55 @@ export default function VentaForm({ pacienteId, servicios, medicos }: Props) {
               onChange={e => setServicioSku(e.target.value)}
               required
             >
-              <option value="">-- Seleccionar del Catálogo --</option>
+              <option value="">-- Seleccionar --</option>
               {servicios.map(s => (
-                <option key={s.sku} value={s.sku}>
-                    {s.nombre} ({s.tipo}) - {s.precio}
-                </option>
+                <option key={s.sku} value={s.sku}>{s.nombre} - ${s.precio}</option>
               ))}
             </select>
           </div>
 
-          {/* OBSERVACIONES (Información Visual) */}
+          {/* --- NUEVO: SELECTOR DE DESCUENTOS --- */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+             <div>
+                <label className="block text-sm font-bold text-slate-600 mb-2">🏷️ Descuento / Cortesía</label>
+                <select 
+                    className="w-full border p-3 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={descuentoId}
+                    onChange={e => setDescuentoId(e.target.value)}
+                >
+                    <option value="">Ninguno (Precio de Lista)</option>
+                    {descuentos.map(d => (
+                        <option key={d.id} value={d.id}>
+                            {d.nombre} ({d.tipo === 'Porcentaje' ? `-${d.valor}%` : `-$${d.valor}`})
+                        </option>
+                    ))}
+                </select>
+             </div>
+             
+             {/* VISUALIZADOR DE PRECIO */}
+             <div className="text-right p-3 bg-slate-50 rounded-lg border border-slate-100">
+                {descuentoSeleccionado ? (
+                    <div>
+                        <span className="text-sm text-slate-400 line-through mr-2">${precioOriginal.toFixed(2)}</span>
+                        <span className="text-xl font-bold text-green-600">${precioFinal.toFixed(2)}</span>
+                    </div>
+                ) : (
+                    <span className="text-xl font-bold text-slate-700">${precioOriginal.toFixed(2)}</span>
+                )}
+             </div>
+          </div>
+          {/* --- FIN NUEVO BLOQUE --- */}
+
           {servicioSeleccionado?.observaciones && (
              <div className="bg-yellow-50 p-3 rounded-lg border-l-4 border-yellow-400 text-sm text-yellow-800">
-                <strong>📝 Nota:</strong> {servicioSeleccionado.observaciones}
+                {servicioSeleccionado.observaciones}
              </div>
           )}
 
-          {/* --- BLOQUE DE AGENDA (Solo aparece si es Servicio) --- */}
           {esServicio && (
             <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 animate-fade-in">
-                <h3 className="font-bold text-blue-900 mb-4 flex items-center gap-2">
-                    📅 Agendar Cita 
-                    <span className="text-xs font-normal bg-blue-200 px-2 py-1 rounded text-blue-800">
-                        Área: {servicioSeleccionado?.area}
-                    </span>
-                </h3>
-                
+                <h3 className="font-bold text-blue-900 mb-4">📅 Agendar Cita</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Selector de Médico (Filtrado) */}
                     <div className="md:col-span-2">
                         <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Profesional</label>
                         <select 
@@ -205,40 +241,22 @@ export default function VentaForm({ pacienteId, servicios, medicos }: Props) {
                             ))}
                         </select>
                     </div>
-
-                    {/* Fecha */}
                     <div>
                         <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Fecha</label>
-                        <input 
-                            type="date" 
-                            className="w-full border p-2 rounded"
-                            value={fechaCita}
-                            onChange={e => setFechaCita(e.target.value)}
-                            required
-                        />
+                        <input type="date" className="w-full border p-2 rounded" value={fechaCita} onChange={e => setFechaCita(e.target.value)} required />
                     </div>
-
-                    {/* Hora */}
                     <div>
                         <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Hora</label>
-                        <input 
-                            type="time" 
-                            className="w-full border p-2 rounded"
-                            value={horaCita}
-                            onChange={e => setHoraCita(e.target.value)}
-                            required
-                        />
+                        <input type="time" className="w-full border p-2 rounded" value={horaCita} onChange={e => setHoraCita(e.target.value)} required />
                     </div>
                 </div>
             </div>
           )}
 
           <div className="flex gap-4 pt-4">
-            <button type="button" onClick={() => router.back()} className="flex-1 py-3 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
-                Cancelar
-            </button>
+            <button type="button" onClick={() => router.back()} className="flex-1 py-3 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
             <Button type="submit" isLoading={loading} className="flex-1 py-3 text-lg shadow-md">
-                {esServicio ? "Confirmar Cita y Cargo" : "Generar Nota de Venta"}
+                {precioFinal === 0 ? "Confirmar Cortesía" : "Generar Nota de Venta"}
             </Button>
           </div>
 
