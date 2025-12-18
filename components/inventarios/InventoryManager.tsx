@@ -9,11 +9,13 @@ interface Servicio {
   tipo: string;
 }
 
+// 👇 CAMBIO 1: Ajustamos el nombre para coincidir con page.tsx
 interface InventoryProps {
-  productos: Servicio[]; // Solo recibiremos lo que sea "Producto"
+  productosIniciales: any[]; // Usamos 'any[]' para evitar conflictos estrictos de tipo con Google Sheets
 }
 
-export default function InventoryManager({ productos }: InventoryProps) {
+// 👇 CAMBIO 2: Recibimos 'productosIniciales'
+export default function InventoryManager({ productosIniciales }: InventoryProps) {
   const [lotes, setLotes] = useState<any[]>([]);
   const [skuSeleccionado, setSkuSeleccionado] = useState("");
   const [loteFab, setLoteFab] = useState("");
@@ -27,9 +29,7 @@ export default function InventoryManager({ productos }: InventoryProps) {
   }, []);
 
   const cargarInventario = async () => {
-
-      console.log("🔥 LECTURA EJECUTADA EN: [NOMBRE_DEL_ARCHIVO] - " + new Date().toLocaleTimeString());
-
+    // console.log("🔥 LECTURA EJECUTADA..."); // Opcional: Descomentar para depurar
     const q = query(collection(db, "inventarios"), orderBy("fechaCaducidad", "asc"));
     const snapshot = await getDocs(q);
     setLotes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -42,7 +42,8 @@ export default function InventoryManager({ productos }: InventoryProps) {
 
     setLoading(true);
     try {
-      const productoInfo = productos.find(p => p.sku === skuSeleccionado);
+      // 👇 CAMBIO 3: Usamos la nueva variable 'productosIniciales'
+      const productoInfo = productosIniciales.find((p: any) => p.sku === skuSeleccionado);
 
       await addDoc(collection(db, "inventarios"), {
         sku: skuSeleccionado,
@@ -70,7 +71,7 @@ export default function InventoryManager({ productos }: InventoryProps) {
   return (
     <div className="max-w-5xl mx-auto p-6 bg-white rounded-xl shadow-sm border border-slate-200">
       
-      {/* --- MODIFICACIÓN INICIO: ENCABEZADO CON BOTÓN DE CONSULTA --- */}
+      {/* ENCABEZADO */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-slate-900">📦 Gestión de Inventarios (Entradas)</h1>
         <a 
@@ -82,7 +83,7 @@ export default function InventoryManager({ productos }: InventoryProps) {
           🔍 Consultar Stock Externo
         </a>
       </div>
-      {/* --- MODIFICACIÓN FIN --- */}
+
       {/* FORMULARIO DE ENTRADA */}
       <form onSubmit={handleGuardar} className="bg-slate-50 p-6 rounded-lg border border-slate-200 mb-8 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
         
@@ -95,7 +96,8 @@ export default function InventoryManager({ productos }: InventoryProps) {
                 required
             >
                 <option value="">-- Seleccionar --</option>
-                {productos.map(p => (
+                {/* 👇 CAMBIO 4: Mapeamos 'productosIniciales' */}
+                {productosIniciales.map((p: any) => (
                     <option key={p.sku} value={p.sku}>{p.nombre}</option>
                 ))}
             </select>
