@@ -7,6 +7,7 @@ export interface Paciente {
   genero: string;
   telefonoCelular: string;
   email: string;
+  fotoUrl?: string | null;
   
   // --- CAMPOS QUE FALTABAN ---
   tutor?: string | null; 
