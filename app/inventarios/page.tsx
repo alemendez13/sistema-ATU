@@ -6,10 +6,7 @@ export default async function InventariosPage() {
   // 1. Leemos todo el catálogo de Excel
   const { servicios } = await getCatalogos();
 
-  // 2. FILTRADO IMPORTANTE: Solo queremos los que digan Tipo = 'Producto'
-  // Ignoramos las 'Consultas' porque esas no tienen inventario.
-  const soloProductos = servicios.filter(s => s.tipo === "Producto");
-
+  const soloProductos = servicios.filter((s: any) => s.tipo === "Producto");
   return (
     <ProtectedRoute>
     <div className="min-h-screen bg-slate-50 py-8 px-4">
