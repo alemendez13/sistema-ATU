@@ -5,12 +5,13 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useRouter } from "next/navigation";
 import { verificarStock, descontarStockPEPS } from "../../lib/inventoryController";
-import Button from "../ui/Button"; // Ajusta la ruta si es necesario (puede ser ../../components/ui/Button)
+import Button from "../ui/Button"; 
 import { toast } from 'sonner';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../../lib/firebase"; // Asegúrate de importar storage
+import { storage } from "../../lib/firebase"; 
+import SmartAvatarUploader from "../ui/SmartAvatarUploader";
 
-// --- CATÁLOGOS ESTÁTICOS (Basados en tu PDF) ---
+// --- CATÁLOGOS ESTÁTICOS ---
 const ESTADOS_MX = ["Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango", "Estado de México", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas", "Extranjero"];
 const GENEROS = ["Masculino", "Femenino", "Transgénero", "No binario", "Prefiero no decir"];
 const ESTADO_CIVIL = ["Soltero", "Casado", "Divorciado", "Viudo", "Concubinato"];
@@ -46,7 +47,7 @@ interface Servicio {
 }
 
 interface PatientFormProps {
-  servicios: Servicio[];
+  servicios: any[];
 }
 
 export default function PatientFormClient({ servicios }: PatientFormProps) {
@@ -55,17 +56,10 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
   const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null);
   const [requiereFactura, setRequiereFactura] = useState(false);
   const router = useRouter();
-  // FOTO DEL PACIENTE
+  
+  // FOTO DEL PACIENTE (Solo el File, el preview lo maneja el componente Smart)
   const [fotoFile, setFotoFile] = useState<File | null>(null);
-  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setFotoFile(file);
-      setFotoPreview(URL.createObjectURL(file));
-    }
-  };
+  
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm();
   const fechaNacimiento = watch("fechaNacimiento");
 
@@ -105,43 +99,36 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
         await descontarStockPEPS(servicioSeleccionado.sku, servicioSeleccionado.nombre, 1);
       }
 
-      // 2.1 SUBIDA DE FOTO (Nueva Lógica)
+      // 2.1 SUBIDA DE FOTO
       let fotoUrl = null;
       if (fotoFile) {
         try {
-          // Crea una referencia única: pacientes/fecha_nombrearchivo
           const storageRef = ref(storage, `pacientes/${Date.now()}_${fotoFile.name}`);
           const snapshot = await uploadBytes(storageRef, fotoFile);
           fotoUrl = await getDownloadURL(snapshot.ref);
         } catch (uploadError) {
           console.error("Error subiendo foto:", uploadError);
-          toast.warning("No se pudo subir la foto, pero se guardará el texto.");
         }
       }
 
       // 2.2 Preparar datos COMPLETOS del Paciente
-      
-      // LOGICA NUEVA: Construcción de nombre
       const nombreConstruido = `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno || ''}`.trim().toUpperCase();
 
       const patientData = {
-        // Identidad
         nombres: data.nombres.toUpperCase(),
         apellidoPaterno: data.apellidoPaterno.toUpperCase(),
         apellidoMaterno: data.apellidoMaterno ? data.apellidoMaterno.toUpperCase() : "",
-        nombreCompleto: nombreConstruido, // Se guarda unido para búsquedas y compatibilidad
+        nombreCompleto: nombreConstruido,
         fechaNacimiento: data.fechaNacimiento,
         edad: age || 0,
         genero: data.genero,
         tutor: (age !== null && age < 18) ? (data.tutor || null) : null,
-        fotoUrl: fotoUrl,
+        fotoUrl: fotoUrl, // URL obtenida de Firebase Storage
         
-        // Contacto
         telefonoCelular: data.telefonoCelular,
         telefonoFijo: data.telefonoFijo || null,
         email: data.email,
 
-        // Demográficos
         lugarNacimiento: data.lugarNacimiento,
         lugarResidencia: data.lugarResidencia,
         estadoCivil: data.estadoCivil,
@@ -149,11 +136,9 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
         escolaridad: data.escolaridad,
         ocupacion: data.ocupacion,
 
-        // Marketing
         medioMarketing: data.medioMarketing,
         referidoPor: data.referidoPor || null,
 
-        // Fiscal (Solo si requiere factura)
         datosFiscales: requiereFactura ? {
             tipoPersona: data.tipoPersona,
             razonSocial: data.razonSocial.toUpperCase(),
@@ -167,10 +152,8 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
         fechaRegistro: serverTimestamp(),
       };
       
-      // 3. Guardar en Firebase
       const docRef = await addDoc(collection(db, "pacientes"), patientData);
 
-      // 4. Generar Deuda
       await addDoc(collection(db, "operaciones"), {
         pacienteId: docRef.id,
         pacienteNombre: patientData.nombreCompleto,
@@ -192,7 +175,6 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
     }
   };
 
-  // Estilos
   const inputStyle = "w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 text-sm border";
   const labelStyle = "block text-xs font-bold text-slate-600 mb-1 uppercase";
   const sectionTitle = "text-lg font-bold text-slate-800 border-b pb-2 mb-4 flex items-center gap-2";
@@ -236,29 +218,21 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
             <h2 className={sectionTitle}>👤 Identidad y Contacto</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
+                {/* CORRECCIÓN AQUÍ: 
+                   Se usa SOLAMENTE el SmartAvatarUploader.
+                   Se ha eliminado el antiguo <label> con <input onChange={handleImageChange}>
+                */}
                 <div className="flex justify-center mb-6">
-          <div className="relative group">
-            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-100 shadow-md bg-slate-50 flex items-center justify-center">
-              {fotoPreview ? (
-                <img src={fotoPreview} alt="Preview" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-4xl text-slate-300">📷</span>
-              )}
-            </div>
-            <label className="absolute bottom-0 right-0 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full cursor-pointer shadow-lg transition-all">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-            </label>
-          </div>
-        </div>
+                   <SmartAvatarUploader 
+                      onImageSelected={(file) => setFotoFile(file)} 
+                   />
+                </div>
 
                 <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label className={labelStyle}>Nombre(s)</label>
-                        <input type="text" className={inputStyle} {...register("nombres", { required: true })}
-                               onChange={(e) => setValue('nombres', e.target.value.toUpperCase())} placeholder="EJ. JUAN" />
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Nombre(s)</label>
+                        <input className="w-full border rounded p-2 text-sm" {...register("nombres", { required: true })} 
+                               onChange={(e) => setValue('nombres', e.target.value.toUpperCase())}/>
                     </div>
                     <div>
                         <label className={labelStyle}>Apellido Paterno</label>
@@ -292,7 +266,6 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
                 </div>
             </div>
             
-            {/* Campo Tutor Condicional */}
             {age !== null && age < 18 && (
                 <div className="mt-4 bg-amber-50 p-4 rounded border border-amber-200">
                     <label className={`${labelStyle} text-amber-700`}>Nombre del Tutor (Obligatorio por ser menor de edad)</label>
@@ -424,12 +397,12 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
         </section>
 
         <Button 
-  type="submit" 
-  isLoading={isSubmitting}
-  className="w-full text-lg mt-8 py-4"
->
-  💾 Guardar Expediente y Generar Cobro
-</Button>
+          type="submit" 
+          isLoading={isSubmitting}
+          className="w-full text-lg mt-8 py-4"
+        >
+          💾 Guardar Expediente y Generar Cobro
+        </Button>
       </form>
     </div>
   );
