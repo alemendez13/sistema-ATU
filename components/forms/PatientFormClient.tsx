@@ -5,6 +5,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useRouter } from "next/navigation";
 import { verificarStock, descontarStockPEPS } from "../../lib/inventoryController";
+import { agendarCitaGoogle } from "../../lib/actions"; 
 import Button from "../ui/Button"; 
 import { toast } from 'sonner';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -44,13 +45,17 @@ interface Servicio {
   nombre: string;
   precio: string;
   tipo?: string;
+  duracion?: string; 
+  area?: string;
 }
 
 interface PatientFormProps {
   servicios: any[];
+  medicos: any[];     
+  descuentos: any[];
 }
 
-export default function PatientFormClient({ servicios }: PatientFormProps) {
+export default function PatientFormClient({ servicios, medicos, descuentos }: PatientFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [age, setAge] = useState<number | null>(null);
   const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null);
@@ -59,9 +64,41 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
   
   // FOTO DEL PACIENTE (Solo el File, el preview lo maneja el componente Smart)
   const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [descuentoSeleccionado, setDescuentoSeleccionado] = useState<any>(null);
+  const [montoFinal, setMontoFinal] = useState(0);
+  const [esServicioMedico, setEsServicioMedico] = useState(false); // Detecta si requiere agenda
   
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm();
   const fechaNacimiento = watch("fechaNacimiento");
+
+
+  // 🧠 CEREBRO FINANCIERO: Recalcula precio al cambiar servicio o descuento
+  useEffect(() => {
+    if (!servicioSeleccionado) {
+        setMontoFinal(0);
+        setEsServicioMedico(false);
+        return;
+    }
+
+    // 1. Detectar si es servicio médico (busca palabras clave o tipo)
+    const esServ = servicioSeleccionado.tipo === "Servicio" || servicioSeleccionado.nombre.toLowerCase().includes("consulta");
+    setEsServicioMedico(esServ);
+
+    // 2. Limpieza de precio
+    let precioBase = parseFloat(servicioSeleccionado.precio.toString().replace(/[$,]/g, '')) || 0;
+    
+    // 3. Aplicar Descuento
+    if (descuentoSeleccionado && precioBase > 0) {
+      if (descuentoSeleccionado.tipo === "Porcentaje") {
+        const cantidadDescontar = (precioBase * descuentoSeleccionado.valor) / 100;
+        precioBase = precioBase - cantidadDescontar;
+      } else if (descuentoSeleccionado.tipo === "Monto") {
+        precioBase = precioBase - descuentoSeleccionado.valor;
+      }
+    }
+    
+    setMontoFinal(Math.max(0, precioBase));
+  }, [servicioSeleccionado, descuentoSeleccionado]);
 
   // Cálculo de edad
   useEffect(() => {
@@ -85,6 +122,9 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
 
   const onSubmit = async (data: any) => {
     if (!servicioSeleccionado) return toast.warning("Por favor selecciona un servicio inicial.");
+    if (esServicioMedico && (!data.medicoId || !data.fechaCita || !data.horaCita)) {
+        return toast.error("⚠️ Para este servicio debes asignar Médico, Fecha y Hora.");
+    }
     setIsSubmitting(true);
     
     try {
@@ -154,14 +194,53 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
       
       const docRef = await addDoc(collection(db, "pacientes"), patientData);
 
+      if (esServicioMedico) {
+          const medicoElegido = medicos.find(m => m.id === data.medicoId);
+          
+          // A. Google Calendar
+          const resultadoGoogle = await agendarCitaGoogle({
+              calendarId: medicoElegido.calendarId,
+              doctorNombre: medicoElegido.nombre,
+              fecha: data.fechaCita,
+              hora: data.horaCita,
+              pacienteNombre: nombreConstruido,
+              motivo: "Primera Vez: " + servicioSeleccionado.nombre,
+              duracionMinutos: parseInt(servicioSeleccionado?.duracion || "30")
+          });
+
+          // B. Firebase Citas
+          await addDoc(collection(db, "citas"), {
+              doctorId: medicoElegido.id,
+              doctorNombre: medicoElegido.nombre,
+              paciente: nombreConstruido,
+              pacienteId: docRef.id,
+              fecha: data.fechaCita,
+              hora: data.horaCita,
+              motivo: servicioSeleccionado.nombre,
+              creadoEn: new Date(),
+              googleEventId: resultadoGoogle.googleEventId || null,
+              confirmada: true 
+          });
+      }
+
       await addDoc(collection(db, "operaciones"), {
         pacienteId: docRef.id,
         pacienteNombre: patientData.nombreCompleto,
         servicioSku: servicioSeleccionado.sku,
         servicioNombre: servicioSeleccionado.nombre,
-        monto: servicioSeleccionado.precio,
+        
+        // --- DATOS FINANCIEROS ACTUALIZADOS ---
+        monto: montoFinal, 
+        montoOriginal: parseFloat(servicioSeleccionado.precio.toString().replace(/[$,]/g, '')) || 0,
+        descuentoAplicado: descuentoSeleccionado ? descuentoSeleccionado.nombre : null,
+        
         fecha: serverTimestamp(),
-        estatus: "Pendiente de Pago"
+        // Autopago si es cortesía ($0)
+        estatus: montoFinal === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago", 
+        
+        esCita: esServicioMedico,
+        doctorId: data.medicoId || null,
+        doctorNombre: medicos.find(m => m.id === data.medicoId)?.nombre || null
       });
       
       toast.success("✅ Paciente registrado exitosamente.");
@@ -187,11 +266,15 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         
         {/* === SECCIÓN 0: SERVICIO INICIAL === */}
+        {/* === SECCIÓN 0: SERVICIO Y AGENDA (MEJORADA) === */}
         <section className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-          <h2 className="text-xl font-bold text-blue-800 border-b border-blue-200 pb-2 mb-4">💰 Servicio Inicial</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <h2 className="text-xl font-bold text-blue-800 border-b border-blue-200 pb-2 mb-4 flex items-center gap-2">
+             📅 Cita y Servicio Inicial
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
             <div>
-              <label className={labelStyle}>Seleccionar Servicio a Cobrar</label>
+              <label className={labelStyle}>Servicio a Realizar</label>
               <select className={inputStyle} onChange={handleServicioChange} required>
                 <option value="">-- Selecciona del Catálogo --</option>
                 {servicios.map(s => (
@@ -199,18 +282,69 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
                 ))}
               </select>
             </div>
-            <div className="flex items-center">
-               {servicioSeleccionado && (
-                 <div className="flex gap-4 items-end">
-                    <div>
-                        <p className="text-xs text-slate-500">Precio:</p>
-                        <p className="text-2xl font-bold text-green-600">{servicioSeleccionado.precio}</p>
-                    </div>
-                    <span className="text-xs bg-white border px-2 py-1 rounded text-slate-400">SKU: {servicioSeleccionado.sku}</span>
-                 </div>
-               )}
+
+            {/* Selector de Descuento */}
+            <div>
+                <label className={labelStyle}>🏷️ Descuento / Convenio</label>
+                <select 
+                    className={inputStyle}
+                    onChange={(e) => {
+                        const id = e.target.value;
+                        setDescuentoSeleccionado(descuentos.find(d => d.id === id) || null);
+                    }}
+                >
+                    <option value="">-- Ninguno (Precio Lista) --</option>
+                    {descuentos.map(d => (
+                        <option key={d.id} value={d.id}>
+                            {d.nombre} ({d.tipo === 'Porcentaje' ? `-${d.valor}%` : `-$${d.valor}`})
+                        </option>
+                    ))}
+                </select>
             </div>
           </div>
+
+          {/* VISUALIZADOR DE TOTAL */}
+          {servicioSeleccionado && (
+             <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-blue-100 mb-6">
+                 <div>
+                    <p className="text-xs text-slate-500">Precio Lista: <span className="line-through">${servicioSeleccionado.precio}</span></p>
+                    {descuentoSeleccionado && <p className="text-xs text-green-600 font-bold">Aplicado: {descuentoSeleccionado.nombre}</p>}
+                 </div>
+                 <div className="text-right">
+                    <p className="text-xs text-slate-500 uppercase">Total a Pagar</p>
+                    <p className="text-3xl font-bold text-blue-700">${montoFinal.toFixed(2)}</p>
+                 </div>
+             </div>
+          )}
+
+          {/* CAMPOS DE AGENDA (Solo aparecen si es servicio médico) */}
+          {esServicioMedico && (
+             <div className="bg-white p-4 rounded-lg border border-blue-200 animate-fade-in">
+                <h3 className="text-sm font-bold text-blue-900 mb-3 uppercase">Datos de la Cita</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label className={labelStyle}>Médico / Especialista</label>
+                        <select className={inputStyle} {...register("medicoId", { required: true })}>
+                            <option value="">-- Seleccionar --</option>
+                            {/* Filtramos médicos según el área del servicio si existe */}
+                            {/* Filtramos médicos con seguridad usando ?. */}
+{medicos.filter(m => !servicioSeleccionado?.area || m.especialidad === servicioSeleccionado?.area || m.especialidad === "General")
+    .map(m => (
+    <option key={m.id} value={m.id}>{m.nombre} ({m.especialidad})</option>
+))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className={labelStyle}>Fecha Cita</label>
+                        <input type="date" className={inputStyle} {...register("fechaCita", { required: true })} />
+                    </div>
+                    <div>
+                        <label className={labelStyle}>Hora Inicio</label>
+                        <input type="time" className={inputStyle} {...register("horaCita", { required: true })} />
+                    </div>
+                </div>
+             </div>
+          )}
         </section>
 
         {/* === SECCIÓN 1: IDENTIDAD === */}
@@ -275,9 +409,14 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
         </section>
 
         {/* === SECCIÓN 2: SOCIODEMOGRÁFICOS === */}
-        <section>
-            <h2 className={sectionTitle}>🌎 Datos Sociodemográficos</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* === SECCIONES 2 y 3: DATOS COMPLEMENTARIOS (Acordeón simplificado) === */}
+        <details className="group border rounded-lg bg-gray-50 mb-6">
+            <summary className="cursor-pointer p-4 font-bold text-slate-700 list-none flex justify-between items-center">
+                <span>📋 Datos Demográficos y Marketing (Opcional)</span>
+                <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="p-4 pt-0 border-t grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                {/* Campos Sociodemográficos */}
                 <div>
                     <label className={labelStyle}>Lugar de Nacimiento</label>
                     <select className={inputStyle} {...register("lugarNacimiento")}>
@@ -300,46 +439,27 @@ export default function PatientFormClient({ servicios }: PatientFormProps) {
                     </select>
                 </div>
                 <div>
-                    <label className={labelStyle}>Religión</label>
-                    <select className={inputStyle} {...register("religion")}>
-                        <option value="">Seleccionar...</option>
-                        {RELIGIONES.map(e => <option key={e} value={e}>{e}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label className={labelStyle}>Escolaridad</label>
-                    <select className={inputStyle} {...register("escolaridad")}>
-                        <option value="">Seleccionar...</option>
-                        {ESCOLARIDAD.map(e => <option key={e} value={e}>{e}</option>)}
-                    </select>
-                </div>
-                <div>
                     <label className={labelStyle}>Ocupación</label>
                     <select className={inputStyle} {...register("ocupacion")}>
                         <option value="">Seleccionar...</option>
                         {OCUPACIONES.map(e => <option key={e} value={e}>{e}</option>)}
                     </select>
                 </div>
-            </div>
-        </section>
-
-        {/* === SECCIÓN 3: MARKETING === */}
-        <section className="bg-gray-50 p-6 rounded-lg">
-            <h2 className={sectionTitle}>📢 ¿Cómo se enteró de nosotros?</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Campos Marketing */}
                 <div>
-                    <label className={labelStyle}>¿Cómo se enteró de SANSCE?</label>
-                    <select className={inputStyle} {...register("medioMarketing", { required: true })}>
+                    <label className={labelStyle}>¿Cómo se enteró?</label>
+                    <select className={inputStyle} {...register("medioMarketing")}>
                         <option value="">Seleccionar...</option>
                         {MEDIOS_MARKETING.map(e => <option key={e} value={e}>{e}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label className={labelStyle}>Nombre de quien refiere (Opcional)</label>
-                    <input type="text" className={inputStyle} {...register("referidoPor")} placeholder="Nombre del médico o familiar" />
+                    <label className={labelStyle}>Referido Por</label>
+                    <input type="text" className={inputStyle} {...register("referidoPor")} placeholder="Opcional" />
                 </div>
             </div>
-        </section>
+        </details>
 
         {/* === SECCIÓN 4: DATOS FISCALES === */}
         <section className="border-t pt-6">
