@@ -40,11 +40,18 @@ export default function CitaDetalleModal({ isOpen, onClose, cita }: ModalProps) 
     try {
       
       // 1. Borrar de Google (Si tiene ID y Calendario)
-      if (cita.googleEventId && cita.doctorCalendarId) { 
+      // La cita viene con 'doctorCalendarId' porque así lo armamos en AgendaBoard.tsx
+      const calendarIdReal = cita.doctorCalendarId || cita.calendarId; 
+      
+      if (cita.googleEventId && calendarIdReal) { 
+           console.log("Intentando borrar de Google...", { calendarIdReal, eventId: cita.googleEventId });
+           
            await cancelarCitaGoogle({
-               calendarId: cita.doctorCalendarId, 
+               calendarId: calendarIdReal, // ✅ CORREGIDO: Usamos la variable unificada
                eventId: cita.googleEventId
            });
+      } else {
+           console.warn("No se borró de Google: Faltan datos (ID Evento o ID Calendario)", cita);
       }
 
       // --- 🟢 NUEVO BLOQUE: BORRAR LA DEUDA EN CAJA ---
