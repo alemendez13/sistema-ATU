@@ -1,8 +1,12 @@
 [
   {
-    "origin": ["*"],
-    "method": ["GET", "HEAD", "PUT", "POST", "DELETE"],
-    "responseHeader": ["Content-Type", "Access-Control-Allow-Origin"],
+    "origin": [
+      "http://localhost:3000",
+      "https://sistema-atu.netlify.app",
+      "https://tu-dominio-real.com"
+    ],
+    "method": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "responseHeader": ["Authorization", "Content-Type"],
     "maxAgeSeconds": 3600
   }
 ]
