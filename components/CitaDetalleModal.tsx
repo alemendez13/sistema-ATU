@@ -13,6 +13,7 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   cita: any; 
+  onEditar?: (cita: any) => void;
 }
 
 export default function CitaDetalleModal({ isOpen, onClose, cita }: ModalProps) {

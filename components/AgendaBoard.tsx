@@ -81,6 +81,7 @@ export default function AgendaBoard({ medicos, servicios }: AgendaBoardProps) {
   
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [citaDetalle, setCitaDetalle] = useState<any>(null);
+  const [citaParaEditar, setCitaParaEditar] = useState<any>(null);
   
 
   const medicosHash = medicos.map(m => m.id).join(",");
@@ -203,6 +204,24 @@ export default function AgendaBoard({ medicos, servicios }: AgendaBoardProps) {
       setIsDetailOpen(true);
   };
 
+  // 🆕 FUNCIÓN PARA INICIAR EDICIÓN
+  const handleEditarCita = (cita: any) => {
+      setIsDetailOpen(false); // Cerramos el detalle
+      
+      const medico = medicos.find(m => m.id === cita.doctorId);
+      
+      // Configuramos el slot con los datos actuales
+      setSelectedSlot({
+          doctor: medico,
+          hora: cita.hora,
+          fecha: cita.fecha,
+          prefilledName: cita.paciente, 
+      });
+      
+      setCitaParaEditar(cita); // Guardamos la referencia
+      setIsModalOpen(true);    // Abrimos el formulario
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="max-w-full mx-auto">
@@ -315,16 +334,21 @@ export default function AgendaBoard({ medicos, servicios }: AgendaBoardProps) {
         {/* 👇 MODIFICACIÓN CRÍTICA: Pasamos 'bloqueos' al modal para que sepa qué está ocupado en Google */}
         <ModalReserva 
             isOpen={isModalOpen} 
-            onClose={() => setIsModalOpen(false)} 
+            onClose={() => { 
+                setIsModalOpen(false); 
+                setCitaParaEditar(null); // 🆕 Limpiamos al cerrar
+            }} 
             data={selectedSlot}
             catalogoServicios={servicios} 
-            bloqueos={bloqueos} // 👈 ¡ESTA ES LA LÍNEA NUEVA!
+            bloqueos={bloqueos}
+            citaExistente={citaParaEditar} // 🆕 Pasamos la cita a editar
         />
         
-        <CitaDetalleModal 
+    <CitaDetalleModal 
             isOpen={isDetailOpen}
             onClose={() => setIsDetailOpen(false)}
             cita={citaDetalle}
+            onEditar={handleEditarCita} // 🆕 Conectamos el botón
         />
         <WaitingList onAsignar={(p: any) => { setPacienteEnEspera({ nombre: p.paciente, id: p.id }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}/>
       </div>

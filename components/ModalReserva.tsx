@@ -16,7 +16,8 @@ interface ModalProps {
     waitingListId?: string;
   } | null;
   catalogoServicios: any[];
-  bloqueos: string[]; // 👈 NUEVO: Recibimos la lista de bloqueos de Google
+  bloqueos: string[]; 
+  citaExistente?: any;
 }
 
 const sumarMinutos = (hora: string, minutos: number) => {
