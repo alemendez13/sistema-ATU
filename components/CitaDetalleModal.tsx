@@ -16,7 +16,8 @@ interface ModalProps {
   onEditar?: (cita: any) => void;
 }
 
-export default function CitaDetalleModal({ isOpen, onClose, cita }: ModalProps) {
+// 👇 CORRECCIÓN 1: Agregamos 'onEditar' aquí para poder usarlo
+export default function CitaDetalleModal({ isOpen, onClose, cita, onEditar }: ModalProps) {
   const [loading, setLoading] = useState(false);
 
   if (!isOpen || !cita) return null;
@@ -41,33 +42,30 @@ export default function CitaDetalleModal({ isOpen, onClose, cita }: ModalProps) 
     try {
       
       // 1. Borrar de Google (Si tiene ID y Calendario)
-      // La cita viene con 'doctorCalendarId' porque así lo armamos en AgendaBoard.tsx
       const calendarIdReal = cita.doctorCalendarId || cita.calendarId; 
       
       if (cita.googleEventId && calendarIdReal) { 
            console.log("Intentando borrar de Google...", { calendarIdReal, eventId: cita.googleEventId });
            
            await cancelarCitaGoogle({
-               calendarId: calendarIdReal, // ✅ CORREGIDO: Usamos la variable unificada
+               calendarId: calendarIdReal,
                eventId: cita.googleEventId
            });
       } else {
            console.warn("No se borró de Google: Faltan datos (ID Evento o ID Calendario)", cita);
       }
 
-      // --- 🟢 NUEVO BLOQUE: BORRAR LA DEUDA EN CAJA ---
+      // 2. Borrar Deuda en Caja
       try {
           let q;
-          // Estrategia: Buscar la deuda pendiente que coincida con este paciente y doctor
           if (cita.pacienteId) {
               q = query(
                   collection(db, "operaciones"),
                   where("pacienteId", "==", cita.pacienteId),
                   where("doctorId", "==", cita.doctorId), 
-                  where("estatus", "==", "Pendiente de Pago") // Solo borramos si NO ha pagado
+                  where("estatus", "==", "Pendiente de Pago")
               );
           } else {
-              // Si no tiene ID (paciente nuevo), buscamos por nombre exacto
               q = query(
                   collection(db, "operaciones"),
                   where("pacienteNombre", "==", cita.paciente),
@@ -75,21 +73,15 @@ export default function CitaDetalleModal({ isOpen, onClose, cita }: ModalProps) 
                   where("estatus", "==", "Pendiente de Pago")
               );
           }
-
           const snapshot = await getDocs(q);
-          
-          // Borramos las coincidencias encontradas
           snapshot.forEach(async (docOp) => {
               await deleteDoc(doc(db, "operaciones", docOp.id));
-              console.log(`🗑️ Deuda eliminada: ${docOp.id}`);
           });
-
       } catch (errFinanzas) {
-          console.error("Nota: No se pudo limpiar finanzas o ya no existía la deuda.", errFinanzas);
+          console.error("Nota: No se pudo limpiar finanzas", errFinanzas);
       }
-      // ----------------------------------------------------
 
-      // 2. Borrar de Firebase (Agenda Local)
+      // 3. Borrar de Firebase (Agenda Local)
       await deleteDoc(doc(db, "citas", cita.id));
       
       toast.success("🗑️ Cita y cargo eliminados correctamente");
@@ -107,7 +99,7 @@ export default function CitaDetalleModal({ isOpen, onClose, cita }: ModalProps) 
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
         
-        {/* Header */}
+        {/* 👇 CORRECCIÓN 2: Header ACTUALIZADO con botón Editar */}
         <div className="p-4 bg-slate-50 border-b flex justify-between items-start">
           <div>
             <h2 className="text-xl font-bold text-slate-800">{cita.paciente}</h2>
@@ -115,7 +107,25 @@ export default function CitaDetalleModal({ isOpen, onClose, cita }: ModalProps) 
               {cita.fecha} a las <span className="font-bold text-slate-800">{cita.hora} hrs</span>
             </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl">×</button>
+          
+          <div className="flex gap-2 items-center">
+              {/* Botón Editar */}
+              {onEditar && (
+                <button 
+                    onClick={() => onEditar(cita)}
+                    className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-xs font-bold uppercase"
+                >
+                    ✏️ Editar
+                </button>
+              )}
+
+              <button 
+                  onClick={onClose} 
+                  className="text-slate-400 hover:text-slate-600 text-2xl px-2 ml-2"
+              >
+                  ×
+              </button>
+          </div>
         </div>
 
         <div className="p-6 space-y-6">
