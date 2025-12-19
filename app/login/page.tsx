@@ -16,9 +16,20 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      // 1. Autenticación normal con Firebase
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // 2. 🟢 NUEVO: Obtenemos el Token Seguro
+      const user = userCredential.user;
+      const token = await user.getIdToken();
+
+      // 3. 🟢 NUEVO: Creamos la Cookie "Gafete" manualmente
+      // Esto hace que el Middleware pueda ver que ya entramos
+      document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`; 
+
       toast.success("¡Bienvenido a SANSCE!");
       router.push("/"); // Te manda al Dashboard
+      
     } catch (error: any) {
       console.error("Error login:", error);
       toast.error("Credenciales incorrectas. Intenta de nuevo.");
