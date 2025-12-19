@@ -1,23 +1,23 @@
-import { getCatalogos } from "../../../lib/googleSheets";
-import PatientFormClient from "../../../components/forms/PatientFormClient";
+/* UBICACIÓN: app/pacientes/registro/page.tsx */
+import { getCatalogos } from "../../../lib/googleSheets"; // Ajusta la ruta si es necesario
+import PatientFormClient from "../../../components/forms/PatientFormClient"; // Ajusta la ruta a tu componente
+import ProtectedRoute from "../../../components/ProtectedRoute";
 
-// Esta función se ejecuta en el servidor
-export default async function RegisterPage() {
-  
-  // 1. Obtenemos los servicios del Excel
-  const { servicios } = await getCatalogos();
+// Esta línea asegura que la página siempre traiga datos frescos de Google Sheets
+export const dynamic = 'force-dynamic';
 
-  // 2. Renderizamos el formulario pasándole los datos reales
+export default async function RegistroPage() {
+  // 1. Obtenemos TODO el catálogo en una sola llamada
+  const { servicios, medicos, descuentos } = await getCatalogos();
+
   return (
-    <div className="min-h-screen bg-slate-50 py-8">
-      <div className="max-w-5xl mx-auto px-4 mb-4">
-        <a href="/pacientes" className="text-sm text-slate-500 hover:text-blue-600 flex items-center gap-1">
-           ← Volver al Tablero
-        </a>
-      </div>
-      
-      {/* Aquí vive el formulario interactivo */}
-      <PatientFormClient servicios={servicios} />
-    </div>
+    <ProtectedRoute>
+      {/* 2. Le pasamos las 3 listas al formulario */}
+      <PatientFormClient 
+        servicios={servicios} 
+        medicos={medicos} 
+        descuentos={descuentos} 
+      />
+    </ProtectedRoute>
   );
 }
