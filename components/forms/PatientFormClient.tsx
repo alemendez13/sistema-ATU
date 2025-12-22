@@ -321,7 +321,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
       
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         
-        {/* === SECCIÓN 0: SERVICIO EN CASCADA (REEMPLAZO) === */}
+        {/* === SECCIÓN 0: SERVICIO EN CASCADA (CORREGIDO PARA PATIENT FORM) === */}
         <section className="bg-blue-50 p-6 rounded-lg border border-blue-200 shadow-sm">
           <h2 className="text-xl font-bold text-blue-800 border-b border-blue-200 pb-2 mb-4">
              1. Selección del Servicio (Cascada)
@@ -337,14 +337,14 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                     value={selectedArea}
                     onChange={e => {
                         setSelectedArea(e.target.value);
-                        setSelectedMedicoId(""); // Reset
-                        setSelectedTipo(""); // Reset
-                        setServicioSeleccionado(null);
+                        setSelectedMedicoId(""); 
+                        setSelectedTipo(""); 
+                        setServicioSeleccionado(null); // 👈 CORREGIDO: Antes decía setServicioSku
                     }}
                     required
                 >
                     <option value="">-- Seleccionar --</option>
-                    {areasDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
+                    {areasDisponibles.map((a: string) => <option key={a} value={a}>{a}</option>)}
                 </select>
             </div>
 
@@ -355,12 +355,10 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                     className={inputStyle}
                     value={selectedMedicoId}
                     onChange={e => setSelectedMedicoId(e.target.value)}
-                    disabled={!selectedArea || medicosFiltrados.length === 0}
+                    disabled={!selectedArea}
                 >
-                    <option value="">{medicosFiltrados.length === 0 ? "-- N/A --" : "-- Seleccionar (Opcional) --"}</option>
-                    {medicosFiltrados.map(m => (
-                        <option key={m.id} value={m.id}>{m.nombre}</option>
-                    ))}
+                    <option value="">-- Opcional / N/A --</option>
+                    {medicosFiltrados.map((m: any) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
                 </select>
             </div>
 
@@ -372,12 +370,12 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                     value={selectedTipo}
                     onChange={e => {
                         setSelectedTipo(e.target.value);
-                        setServicioSeleccionado(null);
+                        setServicioSeleccionado(null); // 👈 CORREGIDO: Antes decía setServicioSku
                     }}
                     disabled={!selectedArea}
                 >
                     <option value="">-- Seleccionar --</option>
-                    {tiposDisponibles.map(t => <option key={t} value={t}>{t}</option>)}
+                    {tiposDisponibles.map((t: string) => <option key={t} value={t}>{t}</option>)}
                 </select>
             </div>
 
@@ -386,6 +384,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                 <label className={labelStyle}>4. Servicio Específico</label>
                 <select 
                     className={inputStyle}
+                    // 👇 CORREGIDO: Usamos el objeto servicioSeleccionado
                     value={servicioSeleccionado?.sku || ""}
                     onChange={e => {
                         const s = servicios.find(x => x.sku === e.target.value);
@@ -395,14 +394,14 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                     required
                 >
                     <option value="">-- Seleccionar --</option>
-                    {serviciosFinales.map(s => (
+                    {serviciosFinales.map((s: any) => (
                         <option key={s.sku} value={s.sku}>{s.nombre}</option>
                     ))}
                 </select>
             </div>
           </div>
 
-          {/* DESCUENTO Y TOTAL (CONSERVADO) */}
+          {/* DESCUENTO Y TOTAL */}
           <div className="flex flex-col md:flex-row gap-4 items-end bg-white p-4 rounded border border-blue-100">
              <div className="flex-1 w-full">
                 <label className={labelStyle}>🏷️ Descuento / Convenio</label>
@@ -411,7 +410,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                     onChange={(e) => setDescuentoSeleccionado(descuentos.find(d => d.id === e.target.value) || null)}
                 >
                     <option value="">-- Ninguno (Precio Lista) --</option>
-                    {descuentos.map(d => (
+                    {descuentos.map((d: any) => (
                         <option key={d.id} value={d.id}>
                             {d.nombre} ({d.tipo === 'Porcentaje' ? `-${d.valor}%` : `-$${d.valor}`})
                         </option>
@@ -422,6 +421,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
              {servicioSeleccionado && (
                  <div className="text-right">
                     <p className="text-xs text-slate-400 line-through">
+                        {/* Validación de tipo para evitar errores de .toFixed */}
                         ${typeof servicioSeleccionado.precio === 'number' ? servicioSeleccionado.precio.toFixed(2) : servicioSeleccionado.precio}
                     </p>
                     <p className="text-3xl font-bold text-blue-700">${montoFinal.toFixed(2)}</p>
@@ -429,7 +429,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
              )}
           </div>
 
-          {/* AGENDA (CONSERVADO) */}
+          {/* AGENDA (Solo si aplica) */}
           {esServicioMedico && (
              <div className="mt-4 pt-4 border-t border-blue-200">
                 <h3 className="text-sm font-bold text-blue-900 mb-2 uppercase">📅 Datos de la Cita</h3>
