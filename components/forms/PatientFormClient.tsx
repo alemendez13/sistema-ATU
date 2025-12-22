@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase";
@@ -19,7 +19,7 @@ const ESTADO_CIVIL = ["Soltero", "Casado", "Divorciado", "Viudo", "Concubinato"]
 const RELIGIONES = ["Ninguna", "Catolicismo", "Cristianismo", "Testigo de Jehová", "Judaísmo", "Islam", "Budismo", "Hinduismo", "Otra"];
 const ESCOLARIDAD = ["Analfabeta", "Sabe leer y escribir", "Preescolar", "Primaria", "Secundaria", "Preparatoria", "Licenciatura", "Postgrado", "Otro"];
 const OCUPACIONES = ["Empleado", "Empresario", "Comerciante", "Profesional de la salud", "Oficinista", "Obrero", "Ama de casa", "Desempleado", "Estudiante", "Jubilado", "Otro"];
-const MEDIOS_MARKETING = ["Google", "Doctoralia", "Facebook", "Instagram", "Página Web", "WhatsApp", "Recomendación Familiar", "Recomendación Profesional Salud", "Otro"];
+const MEDIOS_MARKETING = ["Pacientes", "Google", "Doctoralia", "Facebook", "Instagram", "Página Web", "WhatsApp", "Recomendación Familiar", "Recomendación Profesional Salud", "Otro"];
 const REGIMENES_FISCALES = [
   "601 - General de Ley Personas Morales",
   "603 - Personas Morales con Fines no Lucrativos",
@@ -43,7 +43,7 @@ const USOS_CFDI = [
 interface Servicio {
   sku: string;
   nombre: string;
-  precio: string;
+  precio: string | number;
   tipo?: string;
   duracion?: string; 
   area?: string;
@@ -58,58 +58,103 @@ interface PatientFormProps {
 export default function PatientFormClient({ servicios, medicos, descuentos }: PatientFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [age, setAge] = useState<number | null>(null);
-  const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null);
-  const [requiereFactura, setRequiereFactura] = useState(false);
   const router = useRouter();
   
-  // FOTO DEL PACIENTE (Solo el File, el preview lo maneja el componente Smart)
+  // --- ESTADOS PARA SELECCIÓN EN CASCADA (NUEVO) ---
+  const [selectedArea, setSelectedArea] = useState("");
+  const [selectedMedicoId, setSelectedMedicoId] = useState("");
+  const [selectedTipo, setSelectedTipo] = useState("");
+  const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null);
+
+  // Estados financieros y archivos
+  const [requiereFactura, setRequiereFactura] = useState(false);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [constanciaFile, setConstanciaFile] = useState<File | null>(null); // Nuevo: Constancia Fiscal
   const [descuentoSeleccionado, setDescuentoSeleccionado] = useState<any>(null);
   const [montoFinal, setMontoFinal] = useState(0);
-  const [esServicioMedico, setEsServicioMedico] = useState(false); // Detecta si requiere agenda
+  const [esServicioMedico, setEsServicioMedico] = useState(false);
   
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm();
   const fechaNacimiento = watch("fechaNacimiento");
 
+  // 🧠 LÓGICA DE FILTRADO (CASCADA)
+  // 1. Áreas Disponibles
+  const areasDisponibles = useMemo(() => {
+    const areas = new Set<string>();
+    servicios.forEach(s => s.area && areas.add(s.area));
+    medicos.forEach(m => m.especialidad && areas.add(m.especialidad));
+    return Array.from(areas).sort();
+  }, [servicios, medicos]);
 
-  // 🧠 CEREBRO FINANCIERO: Recalcula precio al cambiar servicio o descuento
+  // 2. Médicos Filtrados
+  const medicosFiltrados = useMemo(() => {
+    if (!selectedArea) return [];
+    return medicos.filter(m => m.especialidad === selectedArea || m.especialidad === "General");
+  }, [selectedArea, medicos]);
+
+  // 3. Tipos de Servicio
+  const tiposDisponibles = useMemo(() => {
+    if (!selectedArea) return [];
+    const servsDelArea = servicios.filter(s => s.area === selectedArea);
+    const tipos = new Set<string>();
+    servsDelArea.forEach(s => {
+        if (s.tipo === "Laboratorio") tipos.add("Estudios de Laboratorio");
+        else if (s.tipo === "Producto") tipos.add("Farmacia / Productos");
+        else if (s.nombre.toLowerCase().includes("paquete")) tipos.add("Paquetes");
+        else tipos.add("Consulta / Terapia");
+    });
+    return Array.from(tipos).sort();
+  }, [selectedArea, servicios]);
+
+  // 4. Servicios Finales
+  const serviciosFinales = useMemo(() => {
+    if (!selectedArea || !selectedTipo) return [];
+    return servicios.filter(s => {
+        const coincideArea = s.area === selectedArea;
+        let coincideTipo = false;
+        if (selectedTipo === "Estudios de Laboratorio") coincideTipo = s.tipo === "Laboratorio";
+        else if (selectedTipo === "Farmacia / Productos") coincideTipo = s.tipo === "Producto";
+        else if (selectedTipo === "Paquetes") coincideTipo = s.nombre.toLowerCase().includes("paquete");
+        else coincideTipo = s.tipo === "Servicio" && !s.nombre.toLowerCase().includes("paquete");
+        return coincideArea && coincideTipo;
+    });
+  }, [selectedArea, selectedTipo, servicios]);
+
+  // 🧠 CEREBRO FINANCIERO ACTUALIZADO
   useEffect(() => {
     if (!servicioSeleccionado) {
         setMontoFinal(0);
         setEsServicioMedico(false);
         return;
     }
+    // Detectar agenda (Servicio y NO laboratorio)
+    const esAgenda = (servicioSeleccionado.tipo === "Servicio") && !servicioSeleccionado.nombre.toLowerCase().includes("laboratorio");
+    setEsServicioMedico(esAgenda);
 
-    // 1. Detectar si es servicio médico (busca palabras clave o tipo)
-    const esServ = servicioSeleccionado.tipo === "Servicio" || servicioSeleccionado.nombre.toLowerCase().includes("consulta");
-    setEsServicioMedico(esServ);
-
-    // 2. Limpieza de precio
-    let precioBase = parseFloat(servicioSeleccionado.precio.toString().replace(/[$,]/g, '')) || 0;
+    // Limpieza precio
+    let precioBase = typeof servicioSeleccionado.precio === 'string' 
+        ? parseFloat(servicioSeleccionado.precio.replace(/[$,]/g, '')) 
+        : Number(servicioSeleccionado.precio);
     
-    // 3. Aplicar Descuento
+    // Descuento
     if (descuentoSeleccionado && precioBase > 0) {
       if (descuentoSeleccionado.tipo === "Porcentaje") {
-        const cantidadDescontar = (precioBase * descuentoSeleccionado.valor) / 100;
-        precioBase = precioBase - cantidadDescontar;
-      } else if (descuentoSeleccionado.tipo === "Monto") {
+        precioBase = precioBase - ((precioBase * descuentoSeleccionado.valor) / 100);
+      } else {
         precioBase = precioBase - descuentoSeleccionado.valor;
       }
     }
-    
-    setMontoFinal(Math.max(0, precioBase));
+    setMontoFinal(Math.max(0, precioBase || 0));
   }, [servicioSeleccionado, descuentoSeleccionado]);
 
-  // Cálculo de edad
+  // Cálculo de edad (Se mantiene igual, no lo toques)
   useEffect(() => {
     if (fechaNacimiento) {
       const today = new Date();
       const birthDate = new Date(fechaNacimiento);
       let calculatedAge = today.getFullYear() - birthDate.getFullYear();
       const m = today.getMonth() - birthDate.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        calculatedAge--;
-      }
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) calculatedAge--;
       setAge(calculatedAge);
     }
   }, [fechaNacimiento]);
@@ -121,37 +166,43 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
   };
 
   const onSubmit = async (data: any) => {
-    if (!servicioSeleccionado) return toast.warning("Por favor selecciona un servicio inicial.");
-    if (esServicioMedico && (!data.medicoId || !data.fechaCita || !data.horaCita)) {
-        return toast.error("⚠️ Para este servicio debes asignar Médico, Fecha y Hora.");
+    // 1. VALIDACIONES INICIALES
+    if (!servicioSeleccionado) return toast.warning("Por favor completa la selección del servicio.");
+    
+    // Validación de Agenda: Si es médico, forzamos selección de profesional
+    if (esServicioMedico) {
+        if (!selectedMedicoId) return toast.warning("Debes seleccionar un Profesional de la Salud.");
+        if (!data.fechaCita || !data.horaCita) return toast.error("Faltan datos de fecha/hora para la cita.");
     }
+
     setIsSubmitting(true);
     
     try {
-      // 1. Validación de Stock (Solo Productos)
+      // 2. STOCK (Conservado)
       if (servicioSeleccionado.tipo === "Producto") {
         const verificacion = await verificarStock(servicioSeleccionado.sku, 1);
         if (!verificacion.suficiente) {
-          toast.error("❌ Stock insuficiente para este servicio.");
+          toast.error("❌ Stock insuficiente.");
           setIsSubmitting(false);
           return;
         }
         await descontarStockPEPS(servicioSeleccionado.sku, servicioSeleccionado.nombre, 1);
       }
 
-      // 2.1 SUBIDA DE FOTO
+      // 3. SUBIDA DE ARCHIVOS (Mejorado: Foto + Constancia)
       let fotoUrl = null;
+      let constanciaUrl = null;
+
       if (fotoFile) {
-        try {
-          const storageRef = ref(storage, `pacientes/${Date.now()}_${fotoFile.name}`);
-          const snapshot = await uploadBytes(storageRef, fotoFile);
-          fotoUrl = await getDownloadURL(snapshot.ref);
-        } catch (uploadError) {
-          console.error("Error subiendo foto:", uploadError);
-        }
+          const snap = await uploadBytes(ref(storage, `pacientes/fotos/${Date.now()}_${fotoFile.name}`), fotoFile);
+          fotoUrl = await getDownloadURL(snap.ref);
+      }
+      if (constanciaFile) {
+          const snap = await uploadBytes(ref(storage, `pacientes/fiscales/${Date.now()}_${constanciaFile.name}`), constanciaFile);
+          constanciaUrl = await getDownloadURL(snap.ref);
       }
 
-      // 2.2 Preparar datos COMPLETOS del Paciente
+      // 4. PREPARAR DATOS DEL PACIENTE (Mejorado: Nuevos Campos)
       const nombreConstruido = `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno || ''}`.trim().toUpperCase();
 
       const patientData = {
@@ -163,7 +214,8 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
         edad: age || 0,
         genero: data.genero,
         tutor: (age !== null && age < 18) ? (data.tutor || null) : null,
-        fotoUrl: fotoUrl, // URL obtenida de Firebase Storage
+        fotoUrl, 
+        constanciaFiscalUrl: constanciaUrl, // ✅ Nuevo
         
         telefonoCelular: data.telefonoCelular,
         telefonoFijo: data.telefonoFijo || null,
@@ -175,6 +227,8 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
         religion: data.religion,
         escolaridad: data.escolaridad,
         ocupacion: data.ocupacion,
+        curp: data.curp ? data.curp.toUpperCase() : null, // ✅ Nuevo
+        grupoEtnico: data.grupoEtnico || null, // ✅ Nuevo
 
         medioMarketing: data.medioMarketing,
         referidoPor: data.referidoPor || null,
@@ -194,24 +248,27 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
       
       const docRef = await addDoc(collection(db, "pacientes"), patientData);
 
-      if (esServicioMedico) {
-          const medicoElegido = medicos.find(m => m.id === data.medicoId);
+      // 5. AGENDA GOOGLE Y LOCAL (Conservado y Adaptado)
+      let doctorFinalId = selectedMedicoId || null;
+      let doctorFinalNombre = medicos.find(m => m.id === selectedMedicoId)?.nombre || null;
+
+      if (esServicioMedico && doctorFinalId) {
+          const medicoObj = medicos.find(m => m.id === doctorFinalId);
           
-          // A. Google Calendar
+          // ✅ AQUÍ ESTÁ LA INTEGRACIÓN CON GOOGLE
           const resultadoGoogle = await agendarCitaGoogle({
-              calendarId: medicoElegido.calendarId,
-              doctorNombre: medicoElegido.nombre,
+              calendarId: medicoObj.calendarId,
+              doctorNombre: medicoObj.nombre,
               fecha: data.fechaCita,
               hora: data.horaCita,
               pacienteNombre: nombreConstruido,
-              motivo: "Primera Vez: " + servicioSeleccionado.nombre,
+              motivo: "1ra Vez: " + servicioSeleccionado.nombre,
               duracionMinutos: parseInt(servicioSeleccionado?.duracion || "30")
           });
 
-          // B. Firebase Citas
           await addDoc(collection(db, "citas"), {
-              doctorId: medicoElegido.id,
-              doctorNombre: medicoElegido.nombre,
+              doctorId: medicoObj.id,
+              doctorNombre: medicoObj.nombre,
               paciente: nombreConstruido,
               pacienteId: docRef.id,
               fecha: data.fechaCita,
@@ -223,27 +280,26 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
           });
       }
 
+      // 6. OPERACIÓN FINANCIERA (Mejorado: Desglose)
       await addDoc(collection(db, "operaciones"), {
         pacienteId: docRef.id,
         pacienteNombre: patientData.nombreCompleto,
         servicioSku: servicioSeleccionado.sku,
         servicioNombre: servicioSeleccionado.nombre,
         
-        // --- DATOS FINANCIEROS ACTUALIZADOS ---
         monto: montoFinal, 
-        montoOriginal: parseFloat(servicioSeleccionado.precio.toString().replace(/[$,]/g, '')) || 0,
+        montoOriginal: typeof servicioSeleccionado.precio === 'string' ? parseFloat(servicioSeleccionado.precio.replace(/[$,]/g, '')) : servicioSeleccionado.precio,
         descuentoAplicado: descuentoSeleccionado ? descuentoSeleccionado.nombre : null,
         
         fecha: serverTimestamp(),
-        // Autopago si es cortesía ($0)
         estatus: montoFinal === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago", 
         
         esCita: esServicioMedico,
-        doctorId: data.medicoId || null,
-        doctorNombre: medicos.find(m => m.id === data.medicoId)?.nombre || null
+        doctorId: doctorFinalId,
+        doctorNombre: doctorFinalNombre
       });
       
-      toast.success("✅ Paciente registrado exitosamente.");
+      toast.success("✅ Paciente registrado.");
       router.push('/pacientes'); 
       
     } catch (error: any) {
@@ -265,33 +321,94 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
       
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         
-        {/* === SECCIÓN 0: SERVICIO INICIAL === */}
-        {/* === SECCIÓN 0: SERVICIO Y AGENDA (MEJORADA) === */}
-        <section className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-          <h2 className="text-xl font-bold text-blue-800 border-b border-blue-200 pb-2 mb-4 flex items-center gap-2">
-             📅 Cita y Servicio Inicial
+        {/* === SECCIÓN 0: SERVICIO EN CASCADA (REEMPLAZO) === */}
+        <section className="bg-blue-50 p-6 rounded-lg border border-blue-200 shadow-sm">
+          <h2 className="text-xl font-bold text-blue-800 border-b border-blue-200 pb-2 mb-4">
+             1. Selección del Servicio (Cascada)
           </h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            
+            {/* PASO 1: ESPECIALIDAD */}
             <div>
-              <label className={labelStyle}>Servicio a Realizar</label>
-              <select className={inputStyle} onChange={handleServicioChange} required>
-                <option value="">-- Selecciona del Catálogo --</option>
-                {servicios.map(s => (
-                  <option key={s.sku} value={s.sku}>{s.nombre}</option>
-                ))}
-              </select>
+                <label className={labelStyle}>1. Especialidad / Área</label>
+                <select 
+                    className={inputStyle} 
+                    value={selectedArea}
+                    onChange={e => {
+                        setSelectedArea(e.target.value);
+                        setSelectedMedicoId(""); // Reset
+                        setSelectedTipo(""); // Reset
+                        setServicioSeleccionado(null);
+                    }}
+                    required
+                >
+                    <option value="">-- Seleccionar --</option>
+                    {areasDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
             </div>
 
-            {/* Selector de Descuento */}
+            {/* PASO 2: PROFESIONAL */}
             <div>
+                <label className={labelStyle}>2. Profesional</label>
+                <select 
+                    className={inputStyle}
+                    value={selectedMedicoId}
+                    onChange={e => setSelectedMedicoId(e.target.value)}
+                    disabled={!selectedArea || medicosFiltrados.length === 0}
+                >
+                    <option value="">{medicosFiltrados.length === 0 ? "-- N/A --" : "-- Seleccionar (Opcional) --"}</option>
+                    {medicosFiltrados.map(m => (
+                        <option key={m.id} value={m.id}>{m.nombre}</option>
+                    ))}
+                </select>
+            </div>
+
+            {/* PASO 3: TIPO DE SERVICIO */}
+            <div>
+                <label className={labelStyle}>3. Tipo de Consulta</label>
+                <select 
+                    className={inputStyle}
+                    value={selectedTipo}
+                    onChange={e => {
+                        setSelectedTipo(e.target.value);
+                        setServicioSeleccionado(null);
+                    }}
+                    disabled={!selectedArea}
+                >
+                    <option value="">-- Seleccionar --</option>
+                    {tiposDisponibles.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+            </div>
+
+            {/* PASO 4: SERVICIO FINAL */}
+            <div>
+                <label className={labelStyle}>4. Servicio Específico</label>
+                <select 
+                    className={inputStyle}
+                    value={servicioSeleccionado?.sku || ""}
+                    onChange={e => {
+                        const s = servicios.find(x => x.sku === e.target.value);
+                        setServicioSeleccionado(s || null);
+                    }}
+                    disabled={!selectedTipo}
+                    required
+                >
+                    <option value="">-- Seleccionar --</option>
+                    {serviciosFinales.map(s => (
+                        <option key={s.sku} value={s.sku}>{s.nombre}</option>
+                    ))}
+                </select>
+            </div>
+          </div>
+
+          {/* DESCUENTO Y TOTAL (CONSERVADO) */}
+          <div className="flex flex-col md:flex-row gap-4 items-end bg-white p-4 rounded border border-blue-100">
+             <div className="flex-1 w-full">
                 <label className={labelStyle}>🏷️ Descuento / Convenio</label>
                 <select 
                     className={inputStyle}
-                    onChange={(e) => {
-                        const id = e.target.value;
-                        setDescuentoSeleccionado(descuentos.find(d => d.id === id) || null);
-                    }}
+                    onChange={(e) => setDescuentoSeleccionado(descuentos.find(d => d.id === e.target.value) || null)}
                 >
                     <option value="">-- Ninguno (Precio Lista) --</option>
                     {descuentos.map(d => (
@@ -300,49 +417,33 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                         </option>
                     ))}
                 </select>
-            </div>
-          </div>
-
-          {/* VISUALIZADOR DE TOTAL */}
-          {servicioSeleccionado && (
-             <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-blue-100 mb-6">
-                 <div>
-                    <p className="text-xs text-slate-500">Precio Lista: <span className="line-through">${servicioSeleccionado.precio}</span></p>
-                    {descuentoSeleccionado && <p className="text-xs text-green-600 font-bold">Aplicado: {descuentoSeleccionado.nombre}</p>}
-                 </div>
+             </div>
+             
+             {servicioSeleccionado && (
                  <div className="text-right">
-                    <p className="text-xs text-slate-500 uppercase">Total a Pagar</p>
+                    <p className="text-xs text-slate-400 line-through">
+                        ${typeof servicioSeleccionado.precio === 'number' ? servicioSeleccionado.precio.toFixed(2) : servicioSeleccionado.precio}
+                    </p>
                     <p className="text-3xl font-bold text-blue-700">${montoFinal.toFixed(2)}</p>
                  </div>
-             </div>
-          )}
+             )}
+          </div>
 
-          {/* CAMPOS DE AGENDA (Solo aparecen si es servicio médico) */}
+          {/* AGENDA (CONSERVADO) */}
           {esServicioMedico && (
-             <div className="bg-white p-4 rounded-lg border border-blue-200 animate-fade-in">
-                <h3 className="text-sm font-bold text-blue-900 mb-3 uppercase">Datos de la Cita</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+             <div className="mt-4 pt-4 border-t border-blue-200">
+                <h3 className="text-sm font-bold text-blue-900 mb-2 uppercase">📅 Datos de la Cita</h3>
+                <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className={labelStyle}>Médico / Especialista</label>
-                        <select className={inputStyle} {...register("medicoId", { required: true })}>
-                            <option value="">-- Seleccionar --</option>
-                            {/* Filtramos médicos según el área del servicio si existe */}
-                            {/* Filtramos médicos con seguridad usando ?. */}
-{medicos.filter(m => !servicioSeleccionado?.area || m.especialidad === servicioSeleccionado?.area || m.especialidad === "General")
-    .map(m => (
-    <option key={m.id} value={m.id}>{m.nombre} ({m.especialidad})</option>
-))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className={labelStyle}>Fecha Cita</label>
+                        <label className={labelStyle}>Fecha</label>
                         <input type="date" className={inputStyle} {...register("fechaCita", { required: true })} />
                     </div>
                     <div>
-                        <label className={labelStyle}>Hora Inicio</label>
+                        <label className={labelStyle}>Hora</label>
                         <input type="time" className={inputStyle} {...register("horaCita", { required: true })} />
                     </div>
                 </div>
+                {!selectedMedicoId && <p className="text-xs text-red-500 mt-1">⚠️ Selecciona un Profesional en el paso 2 para agendar.</p>}
              </div>
           )}
         </section>
