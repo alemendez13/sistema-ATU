@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { db } from "../../../../lib/firebase";
 import { useRouter } from "next/navigation";
@@ -24,12 +24,58 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
   // Estados del Formulario
   const [servicioSku, setServicioSku] = useState("");
   const [descuentoId, setDescuentoId] = useState(""); // 👈 Nuevo Estado
+  const [selectedArea, setSelectedArea] = useState("");
+  const [selectedMedicoId, setSelectedMedicoId] = useState("");
+  const [selectedTipo, setSelectedTipo] = useState("");
   
   // Estados para Agenda
   const [esServicio, setEsServicio] = useState(false);
   const [medicoId, setMedicoId] = useState("");
   const [fechaCita, setFechaCita] = useState("");
   const [horaCita, setHoraCita] = useState("");
+
+  // 🧠 LÓGICA DE FILTRADO (CASCADA) - NUEVO BLOQUE
+  // 1. Áreas Disponibles
+  const areasDisponibles = useMemo(() => {
+    const areas = new Set<string>();
+    servicios.forEach(s => s.area && areas.add(s.area));
+    medicos.forEach(m => m.especialidad && areas.add(m.especialidad));
+    return Array.from(areas).sort();
+  }, [servicios, medicos]);
+
+  // 2. Médicos Filtrados
+  const medicosFiltrados = useMemo(() => {
+    if (!selectedArea) return [];
+    return medicos.filter(m => m.especialidad === selectedArea || m.especialidad === "General");
+  }, [selectedArea, medicos]);
+
+  // 3. Tipos de Servicio
+  const tiposDisponibles = useMemo(() => {
+    if (!selectedArea) return [];
+    const servsDelArea = servicios.filter(s => s.area === selectedArea);
+    const tipos = new Set<string>();
+    servsDelArea.forEach(s => {
+        if (s.tipo === "Laboratorio") tipos.add("Estudios de Laboratorio");
+        else if (s.tipo === "Producto") tipos.add("Farmacia / Productos");
+        else if (s.nombre.toLowerCase().includes("paquete")) tipos.add("Paquetes");
+        else tipos.add("Consulta / Terapia");
+    });
+    return Array.from(tipos).sort();
+  }, [selectedArea, servicios]);
+
+  // 4. Servicios Finales
+  const serviciosFinales = useMemo(() => {
+    if (!selectedArea || !selectedTipo) return [];
+    return servicios.filter(s => {
+        const coincideArea = s.area === selectedArea;
+        let coincideTipo = false;
+        if (selectedTipo === "Estudios de Laboratorio") coincideTipo = s.tipo === "Laboratorio";
+        else if (selectedTipo === "Farmacia / Productos") coincideTipo = s.tipo === "Producto";
+        else if (selectedTipo === "Paquetes") coincideTipo = s.nombre.toLowerCase().includes("paquete");
+        else coincideTipo = s.tipo === "Servicio" && !s.nombre.toLowerCase().includes("paquete");
+        return coincideArea && coincideTipo;
+    });
+  }, [selectedArea, selectedTipo, servicios]);
 
   // 1. Encontrar objetos seleccionados
   const servicioSeleccionado = servicios.find(s => s.sku === servicioSku);
@@ -170,19 +216,62 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
         <form onSubmit={handleVenta} className="space-y-6">
           
           {/* SELECCIÓN DE PRODUCTO */}
-          <div>
-            <label className="block text-sm font-bold text-slate-600 mb-2">Producto o Servicio</label>
-            <select 
-              className="w-full border p-3 rounded-lg bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={servicioSku}
-              onChange={e => setServicioSku(e.target.value)}
-              required
-            >
-              <option value="">-- Seleccionar --</option>
-              {servicios.map(s => (
-                <option key={s.sku} value={s.sku}>{s.nombre} - ${s.precio}</option>
-              ))}
-            </select>
+          {/* CASCADA DE SELECCIÓN (REEMPLAZO) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+              
+              <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">1. Especialidad</label>
+                  <select 
+                      className="w-full border p-2 rounded" 
+                      value={selectedArea}
+                      onChange={e => { setSelectedArea(e.target.value); setSelectedMedicoId(""); setSelectedTipo(""); setServicioSku(""); }}
+                  >
+                      <option value="">-- Seleccionar --</option>
+                      {areasDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+              </div>
+
+              <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">2. Profesional</label>
+                  <select 
+                      className="w-full border p-2 rounded"
+                      value={selectedMedicoId}
+                      onChange={e => setSelectedMedicoId(e.target.value)}
+                      disabled={!selectedArea}
+                  >
+                      <option value="">-- Opcional / N/A --</option>
+                      {medicosFiltrados.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                  </select>
+              </div>
+
+              <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">3. Tipo</label>
+                  <select 
+                      className="w-full border p-2 rounded"
+                      value={selectedTipo}
+                      onChange={e => { setSelectedTipo(e.target.value); setServicioSku(""); }}
+                      disabled={!selectedArea}
+                  >
+                      <option value="">-- Seleccionar --</option>
+                      {tiposDisponibles.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+              </div>
+
+              <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-blue-600 uppercase mb-1">4. Producto / Servicio</label>
+                  <select 
+                      className="w-full border-2 border-blue-200 p-2 rounded font-bold text-slate-700"
+                      value={servicioSku}
+                      onChange={e => setServicioSku(e.target.value)}
+                      disabled={!selectedTipo}
+                      required
+                  >
+                      <option value="">-- Elegir --</option>
+                      {serviciosFinales.map(s => (
+                          <option key={s.sku} value={s.sku}>{s.nombre}</option>
+                      ))}
+                  </select>
+              </div>
           </div>
 
           {/* --- NUEVO: SELECTOR DE DESCUENTOS --- */}
