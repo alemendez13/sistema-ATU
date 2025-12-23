@@ -46,8 +46,15 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
 
   // 2. Médicos Filtrados
   const medicosFiltrados = useMemo(() => {
-    if (!selectedArea) return [];
-    return medicos.filter(m => m.especialidad === selectedArea || m.especialidad === "General");
+  if (!selectedArea) return [];
+  // Si seleccionamos Laboratorio, permitimos elegir a CUALQUIER médico para el seguimiento
+  if (selectedArea === "Laboratorio") return medicos;
+    // Para otras áreas, filtramos por especialidad o Medicina General
+  return medicos.filter(m => 
+    m.especialidad === selectedArea || 
+    m.especialidad === "Medicina General" || 
+    m.especialidad === "General"
+  );
   }, [selectedArea, medicos]);
 
   // 3. Tipos de Servicio
