@@ -18,6 +18,7 @@ export async function agendarCitaGoogle(cita: {
     pacienteNombre: string;
     motivo: string;
     doctorId?: string;
+    esTodoElDia?: boolean;
 }) {
     const calendarId = cita.calendarId;
     
@@ -28,13 +29,21 @@ export async function agendarCitaGoogle(cita: {
     const startDateTime = new Date(`${cita.fecha}T${cita.hora}:00-06:00`); 
     const endDateTime = new Date(startDateTime.getTime() + (cita.duracionMinutos || 30) * 60000);
 
-    const evento = {
-        summary: `🩺 Cita: ${cita.pacienteNombre}`,
-        description: `Motivo: ${cita.motivo}\nRegistrado desde App SANSCE`,
-        start: { dateTime: startDateTime.toISOString(), timeZone: 'America/Mexico_City' },
-        end: { dateTime: endDateTime.toISOString(), timeZone: 'America/Mexico_City' },
-        colorId: '11', 
+    const evento: any = {
+        summary: cita.motivo,
+        description: `Paciente: ${cita.pacienteNombre}\nRegistrado desde App SANSCE`,
+        // Cambiamos a color verde (colorId '2') si es Lab para que resalte en la agenda
+        colorId: cita.esTodoElDia ? '2' : '11', 
     };
+
+    if (cita.esTodoElDia) {
+        // Para eventos de todo el día, Google usa 'date' en lugar de 'dateTime'
+        evento.start = { date: cita.fecha };
+        evento.end = { date: cita.fecha };
+    } else {
+        evento.start = { dateTime: startDateTime.toISOString(), timeZone: 'America/Mexico_City' };
+        evento.end = { dateTime: endDateTime.toISOString(), timeZone: 'America/Mexico_City' };
+    }
 
     try {
         const respuesta = await calendar.events.insert({
