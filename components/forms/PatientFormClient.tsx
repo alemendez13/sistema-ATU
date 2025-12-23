@@ -117,9 +117,18 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
 
   // 2. Médicos Filtrados
   const medicosFiltrados = useMemo(() => {
-    if (!selectedArea) return [];
-    return medicos.filter(m => m.especialidad === selectedArea || m.especialidad === "General");
-  }, [selectedArea, medicos]);
+  if (!selectedArea) return [];
+  
+  // Si es Laboratorio, mostramos toda la lista de profesionales para asignar el responsable
+  if (selectedArea === "Laboratorio") return medicos;
+  
+  // Filtro normal para consultas médicas
+  return medicos.filter(m => 
+    m.especialidad === selectedArea || 
+    m.especialidad === "Medicina General" || 
+    m.especialidad === "General"
+  );
+}, [selectedArea, medicos]);
 
   // 3. Tipos de Servicio
   const tiposDisponibles = useMemo(() => {
