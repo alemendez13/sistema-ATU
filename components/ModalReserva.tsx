@@ -227,8 +227,6 @@ const esLaboratorio =
     servicioDetalle?.nombre?.toUpperCase().includes("LAB") || 
     servicioDetalle?.sku?.toUpperCase().startsWith("LAB"); 
 
-const colorIdGoogle = esLaboratorio ? "11" : "1"; // 11 = Rojo (Lab), 1 = Azul (Servicio)
-
 // 2. Pasamos el colorId a la función (Actualización de la llamada)
 
       // Agendamos la NUEVA posición en Google
@@ -241,7 +239,6 @@ const colorIdGoogle = esLaboratorio ? "11" : "1"; // 11 = Rojo (Lab), 1 = Azul (
           fecha: fechaSeleccionada,
           hora: horaSeleccionada,
           duracionMinutos: duracionMinutos,
-          // >>> INICIO ADICIÓN <<<
           esTodoElDia: esLaboratorio
       });
       
