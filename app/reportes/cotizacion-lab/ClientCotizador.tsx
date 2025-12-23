@@ -7,13 +7,7 @@ import CotizacionLabPDF from "../../../components/documents/CotizacionLabPDF";
 import Link from "next/link";
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
-
-// Helper para limpiar precios
-const parsePrecio = (valor: any) => {
-  if (typeof valor === 'number') return valor;
-  if (!valor) return 0;
-  return parseFloat(valor.toString().replace(/[$,]/g, '')) || 0;
-};
+import { cleanPrice } from "../../../lib/utils"; // ⬅️ Importa tu nueva utilidad
 
 export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[], medicos: any[] }) {
   // Estados
@@ -71,7 +65,7 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
     : [];
 
   const agregarItem = (item: any) => {
-    const itemLimpio = { ...item, precio: parsePrecio(item.precio) };
+    const itemLimpio = { ...item, precio: cleanPrice(item.precio) };
     setItemsSeleccionados([...itemsSeleccionados, itemLimpio]);
     setBusquedaEstudio(""); 
   };
