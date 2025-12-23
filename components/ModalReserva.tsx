@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { agendarCitaGoogle } from "../lib/actions";
+import { agendarCitaGoogle, cancelarCitaGoogle } from "../lib/actions";
 import { toast } from "sonner";
 
 interface ModalProps {
@@ -28,11 +28,15 @@ const sumarMinutos = (hora: string, minutos: number) => {
   return `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
 };
 
-export default function ModalReserva({ isOpen, onClose, data, catalogoServicios, bloqueos }: ModalProps) {
+export default function ModalReserva({ isOpen, onClose, data, catalogoServicios, bloqueos, citaExistente 
+
+  }: ModalProps) {
   // Estados Generales
   const [servicioSku, setServicioSku] = useState(""); 
   const [loading, setLoading] = useState(false);
   
+  const [fechaSeleccionada, setFechaSeleccionada] = useState("");
+  const [horaSeleccionada, setHoraSeleccionada] = useState("");
   const [precioFinal, setPrecioFinal] = useState<number | "">(""); 
   const [notaInterna, setNotaInterna] = useState(""); 
   const [historialCitas, setHistorialCitas] = useState<number>(0); 
@@ -51,6 +55,8 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
         setPrecioFinal("");
         setNotaInterna("");
         setHistorialCitas(0);
+        setFechaSeleccionada(data?.fecha || "");
+        setHoraSeleccionada(data?.hora || "");
         if (data?.prefilledName) {
             setModo('nuevo'); 
             setNombreNuevo(data.prefilledName);
@@ -130,7 +136,7 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
   const servicioDetalle = serviciosOrdenados.find(s => s.sku === servicioSku);
 
   const handleGuardar = async () => {
-    // Validaciones
+    // 1. Validaciones de Identidad
     let nombreFinal = "";
     let idFinal = "EXTERNO"; 
 
@@ -147,35 +153,92 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
     if (precioFinal === "" || Number(precioFinal) < 0) return alert("⚠️ Define un precio válido.");
     
     setLoading(true);
+
     try {
       const duracionMinutos = parseInt(servicioDetalle?.duracion || "30");
       const bloquesNecesarios = Math.ceil(duracionMinutos / 30); 
 
-      // 🛡️ VERIFICACIÓN BLINDADA (Google + Firebase)
-      const hayEspacio = await verificarDisponibilidadMultiples(data.doctor.id, data.fecha, data.hora, bloquesNecesarios);
+      // >>> --- INICIO CORRECCIÓN DE VARIABLES --- <<<
+      // 🛡️ VERIFICACIÓN Usando los campos EDITABLES (fechaSeleccionada / horaSeleccionada)
+      const hayEspacio = await verificarDisponibilidadMultiples(
+        data.doctor.id, 
+        fechaSeleccionada, 
+        horaSeleccionada, 
+        bloquesNecesarios
+      );
+      // >>> --- FIN CORRECCIÓN --- <<<
       
       if (!hayEspacio) {
-          alert(`⛔ AGENDA OCUPADA.\n\nUno de los espacios necesarios (${duracionMinutos} min) ya está ocupado (por otra cita o Google Calendar).`);
+          alert(`⛔ AGENDA OCUPADA.\n\nEl horario seleccionado ya no está disponible.`);
           setLoading(false);
           return;
       }
 
-      // ... (Resto del guardado igual) ...
+      // >>> --- INICIO BLOQUE DE LIMPIEZA (EDICIÓN) --- <<<
+      if (citaExistente) {
+          // A. Borrar de Google Calendar la cita anterior
+          if (citaExistente.googleEventId && data.doctor.calendarId) {
+              await cancelarCitaGoogle({
+                  calendarId: data.doctor.calendarId,
+                  eventId: citaExistente.googleEventId
+              });
+          }
+
+          // B. Borrar bloques de cita viejos en Firebase
+          const qOldCitas = query(
+              collection(db, "citas"), 
+              where("googleEventId", "==", citaExistente.googleEventId)
+          );
+          const snapOldCitas = await getDocs(qOldCitas);
+          for (const d of snapOldCitas.docs) {
+              await deleteDoc(doc(db, "citas", d.id));
+          }
+
+          // C. Borrar cargo en caja antiguo (para generar el nuevo con el precio actualizado)
+          const qOldOp = query(
+              collection(db, "operaciones"),
+              where("pacienteNombre", "==", citaExistente.paciente),
+              where("doctorId", "==", citaExistente.doctorId),
+              where("estatus", "==", "Pendiente de Pago")
+          );
+          const snapOldOp = await getDocs(qOldOp);
+          for (const d of snapOldOp.docs) {
+              await deleteDoc(doc(db, "operaciones", d.id));
+          }
+      }
+      // >>> --- FIN BLOQUE DE LIMPIEZA --- <<<
+
       const tituloCita = notaInterna ? `${servicioDetalle?.nombre} (${notaInterna})` : servicioDetalle?.nombre;
 
+      // 1. Lógica para decidir el color (Implementación)
+// Asumimos que tu servicio tiene una propiedad 'categoria' o similar. 
+// Si no la tiene, puedes usar: servicioDetalle?.nombre.includes("LAB")
+const esLaboratorio = 
+    servicioDetalle?.nombre?.toUpperCase().includes("LAB") || 
+    servicioDetalle?.sku?.toUpperCase().startsWith("LAB"); 
+
+const colorIdGoogle = esLaboratorio ? "11" : "1"; // 11 = Rojo (Lab), 1 = Azul (Servicio)
+
+// 2. Pasamos el colorId a la función (Actualización de la llamada)
+
+      // Agendamos la NUEVA posición en Google
       const resultadoGoogle = await agendarCitaGoogle({
           doctorId: data.doctor.id,
           doctorNombre: data.doctor.nombre,
           calendarId: data.doctor.calendarId,
           pacienteNombre: nombreFinal,
           motivo: tituloCita, 
-          fecha: data.fecha,
-          hora: data.hora,
-          duracionMinutos: duracionMinutos
+          fecha: fechaSeleccionada,
+          hora: horaSeleccionada,
+          duracionMinutos: duracionMinutos,
+          // >>> INICIO ADICIÓN <<<
+          esTodoElDia: esLaboratorio
       });
+      
       const googleId = resultadoGoogle.googleEventId || null;
 
-      let horaActual = data.hora;
+      // Guardamos los nuevos bloques en Firebase
+      let horaActual = horaSeleccionada;
       for (let i = 0; i < bloquesNecesarios; i++) {
           await addDoc(collection(db, "citas"), {
             doctorId: data.doctor.id,
@@ -183,15 +246,16 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
             paciente: nombreFinal,
             pacienteId: idFinal !== "EXTERNO" ? idFinal : null,
             motivo: i === 0 ? tituloCita : "(Continuación)", 
-            fecha: data.fecha,
+            fecha: fechaSeleccionada,
             hora: horaActual,
             creadoEn: new Date(),
             googleEventId: googleId,
-            confirmada: false        
+            confirmada: citaExistente?.confirmada || false // Mantenemos confirmación si existía       
           });
           horaActual = sumarMinutos(horaActual, 30);
       }
 
+      // Generamos el nuevo cargo en Caja
       await addDoc(collection(db, "operaciones"), {
         pacienteNombre: nombreFinal, 
         pacienteId: idFinal, 
@@ -200,20 +264,19 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
         monto: Number(precioFinal), 
         estatus: "Pendiente de Pago",
         fecha: serverTimestamp(),
-        origen: "Agenda",
+        origen: "Agenda (Editada)",
         doctorId: data.doctor.id,
         doctorNombre: data.doctor.nombre
       });
 
       if (data.waitingListId) { try { await deleteDoc(doc(db, "lista_espera", data.waitingListId)); } catch (e) {} }
 
-      setNombreNuevo(""); setBusqueda(""); setResultados([]); setPacienteSeleccionado(null);
       onClose(); 
-      toast.success("✅ Cita agendada correctamente."); 
+      toast.success(citaExistente ? "✅ Cita re-programada con éxito." : "✅ Cita agendada correctamente."); 
 
     } catch (error) {
       console.error(error);
-      toast.error("Error al guardar.");
+      toast.error("Error al procesar la cita.");
     } finally {
       setLoading(false);
     }
@@ -223,9 +286,26 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold text-slate-800 mb-1">Nueva Cita</h2>
-        <p className="text-sm text-slate-500 mb-4">
-          {data.doctor.nombre} - {data.fecha} {data.hora}
-        </p>
+        <div className="flex gap-2 mb-4 bg-slate-50 p-2 rounded-lg border border-slate-100">
+            <div className="flex-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase block">Fecha</label>
+                <input 
+                    type="date" 
+                    className="w-full bg-transparent text-sm font-bold text-slate-700 outline-none"
+                    value={fechaSeleccionada}
+                    onChange={(e) => setFechaSeleccionada(e.target.value)}
+                />
+            </div>
+            <div className="flex-1 border-l pl-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase block">Hora</label>
+                <input 
+                    type="time" 
+                    className="w-full bg-transparent text-sm font-bold text-slate-700 outline-none"
+                    value={horaSeleccionada}
+                    onChange={(e) => setHoraSeleccionada(e.target.value)}
+                />
+            </div>
+        </div>
 
         {/* SELECTOR MODO */}
         <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
