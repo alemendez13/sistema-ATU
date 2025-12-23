@@ -19,6 +19,8 @@ export interface Paciente {
   ocupacion?: string;        // <--- Faltaba
   medioMarketing?: string;
   referidoPor?: string;
+  curp?: string | null;
+  grupoEtnico?: string | null;
 
   // Datos Fiscales
   datosFiscales?: {
