@@ -86,20 +86,24 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
 
 
   // --- 🛡️ FUNCIÓN BLINDADA V2: Firebase + Google ---
-  const verificarDisponibilidadMultiples = async (doctorId: string, fecha: string, horaInicio: string, cantidadBloques30min: number) => {
+  // >>> INICIO MODIFICACIÓN: Agregar parámetro googleEventIdAExcluir <<<
+const verificarDisponibilidadMultiples = async (
+    doctorId: string, 
+    fecha: string, 
+    horaInicio: string, 
+    cantidadBloques30min: number,
+    googleEventIdAExcluir?: string // <--- Nuevo parámetro
+) => {
     let horaCheck = horaInicio;
     
     for (let i = 0; i < cantidadBloques30min; i++) {
-        
-        // 1. CHEQUEO RÁPIDO: ¿Está en la lista de bloqueos de Google?
-        // El formato en 'bloqueos' es "ID_MEDICO|HH:MM"
+        // 1. CHEQUEO RÁPIDO: Google Calendar
         const llaveBloqueo = `${doctorId}|${horaCheck}`;
-        if (bloqueos.includes(llaveBloqueo)) {
-            console.warn(`⛔ Choque con Google Calendar a las ${horaCheck}`);
-            return false; // Ocupado por Google
+        if (bloqueos.includes(llaveBloqueo) && !googleEventIdAExcluir) {
+            return false; 
         }
 
-        // 2. CHEQUEO BASE DE DATOS: ¿Está en Firebase?
+        // 2. CHEQUEO BASE DE DATOS: Firebase
         const q = query(
             collection(db, "citas"),
             where("doctorId", "==", doctorId),
@@ -108,15 +112,20 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
         );
         const snapshot = await getDocs(q);
         
+        // FILTRO CRÍTICO: Si hay resultados, verificamos que no sean de la cita actual
         if (!snapshot.empty) {
-            console.warn(`⛔ Choque con Cita Interna a las ${horaCheck}`);
-            return false; // Ocupado por Firebase
+            const esMismaCita = snapshot.docs.every(d => d.data().googleEventId === googleEventIdAExcluir);
+            if (!esMismaCita || !googleEventIdAExcluir) {
+                console.warn(`⛔ Choque real detectado en ${horaCheck}`);
+                return false; 
+            }
         }
 
         horaCheck = sumarMinutos(horaCheck, 30); 
     }
     return true; 
-  };
+};
+// >>> FIN MODIFICACIÓN <<<
 
   // Buscador
   useEffect(() => {
@@ -164,7 +173,8 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
         data.doctor.id, 
         fechaSeleccionada, 
         horaSeleccionada, 
-        bloquesNecesarios
+        bloquesNecesarios,
+        citaExistente?.googleEventId
       );
       // >>> --- FIN CORRECCIÓN --- <<<
       
