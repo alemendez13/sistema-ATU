@@ -27,6 +27,7 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
   const [selectedArea, setSelectedArea] = useState("");
   const [selectedMedicoId, setSelectedMedicoId] = useState("");
   const [selectedTipo, setSelectedTipo] = useState("");
+  const [esLaboratorio, setEsLaboratorio] = useState(false);
   
   // Estados para Agenda
   const [esServicio, setEsServicio] = useState(false);
@@ -98,10 +99,14 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
 
   // Efecto para detectar tipo de servicio
   useEffect(() => {
-    if (servicioSeleccionado?.tipo === 'Servicio') {
-        setEsServicio(true);
-    } else {
-        setEsServicio(false);
+    const tipo = servicioSeleccionado?.tipo;
+    const isLab = tipo === 'Laboratorio';
+    
+    setEsLaboratorio(isLab);
+    // Habilitamos el bloque de agenda si es Servicio O Laboratorio
+    setEsServicio(tipo === 'Servicio' || isLab);
+
+    if (!isLab && tipo !== 'Servicio') {
         setMedicoId("");
     }
   }, [servicioSku, servicioSeleccionado]);
@@ -114,7 +119,11 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
   const handleVenta = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!servicioSku) return;
-    if (esServicio && (!medicoId || !fechaCita || !horaCita)) {
+    if (esLaboratorio && !medicoId) {
+        toast.error("⚠️ Es obligatorio asignar un responsable para el seguimiento de laboratorio.");
+        return;
+    }
+    if (!esLaboratorio && esServicio && (!medicoId || !fechaCita || !horaCita)) {
         toast.error("Faltan datos de la cita.");
         return;
     }
@@ -133,6 +142,9 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
       }
 
       const medicoElegido = medicos.find(m => m.id === medicoId);
+
+      // Si no hay hora y es laboratorio, se marca como evento de todo el día
+      const esTodoElDia = esLaboratorio && !horaCita;
 
       // 3. Crear OPERACIÓN con Descuentos
       await addDoc(collection(db, "operaciones"), {
@@ -188,10 +200,11 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
             doctorNombre: medicoElegido.nombre,
             calendarId: medicoElegido.calendarId,
             pacienteNombre: pNombre,
-            motivo: servicioSeleccionado?.nombre,
+            motivo: (esLaboratorio ? "🔬 LAB: " : "🩺 ") + servicioSeleccionado?.nombre,
             fecha: fechaCita,
-            hora: horaCita,
-            duracionMinutos: duracion
+            hora: horaCita || "00:00", 
+            duracionMinutos: duracion,
+            esTodoElDia: esTodoElDia
         });
       }
 
@@ -314,7 +327,9 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
 
           {esServicio && (
             <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 animate-fade-in">
-                <h3 className="font-bold text-blue-900 mb-4">📅 Agendar Cita</h3>
+                <h3 className="font-bold text-blue-900 mb-4">
+                    {esLaboratorio ? "📋 Responsable de Seguimiento" : "📅 Agendar Cita"}
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                         <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Profesional</label>
@@ -336,7 +351,18 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Hora</label>
-                        <input type="time" className="w-full border p-2 rounded" value={horaCita} onChange={e => setHoraCita(e.target.value)} required />
+                        <input 
+                            type="time" 
+                            className="w-full border p-2 rounded" 
+                            value={horaCita} 
+                            onChange={e => setHoraCita(e.target.value)} 
+                            required={!esLaboratorio} // Solo es obligatorio si NO es laboratorio
+                        />
+                        {esLaboratorio && (
+                            <p className="text-[10px] text-slate-400 mt-1 italic">
+                                * Opcional: Dejar vacío para evento de todo el día.
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>
