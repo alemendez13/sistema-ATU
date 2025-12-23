@@ -58,6 +58,7 @@ interface PatientFormProps {
 export default function PatientFormClient({ servicios, medicos, descuentos }: PatientFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [age, setAge] = useState<number | null>(null);
+  const [esLaboratorio, setEsLaboratorio] = useState(false);
   const router = useRouter();
   
   // --- ESTADOS PARA SELECCIÓN EN CASCADA (NUEVO) ---
@@ -125,10 +126,15 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
     if (!servicioSeleccionado) {
         setMontoFinal(0);
         setEsServicioMedico(false);
+        setEsLaboratorio(false);
         return;
     }
-    // Detectar agenda (Servicio y NO laboratorio)
-    const esAgenda = (servicioSeleccionado.tipo === "Servicio") && !servicioSeleccionado.nombre.toLowerCase().includes("laboratorio");
+
+    const isLab = servicioSeleccionado.tipo === "Laboratorio";
+    setEsLaboratorio(isLab);
+
+    // Habilitamos el bloque de agenda/seguimiento si es Servicio O Laboratorio
+    const esAgenda = (servicioSeleccionado.tipo === "Servicio") || isLab;
     setEsServicioMedico(esAgenda);
 
     // Limpieza precio
@@ -168,9 +174,13 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
   const onSubmit = async (data: any) => {
     // 1. VALIDACIONES INICIALES
     if (!servicioSeleccionado) return toast.warning("Por favor completa la selección del servicio.");
-    
-    // Validación de Agenda: Si es médico, forzamos selección de profesional
-    if (esServicioMedico) {
+    // Validación para Laboratorio
+    if (esLaboratorio && !selectedMedicoId) {
+        return toast.warning("⚠️ Debes seleccionar un Profesional para el seguimiento de laboratorio.");
+    }
+
+    // Validación para Servicios Médicos (Consulta/Terapia)
+    if (!esLaboratorio && esServicioMedico) {
         if (!selectedMedicoId) return toast.warning("Debes seleccionar un Profesional de la Salud.");
         if (!data.fechaCita || !data.horaCita) return toast.error("Faltan datos de fecha/hora para la cita.");
     }
@@ -255,15 +265,19 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
       if (esServicioMedico && doctorFinalId) {
           const medicoObj = medicos.find(m => m.id === doctorFinalId);
           
+          // Si es laboratorio y no hay hora, se marca como evento de todo el día
+          const esTodoElDia = esLaboratorio && !data.horaCita;
+
           // ✅ AQUÍ ESTÁ LA INTEGRACIÓN CON GOOGLE
           const resultadoGoogle = await agendarCitaGoogle({
               calendarId: medicoObj.calendarId,
               doctorNombre: medicoObj.nombre,
               fecha: data.fechaCita,
-              hora: data.horaCita,
+              hora: data.horaCita || "00:00",
               pacienteNombre: nombreConstruido,
-              motivo: "1ra Vez: " + servicioSeleccionado.nombre,
-              duracionMinutos: parseInt(servicioSeleccionado?.duracion || "30")
+              motivo: (esLaboratorio ? "🔬 LAB: " : "🩺 1ra Vez: ") + servicioSeleccionado.nombre,
+              duracionMinutos: parseInt(servicioSeleccionado?.duracion || "30"),
+              esTodoElDia: esTodoElDia // Enviamos la nueva instrucción
           });
 
           await addDoc(collection(db, "citas"), {
@@ -432,7 +446,9 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
           {/* AGENDA (Solo si aplica) */}
           {esServicioMedico && (
              <div className="mt-4 pt-4 border-t border-blue-200">
-                <h3 className="text-sm font-bold text-blue-900 mb-2 uppercase">📅 Datos de la Cita</h3>
+                <h3 className="text-sm font-bold text-blue-900 mb-2 uppercase">
+                    {esLaboratorio ? "📋 Responsable de Seguimiento" : "📅 Datos de la Cita"}
+                </h3>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className={labelStyle}>Fecha</label>
@@ -440,7 +456,16 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                     </div>
                     <div>
                         <label className={labelStyle}>Hora</label>
-                        <input type="time" className={inputStyle} {...register("horaCita", { required: true })} />
+                        <input 
+                            type="time" 
+                            className={inputStyle} 
+                            {...register("horaCita", { required: !esLaboratorio })} 
+                        />
+                        {esLaboratorio && (
+                            <p className="text-[10px] text-slate-400 mt-1 italic">
+                                * Opcional: Dejar vacío para evento de todo el día.
+                            </p>
+                        )}
                     </div>
                 </div>
                 {!selectedMedicoId && <p className="text-xs text-red-500 mt-1">⚠️ Selecciona un Profesional en el paso 2 para agendar.</p>}
