@@ -46,6 +46,7 @@ export interface Cita {
   fecha: string; // Formato YYYY-MM-DD
   hora: string;  // Formato HH:MM
   creadoEn?: any;
+  googleEventId?: string | null;
 }
 
 // Definición de una OPERACIÓN (Deuda o Pago)
@@ -60,6 +61,9 @@ export interface Operacion {
   metodoPago?: "Efectivo" | "Tarjeta" | "Transferencia" | "Otro";
   fecha: any;
   fechaPago?: any;
+  // Para vincular la venta con un responsable de seguimiento (Laboratorio o Consulta)
+  doctorId?: string | null;
+  doctorNombre?: string | null;
 }
 
 // Definición de un PRODUCTO o SERVICIO (Del catálogo)
