@@ -27,12 +27,14 @@ export default function Navbar() {
 
   // Definimos los enlaces del sistema (Igual al original)
   const menuItems = [
-    { name: "Inicio", href: "/" },
-    { name: "Agenda", href: "/agenda" },
-    { name: "Directorio", href: "/pacientes" },
-    { name: "Caja", href: "/finanzas" },
-    { name: "Inventario", href: "/inventarios" },
-    { name: "Reportes", href: "/reportes" },
+    { name: "1. Configuración", href: "/configuracion/conocimiento" }, // [cite: 81, 101]
+    { name: "2. Planeación", href: "/planeacion" }, // [cite: 97]
+    { name: "3. Procesos", href: "/procesos" }, // [cite: 101, 109]
+    { name: "4. CRM", href: "/agenda" }, // [cite: 5, 105]
+    { name: "5. Personal", href: "/personal" }, // [cite: 122]
+    { name: "6. Materiales", href: "/inventarios" }, // [cite: 7, 137]
+    { name: "7. Limpieza", href: "/mantenimiento" }, // [cite: 133]
+    { name: "8. Finanzas", href: "/finanzas" }, // 
   ];
 
   // Función de Cerrar Sesión (NUEVA)
@@ -71,11 +73,11 @@ export default function Navbar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                isActive 
-                  ? "bg-white text-blue-600 shadow-sm border border-slate-100" 
-                  : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-              }`}
+              className={`px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+    isActive 
+    ? "bg-white text-[#78c9cf] shadow-sm border border-slate-100" 
+    : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+}`}
             >
               {item.name}
             </Link>
