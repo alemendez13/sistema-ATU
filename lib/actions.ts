@@ -7,8 +7,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase'; 
 import { getMedicos } from "./googleSheets";
+import { getMensajesWhatsApp } from "./googleSheets"; 
 
-// --- ACCIÓN 1: AGENDAR (Ahora devuelve el ID de Google) ---
+// --- ACCIÓN 1: AGENDAR (Mantiene lógica original) ---
 export async function agendarCitaGoogle(cita: { 
     calendarId: string;
     doctorNombre: string;
@@ -21,10 +22,7 @@ export async function agendarCitaGoogle(cita: {
     esTodoElDia?: boolean;
 }) {
     const calendarId = cita.calendarId;
-    
-    if (!calendarId) {
-        return { success: true, warning: "Sin calendario vinculado" };
-    }
+    if (!calendarId) return { success: true, warning: "Sin calendario vinculado" };
 
     const startDateTime = new Date(`${cita.fecha}T${cita.hora}:00-06:00`); 
     const endDateTime = new Date(startDateTime.getTime() + (cita.duracionMinutos || 30) * 60000);
@@ -32,12 +30,10 @@ export async function agendarCitaGoogle(cita: {
     const evento: any = {
         summary: cita.motivo,
         description: `Paciente: ${cita.pacienteNombre}\nRegistrado desde App SANSCE`,
-        // Cambiamos a color verde (colorId '2') si es Lab para que resalte en la agenda
         colorId: cita.esTodoElDia ? '2' : '11', 
     };
 
     if (cita.esTodoElDia) {
-        // Para eventos de todo el día, Google usa 'date' en lugar de 'dateTime'
         evento.start = { date: cita.fecha };
         evento.end = { date: cita.fecha };
     } else {
@@ -50,103 +46,76 @@ export async function agendarCitaGoogle(cita: {
             calendarId: calendarId,
             requestBody: evento,
         });
-
-        // 👇 ¡ESTO ES LO NUEVO! Devolvemos el ID que nos dio Google
         return { success: true, googleEventId: respuesta.data.id };
-
     } catch (error: any) { 
         console.error("Error creando evento en Google:", error);
         return { success: false, error: error.message };
     }
 }
 
-// --- UTILIDAD: Dividir array en trozos (Chunks) ---
+// --- UTILIDAD: chunkArray (Se mantiene por compatibilidad) ---
 function chunkArray<T>(myArray: T[], chunk_size: number): T[][]{ 
     var results: T[][] = [];
-    while (myArray.length) {
-        results.push(myArray.splice(0, chunk_size));
+    let tempArray = [...myArray];
+    while (tempArray.length) {
+        results.push(tempArray.splice(0, chunk_size));
     }
     return results;
 }
 
-// --- ACCIÓN 2: LEER (OPTIMIZADA CON BATCH/LOTES) ---
-const getBloqueosRaw = async (date: string, medicos: {
-    id: string;
-    calendarId: string;
-}[]): Promise<string[]> => {
-    
+// --- ACCIÓN 2: LEER BLOQUEOS (VERSIÓN MEJORADA CON ID) ---
+const getBloqueosRaw = async (date: string, medicos: { id: string; calendarId: string }[]): Promise<any[]> => {
     const timeMin = new Date(`${date}T00:00:00-06:00`).toISOString();
     const timeMax = new Date(`${date}T23:59:59-06:00`).toISOString();
-    
-    // Usamos copia [...medicos] para no alterar el array original al filtrar
-    let listaItems = [...medicos]
-        .filter(m => m.calendarId)
-        .map(m => ({ id: m.calendarId }));
-
-    if (listaItems.length === 0) return [];
-
-    const lotes = chunkArray(listaItems, 10);
-    const tiemposOcupados: string[] = [];
+    const todosLosBloqueos: any[] = [];
 
     try {
-        const respuestas = await Promise.all(lotes.map(async (lote) => {
-            try {
-                const response = await calendar.freebusy.query({
-                    requestBody: {
-                        timeMin,
-                        timeMax,
-                        timeZone: 'America/Mexico_City',
-                        items: lote 
-                    }
-                });
-                return response.data.calendars || {};
-            } catch (err: any) {
-                console.error("Error en un lote de calendarios:", err.message);
-                return {}; 
-            }
-        }));
+        await Promise.all(medicos.map(async (medico) => {
+            if (!medico.calendarId) return;
 
-        const calendariosGoogleUnificados = Object.assign({}, ...respuestas);
+            const response = await calendar.events.list({
+                calendarId: medico.calendarId,
+                timeMin,
+                timeMax,
+                singleEvents: true,
+                timeZone: 'America/Mexico_City'
+            });
 
-        medicos.forEach(medico => {
-            const calId = medico.calendarId;
-            if (!calId) return;
+            const eventos = response.data.items || [];
 
-            const datosCalendario = calendariosGoogleUnificados[calId];
-            if (!datosCalendario || datosCalendario.errors) return;
-
-            const busy = datosCalendario.busy || [];
-
-            for (const block of busy) {
-                let current = new Date(block.start);
-                const end = new Date(block.end);
+            eventos.forEach(evento => {
+                // Manejo de tiempos para eventos con hora o de todo el día
+                let current = new Date(evento.start?.dateTime || (evento.start?.date + "T00:00:00"));
+                const end = new Date(evento.end?.dateTime || (evento.end?.date + "T23:59:59"));
                 
+                // Ignorar eventos que son puramente de "Todo el día" (sin hora específica)
+                if (evento.start?.date && !evento.start?.dateTime) return; 
+
                 while (current < end) {
                     const hora = current.toLocaleTimeString('es-MX', { 
-                        hour: '2-digit', 
-                        minute: '2-digit', 
-                        hour12: false,
+                        hour: '2-digit', minute: '2-digit', hour12: false,
                         timeZone: 'America/Mexico_City' 
                     });
                     
                     const horaFormateada = hora.length === 4 ? `0${hora}` : hora;
-                    tiemposOcupados.push(`${medico.id}|${horaFormateada}`);
+                    todosLosBloqueos.push({
+                        key: `${medico.id}|${horaFormateada}`,
+                        googleEventId: evento.id
+                    });
                     current.setMinutes(current.getMinutes() + 30);
                 }
-            }
-        });
-
-        return tiemposOcupados;
-
+            });
+        }));
+        return todosLosBloqueos;
     } catch (error: any) {
-        console.error("❌ Error general en getBloqueosRaw:", error.message);
+        console.error("❌ Error en getBloqueosRaw:", error.message);
         return []; 
     }
 };
 
 export const getBloqueosAction = unstable_cache(
     getBloqueosRaw, 
-    ['calendar-bloqueos-action-v2'], 
+    ['calendar-bloqueos-action-v3'], 
     { revalidate: 60 } 
 );
 
@@ -160,7 +129,7 @@ export async function getMedicosAction() {
   }
 }
 
-// --- ACCIÓN 3: ENVIAR REPORTE Y GENERAR VALIDACIÓN (REQUERIMIENTO NUEVO) ---
+// --- ACCIÓN 3: ENVIAR REPORTE (Mantiene lógica original) ---
 export async function enviarCorteMedicoAction(datos: {
     medicoNombre: string;
     medicoEmail: string;
@@ -174,8 +143,6 @@ export async function enviarCorteMedicoAction(datos: {
 
     try {
         const tokenValidacion = uuidv4();
-
-        // Guardar solicitud en Firebase
         await addDoc(collection(db, "validaciones_medicos"), {
             medico: datos.medicoNombre,
             email: datos.medicoEmail,
@@ -187,13 +154,9 @@ export async function enviarCorteMedicoAction(datos: {
             detalles: JSON.stringify(datos.resumen)
         });
 
-         // Configurar Nodemailer (Asegúrate de tener las variables en .env.local)
         const transporter = nodemailer.createTransport({
             service: 'gmail',
-            auth: {
-                user: process.env.GMAIL_USER, // Usa variables de entorno, es más seguro
-                pass: process.env.GMAIL_PASS 
-            }
+            auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS }
         });
 
         const filasTabla = datos.movimientos.map(m => `
@@ -207,7 +170,6 @@ export async function enviarCorteMedicoAction(datos: {
 
         // Ajusta esta URL a tu dominio real cuando hagas deploy
         const enlaceValidacion = `https://sistema-atu.netlify.app/validar-corte/${tokenValidacion}`;
-
         const htmlContent = `
             <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
                 <div style="background-color: #2563eb; padding: 20px; text-align: center; color: white;">
@@ -247,40 +209,35 @@ export async function enviarCorteMedicoAction(datos: {
         });
 
         return { success: true };
-
     } catch (error: any) {
         console.error("Error enviando correo:", error);
         return { success: false, error: error.message };
     }
 }
 
-// --- INICIO DE MODIFICACIÓN: Reemplazo de función cancelarCitaGoogle ---
-
 // --- ACCIÓN 4: CANCELAR CITA (Lógica Real) ---
-export async function cancelarCitaGoogle(datos: {
-    calendarId: string;
-    eventId: string; // 👈 Ahora es obligatorio para poder borrar
-}) {
-    // Validación de seguridad
+export async function cancelarCitaGoogle(datos: { calendarId: string; eventId: string; }) {
     if (!datos.calendarId || !datos.eventId) {
-        return { success: false, error: "Faltan datos (ID de calendario o evento) para borrar en Google." };
+        return { success: false, error: "Faltan datos para borrar en Google." };
     }
 
     try {
-        // Ejecutamos el borrado en la API de Google
-        await calendar.events.delete({
-            calendarId: datos.calendarId,
-            eventId: datos.eventId
-        });
-        
-        return { success: true, message: "Evento eliminado correctamente de Google Calendar." };
-
+        await calendar.events.delete({ calendarId: datos.calendarId, eventId: datos.eventId });
+        return { success: true, message: "Evento eliminado correctamente." };
     } catch (error: any) {
         console.error("Error borrando en Google:", error);
-        
-        // Si el evento ya no existe en Google (404) o hay otro error, 
-        // devolvemos success: true con advertencia para permitir que se borre en Firebase de todos modos.
-        return { success: true, warning: "Se borró localmente, pero Google reportó error o ya no existía." };
+        return { success: true, warning: "Error al borrar en Google, se procedió localmente." };
     }
 }
-// --- FIN DE MODIFICACIÓN ---
+
+// --- ACCIÓN 5: OBTENER PLANTILLAS WHATSAPP (Unificación) ---
+export async function getMensajesConfigAction() {
+  try {
+    const mensajes = await getMensajesWhatsApp();
+    // Normalizamos para asegurar que los datos sean serializables para Next.js
+    return JSON.parse(JSON.stringify(mensajes));
+  } catch (error) {
+    console.error("Error en getMensajesConfigAction:", error);
+    return [];
+  }
+}

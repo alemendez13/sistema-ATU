@@ -65,3 +65,36 @@ export const formatCurrency = (amount: number): string => {
         currency: 'MXN',
     }).format(amount);
 };
+
+/**
+ * 5. Genera un folio único combinando el código de proceso y el ID de Firebase
+ * @param codigo Código del GEC-FR-02 (ej: CLI-FR-01)
+ * @param docId ID generado por Firestore
+ */
+export const generateFolio = (codigo: string, docId: string) => {
+  const cleanCode = codigo.replace(/-/g, '').toUpperCase(); // CLI-FR-01 -> CLIFR01
+  const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, ''); // 251226
+  const shortId = docId.slice(-6).toUpperCase(); // Últimos 6 de Firebase
+  return `${cleanCode}-${dateStr}-${shortId}`;
+};
+
+/**
+ * 6. TRADUCTOR DE PLANTILLAS WHATSAPP
+ * Sustituye etiquetas dinámicas del Excel por datos del sistema.
+ */
+export const parseWhatsAppTemplate = (template: string, data: {
+    pacienteNombre?: string,
+    fecha?: string,
+    hora?: string,
+    doctorNombre?: string
+}) => {
+    if (!template) return "";
+
+    return template
+        .replace(/\[Día de la semana y fecha\]/g, data.fecha || "Próximamente")
+        .replace(/\[Hora\]/g, data.hora || "--:--")
+        .replace(/\[Nombre\]/g, data.pacienteNombre || "Paciente")
+        .replace(/\[Doctor\]/g, data.doctorNombre || "Profesional SANSCE")
+        // Soporte para variaciones de etiquetas detectadas en el Excel
+        .replace(/\[nombrePaciente\]/g, data.pacienteNombre || "Paciente");
+};
