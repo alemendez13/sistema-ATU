@@ -110,6 +110,7 @@ export default function FinanzasPage() {
                             <tr>
                                 <th className="p-4">Paciente</th>
                                 <th className="p-4">Servicio</th>
+                                <th className="p-4">Responsable</th>
                                 <th className="p-4">Monto</th>
                                 <th className="p-4">Fecha Registro</th>
                                 <th className="p-4 text-center">Acción (Cobrar)</th>
@@ -123,6 +124,9 @@ export default function FinanzasPage() {
                                         <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs border border-blue-100">
                                             {op.servicioNombre}
                                         </span>
+                                    </td>
+                                    <td className="p-4 text-xs text-slate-500 italic">
+                                        {op.doctorNombre || "N/A"}
                                     </td>
                                     <td className="p-4 font-mono text-lg font-bold text-slate-900">
                                         {op.monto}

@@ -1,13 +1,13 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
-import { db } from "../../../../lib/firebase";
+import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { generateFolio } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Button from "../../../../components/ui/Button"; // Ajusta ruta si es necesario
 import { agendarCitaGoogle } from "../../../../lib/actions"; 
 import { descontarStockPEPS } from "../../../../lib/inventoryController";
-// Importamos el tipo Descuento (Asegúrate de haber hecho el Paso 2)
 import { Descuento } from "../../../../types"; 
 
 interface Props {
@@ -154,26 +154,27 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
       const esTodoElDia = esLaboratorio && !horaCita;
 
       // 3. Crear OPERACIÓN con Descuentos
-      await addDoc(collection(db, "operaciones"), {
+      // 1. CREAR OPERACIÓN (Paso Inicial)
+      const docRef = await addDoc(collection(db, "operaciones"), {
         pacienteId,
         pacienteNombre: pNombre,
         requiereFactura, 
-        
         servicioSku: servicioSeleccionado?.sku,
         servicioNombre: servicioSeleccionado?.nombre,
         
-        // --- INICIO BLOQUE FINANCIERO DETALLADO ---
+        // Bloque financiero
         montoOriginal: precioOriginal,
         descuentoAplicado: descuentoSeleccionado ? {
             id: descuentoSeleccionado.id,
             nombre: descuentoSeleccionado.nombre,
             monto: montoDescuento
         } : null,
-        monto: precioFinal, // Este es el que se cobra
-        // --- FIN BLOQUE FINANCIERO ---
-
+        monto: precioFinal,
+        
+        // El folio inicia vacío o temporal
+        folioInterno: generateFolio("FIN-FR-09", ""), 
         fecha: serverTimestamp(),
-        estatus: precioFinal === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago", // Autopagar si es cortesía
+        estatus: precioFinal === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
         
         esCita: esServicio,
         doctorId: medicoId || null,
@@ -182,11 +183,22 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
         horaCita: horaCita || null
       });
 
+      // 2. VINCULACIÓN DE FOLIO (Paso Final de Unificación)
+      // Usamos el ID real que Firebase acaba de darnos (docRef.id)
+      await setDoc(doc(db, "operaciones", docRef.id), { 
+        folioInterno: generateFolio("FIN-FR-09", docRef.id) 
+      }, { merge: true });
+
       // Descontar Stock si aplica
-      if (!esServicio && servicioSeleccionado) {
+      // Permitimos descuento si es Producto O si es un Laboratorio que tiene insumos registrados
+      if (servicioSeleccionado && (servicioSeleccionado.tipo === "Producto" || servicioSeleccionado.tipo === "Laboratorio")) {
         try {
             await descontarStockPEPS(servicioSeleccionado.sku, servicioSeleccionado.nombre, 1);
-        } catch (err) { console.error(err); }
+        } catch (err) { 
+            // Si el error es "SinStock", significa que este lab no lleva control de inventario, 
+            // así que podemos ignorar el error o registrarlo.
+            console.warn("No se descontó stock para este ítem:", err); 
+        }
       }
 
       // Agendar Google si aplica

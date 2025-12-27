@@ -7,3 +7,14 @@ body {
   background-color: #f8fafc; /* Slate-50 */
   color: #0f172a; /* Slate-900 */
 }
+
+/* globals.css - Adición de variables de marca */
+:root {
+  --sansce-primary: #2563eb; /* Azul Institucional actual */
+  --sansce-secondary: #78c9cf; /* Color detectado en Módulo de Conocimiento */
+}
+
+body {
+  background-color: #f8fafc;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11"; /* Mejora legibilidad Inter */
+}

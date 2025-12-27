@@ -1,8 +1,7 @@
-/* app/reportes/conciliacion-lab/ConciliacionClient.tsx */
 "use client";
-import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
-import { db } from "../../../lib/firebase";
+import { useState } from "react";
+import { collection, query, where, getDocs, orderBy, limit, startAfter } from "firebase/firestore";
+import { db } from "../../../lib/firebase"; 
 import Link from "next/link";
 import { toast } from "sonner";
 import Button from "../../../components/ui/Button";
@@ -17,10 +16,10 @@ interface ReporteItem {
   costoProveedor: number;
   utilidad: number;
   esDomicilio: boolean;
+  doctorNombre?: string;
 }
 
 export default function ConciliacionClient({ catalogo }: { catalogo: any[] }) {
-  // Fechas (Default: Mes actual)
   const date = new Date();
   const primerDia = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
   const ultimoDia = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -31,53 +30,66 @@ export default function ConciliacionClient({ catalogo }: { catalogo: any[] }) {
   const [movimientos, setMovimientos] = useState<ReporteItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [totales, setTotales] = useState({ venta: 0, costo: 0, utilidad: 0 });
+  const [lastVisible, setLastVisible] = useState<any>(null); 
+  const [hasMore, setHasMore] = useState(false); 
+  const BATCH_SIZE = 20; 
 
-  const generarConciliacion = async () => {
+  const generarConciliacion = async (isLoadMore = false) => {
     setLoading(true);
-    setMovimientos([]);
-    setTotales({ venta: 0, costo: 0, utilidad: 0 });
+    
+    if (!isLoadMore) {
+        setMovimientos([]);
+        setTotales({ venta: 0, costo: 0, utilidad: 0 });
+        setLastVisible(null);
+    }
 
     try {
       const start = new Date(`${fechaInicio}T00:00:00`);
       const end = new Date(`${fechaFin}T23:59:59`);
 
-      // 1. Traer todo lo cobrado en el periodo
-      const q = query(
+      let q = query(
         collection(db, "operaciones"),
         where("estatus", "==", "Pagado"),
         where("fechaPago", ">=", start),
         where("fechaPago", "<=", end),
-        orderBy("fechaPago", "desc")
+        orderBy("fechaPago", "desc"),
+        limit(BATCH_SIZE)
       );
 
+      if (isLoadMore && lastVisible) {
+          q = query(q, startAfter(lastVisible));
+      }
+
       const snapshot = await getDocs(q);
+      
+      if (snapshot.empty && !isLoadMore) {
+          toast.info("No se encontraron estudios en este periodo.");
+          setLoading(false);
+          return;
+      }
+
       const listaTemp: ReporteItem[] = [];
-      let sumVenta = 0;
-      let sumCosto = 0;
+      // Mantenemos los acumulados actuales si estamos cargando más
+      let currentVenta = isLoadMore ? totales.venta : 0;
+      let currentCosto = isLoadMore ? totales.costo : 0;
 
       snapshot.forEach(doc => {
         const data = doc.data();
         const skuVenta = data.servicioSku || "";
         const nombreVenta = data.servicioNombre || "";
         
-        // 2. CRUCE MÁGICO: Buscamos este ítem en el Catálogo de Laboratorio
-        // Intentamos coincidir por SKU primero, si no, por Nombre
         const itemLab = catalogo.find(c => 
             (c.sku === skuVenta) || 
             (c.nombre.trim().toUpperCase() === nombreVenta.trim().toUpperCase())
         );
 
-        // Si encontramos coincidencia en el catálogo de LAB, es un estudio. Si no, lo ignoramos.
         if (itemLab) {
             const precioReal = Number(data.monto) || 0;
-            const costoReal = itemLab.costo || 0;
+            const costoReal = Number(itemLab.precio) || 0; 
             const utilidad = precioReal - costoReal;
 
-            sumVenta += precioReal;
-            sumCosto += costoReal;
-
-            // Detectar si fue domicilio (por si acaso el nombre lo dice)
-            const esDomicilio = nombreVenta.toLowerCase().includes("domicilio");
+            currentVenta += precioReal;
+            currentCosto += costoReal;
 
             listaTemp.push({
                 id: doc.id,
@@ -88,29 +100,35 @@ export default function ConciliacionClient({ catalogo }: { catalogo: any[] }) {
                 precioVenta: precioReal,
                 costoProveedor: costoReal,
                 utilidad: utilidad,
-                esDomicilio
+                // REGLA DE DOMICILIO PRESERVADA AQUÍ:
+                esDomicilio: nombreVenta.toLowerCase().includes("domicilio"),
+                doctorNombre: data.doctorNombre || "Sin asignar"
             });
         }
       });
 
-      setMovimientos(listaTemp);
-      setTotales({ venta: sumVenta, costo: sumCosto, utilidad: sumVenta - sumCosto });
+      const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+      setLastVisible(lastDoc);
+      setHasMore(snapshot.docs.length === BATCH_SIZE);
 
-      if (listaTemp.length === 0) {
-          toast.info("No se encontraron estudios de laboratorio cobrados en este periodo.");
-      } else {
-          toast.success(`Se encontraron ${listaTemp.length} estudios.`);
-      }
+      // Importante: Usar prev para no perder los datos anteriores al paginar
+      setMovimientos(prev => isLoadMore ? [...prev, ...listaTemp] : listaTemp);
+      setTotales({ 
+          venta: currentVenta, 
+          costo: currentCosto, 
+          utilidad: currentVenta - currentCosto 
+      });
+
+      if (!isLoadMore) toast.success(`Se encontraron resultados.`);
 
     } catch (error) {
       console.error(error);
-      toast.error("Error calculando conciliación");
+      toast.error("Error calculando conciliación.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Exportar a CSV (Simple para Excel)
   const descargarCSV = () => {
     const headers = "Fecha,Paciente,Estudio,Precio Venta,Costo Lab,Utilidad\n";
     const rows = movimientos.map(m => 
@@ -124,6 +142,7 @@ export default function ConciliacionClient({ catalogo }: { catalogo: any[] }) {
     link.setAttribute("download", `Conciliacion_Lab_${fechaInicio}_${fechaFin}.csv`);
     document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -148,7 +167,10 @@ export default function ConciliacionClient({ catalogo }: { catalogo: any[] }) {
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Hasta</label>
                 <input type="date" value={fechaFin} onChange={e => setFechaFin(e.target.value)} className="w-full border p-2 rounded" />
             </div>
-            <Button onClick={generarConciliacion} isLoading={loading} className="w-full md:w-auto">
+            <Button 
+                onClick={() => generarConciliacion(false)} 
+                isLoading={loading} 
+                className="w-full md:w-auto">
                 🔍 Buscar Estudios
             </Button>
         </div>
@@ -190,6 +212,7 @@ export default function ConciliacionClient({ catalogo }: { catalogo: any[] }) {
                             <th className="p-3">Fecha</th>
                             <th className="p-3">Paciente</th>
                             <th className="p-3">Estudio</th>
+                            <th className="p-3">Responsable</th>
                             <th className="p-3 text-right">Venta</th>
                             <th className="p-3 text-right bg-orange-100 text-orange-700">Costo</th>
                             <th className="p-3 text-right text-green-700">Ganancia</th>
@@ -207,6 +230,7 @@ export default function ConciliacionClient({ catalogo }: { catalogo: any[] }) {
                                 <td className="p-3 text-right font-bold">${m.precioVenta.toLocaleString()}</td>
                                 <td className="p-3 text-right bg-orange-50 font-medium text-orange-700">${m.costoProveedor.toLocaleString()}</td>
                                 <td className="p-3 text-right font-bold text-green-600">${m.utilidad.toLocaleString()}</td>
+                                <td className="p-3 text-xs text-slate-500 italic">{m.doctorNombre || "Sin asignar"}</td>
                             </tr>
                         ))}
                         {movimientos.length === 0 && !loading && (
@@ -218,10 +242,28 @@ export default function ConciliacionClient({ catalogo }: { catalogo: any[] }) {
                         )}
                     </tbody>
                 </table>
-            </div>
-        </div>
+                {/* BOTÓN DE PAGINACIÓN: Sincronizado con la auditoría incremental */}
+                {hasMore && (
+                    <div className="p-6 bg-slate-50/30 flex justify-center border-t border-slate-100">
+                        <button 
+                            onClick={() => generarConciliacion(true)}
+                            disabled={loading}
+                            className="bg-white border-2 border-slate-200 text-slate-500 px-10 py-2 rounded-xl text-xs font-black hover:border-blue-500 hover:text-blue-500 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                            {loading ? "Auditando..." : "MOSTRAR MÁS ESTUDIOS"}
+                        </button>
+                    </div>
+                )}
 
-      </div>
-    </div>
+                {movimientos.length === 0 && !loading && (
+                    <div className="p-20 text-center">
+                        <p className="text-slate-400 italic">No hay datos para mostrar. Ajusta el rango de fechas.</p>
+                    </div>
+                )}
+            </div> 
+        </div> 
+
+      </div> 
+    </div> 
   );
 }
