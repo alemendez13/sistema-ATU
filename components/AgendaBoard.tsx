@@ -71,7 +71,7 @@ const generarBloques = (inicio: string, fin: string) => {
 export default function AgendaBoard({ medicos, servicios }: AgendaBoardProps) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [citas, setCitas] = useState<Cita[]>([]);
-  const [bloqueos, setBloqueos] = useState<string[]>([]); 
+  const [bloqueos, setBloqueos] = useState<any[]>([]); 
   const [mensajesHoy, setMensajesHoy] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -189,11 +189,11 @@ export default function AgendaBoard({ medicos, servicios }: AgendaBoardProps) {
         };
     }
 
-    const bloqueadoGoogle = bloqueos.includes(`${medicoId}|${hora}`);
+    const bloqueadoGoogle = bloqueos.find((b: any) => b.key === `${medicoId}|${hora}`);
     if (bloqueadoGoogle) return { tipo: 'google', data: { paciente: 'Google Calendar' } };
 
     return null;
-  };
+};
 
   const handleVerDetalle = (cita: Cita) => {
       const medicoDueño = medicos.find(m => m.id === cita.doctorId);

@@ -27,13 +27,16 @@ export default function Navbar() {
 
   // Definimos los enlaces del sistema (Igual al original)
   const menuItems = [
-    { name: "Inicio", href: "/" },
-    { name: "Agenda", href: "/agenda" },
-    { name: "Directorio", href: "/pacientes" },
-    { name: "Caja", href: "/finanzas" },
-    { name: "Inventario", href: "/inventarios" },
-    { name: "Reportes", href: "/reportes" },
-  ];
+  { name: "Dashboard", href: "/" },
+  { name: "M1: Sistema", href: "/configuracion/conocimiento" }, // El Cerebro
+  { name: "M2: Estrategia", href: "/planeacion" },
+  { name: "M3: Procesos", href: "/procesos" },
+  { name: "M4: CRM", href: "/pacientes" }, // Directorio y Agenda
+  { name: "M5: RRHH", href: "/personal" },
+  { name: "M6: Insumos", href: "/inventarios" }, // Almacén y Stock
+  { name: "M7: Mantto.", href: "/mantenimiento" },
+  { name: "M8: Finanzas", href: "/finanzas" }, // Caja y Reportes
+];
 
   // Función de Cerrar Sesión (NUEVA)
   const handleLogout = async () => {

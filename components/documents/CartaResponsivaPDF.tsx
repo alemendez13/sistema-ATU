@@ -86,8 +86,17 @@ export default function CartaResponsivaPDF({ paciente, equipo, serie, fecha, fol
         
         {/* Encabezado */}
         <View style={styles.header}>
-          <Text style={styles.title}>SANSCE - CLÍNICA INTEGRAL</Text>
-          <Text style={styles.subtitle}>CARTA RESPONSIVA DE EQUIPO MÉDICO</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>SANSCE - CLÍNICA INTEGRAL</Text>
+              <Text style={styles.subtitle}>CARTA RESPONSIVA DE EQUIPO MÉDICO</Text>
+            </View>
+            {/* ADICIÓN DE CÓDIGO GEC-FR-02 */}
+            <View style={{ textAlign: 'right', fontSize: 8, color: 'gray' }}>
+              <Text>ATU-FR-06</Text> 
+              <Text>Ed. 0</Text>
+            </View>
+          </View>
           <Text style={{ fontSize: 10, marginTop: 5 }}>Folio: {folio}</Text>
         </View>
 

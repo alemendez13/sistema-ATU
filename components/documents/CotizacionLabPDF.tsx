@@ -63,7 +63,7 @@ export default function CotizacionLabPDF({ paciente, medico, items, fecha }: Pro
           <Image src="/logo-sansce.png" style={styles.logo} />
           <Text style={styles.headerTitle}>Cotización de Estudios</Text>
           <View style={styles.meta}>
-            <Text>ATU-FR-11</Text>
+            <Text>ATU-FR-05</Text> {/* MODIFICACIÓN: Era ATU-FR-11, ahora es ATU-FR-05 según GEC-FR-02 */}
             <Text>Fecha: {fecha}</Text>
           </View>
         </View>

@@ -1,6 +1,7 @@
 "use client";
-import { pdf } from "@react-pdf/renderer"; // 👈 CAMBIO CLAVE: Usamos 'pdf' en vez de 'usePDF'
-import CartaResponsivaPDF from "../documents/CartaResponsivaPDF"; // 👈 SE QUEDA: Es tu plantilla
+import { pdf } from "@react-pdf/renderer";
+import CartaResponsivaPDF from "@/components/documents/CartaResponsivaPDF";
+import { generateFolio } from "@/lib/utils";
 import { useState } from "react"; // 👈 SE QUEDA: Para el estado de loading
 
 export default function DownloadButton({ pacienteNombre, fecha }: { pacienteNombre: string, fecha: string }) {
@@ -18,8 +19,11 @@ export default function DownloadButton({ pacienteNombre, fecha }: { pacienteNomb
   const handleDownload = async () => {
     setLoading(true);
     try {
-      // 1. Generamos el PDF manualmente en memoria
-      const blob = await pdf(<CartaResponsivaPDF {...datosMock} />).toBlob();
+      // ADICIÓN: Generamos el folio real usando el ID (aquí asumimos que lo recibes como prop)
+      const folioReal = generateFolio("ATU-FR-06", "ID_TEMPORAL"); // Reemplazar con ID real de Firestore
+
+      // 1. Generamos el PDF con el folio real
+      const blob = await pdf(<CartaResponsivaPDF {...datosMock} folio={folioReal} />).toBlob();
       
       // 2. Creamos una URL temporal para ese blob
       const url = URL.createObjectURL(blob);

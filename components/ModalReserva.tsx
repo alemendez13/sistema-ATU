@@ -16,7 +16,7 @@ interface ModalProps {
     waitingListId?: string;
   } | null;
   catalogoServicios: any[];
-  bloqueos: string[]; 
+  bloqueos: any[]; 
   citaExistente?: any;
 }
 
@@ -86,24 +86,31 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
 
 
   // --- 🛡️ FUNCIÓN BLINDADA V2: Firebase + Google ---
-  // >>> INICIO MODIFICACIÓN: Agregar parámetro googleEventIdAExcluir <<<
 const verificarDisponibilidadMultiples = async (
     doctorId: string, 
     fecha: string, 
     horaInicio: string, 
     cantidadBloques30min: number,
-    googleEventIdAExcluir?: string // <--- Nuevo parámetro
+    googleEventIdAExcluir?: string 
 ) => {
     let horaCheck = horaInicio;
     
     for (let i = 0; i < cantidadBloques30min; i++) {
-        // 1. CHEQUEO RÁPIDO: Google Calendar
         const llaveBloqueo = `${doctorId}|${horaCheck}`;
-        if (bloqueos.includes(llaveBloqueo) && !googleEventIdAExcluir) {
-            return false; 
+
+        // 1. CHEQUEO GOOGLE: Buscamos si el bloqueo en este horario es de otra persona
+        // 'bloqueos' ahora es un array de objetos {key, googleEventId}
+        const bloqueoEnGoogle = bloqueos.find((b: any) => b.key === llaveBloqueo);
+        
+        if (bloqueoEnGoogle) {
+            // Si hay un bloqueo pero NO es nuestra propia cita, entonces sí está ocupado
+            if (bloqueoEnGoogle.googleEventId !== googleEventIdAExcluir) {
+                console.warn(`⛔ Choque en Google detectado en ${horaCheck}`);
+                return false; 
+            }
         }
 
-        // 2. CHEQUEO BASE DE DATOS: Firebase
+        // 2. CHEQUEO FIREBASE (Para asegurar que no choque con otras citas locales)
         const q = query(
             collection(db, "citas"),
             where("doctorId", "==", doctorId),
@@ -112,12 +119,12 @@ const verificarDisponibilidadMultiples = async (
         );
         const snapshot = await getDocs(q);
         
-        // FILTRO CRÍTICO: Si hay resultados, verificamos que no sean de la cita actual
         if (!snapshot.empty) {
-            const esMismaCita = snapshot.docs.every(d => d.data().googleEventId === googleEventIdAExcluir);
-            if (!esMismaCita || !googleEventIdAExcluir) {
-                console.warn(`⛔ Choque real detectado en ${horaCheck}`);
-                return false; 
+            // Si el documento en Firebase tiene un googleEventId diferente al nuestro, es un choque
+            const hayChoqueReal = snapshot.docs.some(d => d.data().googleEventId !== googleEventIdAExcluir);
+            if (hayChoqueReal) {
+                console.warn(`⛔ Choque en Firebase detectado en ${horaCheck}`);
+                return false;
             }
         }
 
@@ -125,7 +132,6 @@ const verificarDisponibilidadMultiples = async (
     }
     return true; 
 };
-// >>> FIN MODIFICACIÓN <<<
 
   // Buscador
   useEffect(() => {
