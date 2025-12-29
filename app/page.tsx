@@ -23,7 +23,9 @@ export default function Home() {
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-7xl mx-auto">
           <header className="mb-10">
-            <h1 className="text-4xl font-black text-slate-900 tracking-tighter">SANSCE <span className="text-blue-600">OS</span></h1>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase">
+              SANSCE <span className="text-blue-600">OS</span>
+            </h1>
             <p className="text-slate-500 font-medium italic">Sistema Operativo de Gestión Integral</p>
           </header>
 
