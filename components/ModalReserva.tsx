@@ -259,12 +259,14 @@ const esLaboratorio =
             doctorNombre: data.doctor.nombre,
             paciente: nombreFinal,
             pacienteId: idFinal !== "EXTERNO" ? idFinal : null,
+            telefonoCelular: modo === 'buscar' ? pacienteSeleccionado?.telefonoCelular : null,
             motivo: i === 0 ? tituloCita : "(Continuación)", 
             fecha: fechaSeleccionada,
             hora: horaActual,
             creadoEn: new Date(),
             googleEventId: googleId,
-            confirmada: citaExistente?.confirmada || false // Mantenemos confirmación si existía       
+            confirmada: citaExistente?.confirmada || false,        
+            mensajeEnviado: citaExistente?.mensajeEnviado || false
           });
           horaActual = sumarMinutos(horaActual, 30);
       }

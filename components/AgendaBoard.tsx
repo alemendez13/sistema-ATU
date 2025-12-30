@@ -26,6 +26,8 @@ interface Cita {
   paciente: string;
   pacienteId?: string;
   confirmada?: boolean; 
+  mensajeEnviado?: boolean; 
+  telefonoCelular?: string;
 }
 
 // 👇 MODIFICACIÓN: Agregamos servicios a las props
@@ -180,11 +182,11 @@ export default function AgendaBoard({ medicos, servicios }: AgendaBoardProps) {
     const citaLocal = citas.find(c => c.doctorId === medicoId && c.hora === hora);
     
     if (citaLocal) {
-        const mensajeEnviado = mensajesHoy.find(m => m.pacienteNombre === citaLocal.paciente);
+        // CAMBIO: Ahora leemos directamente de la cita, no del historial
         return { 
             tipo: 'local', 
             data: citaLocal, 
-            mensajeEnviado: !!mensajeEnviado,
+            mensajeEnviado: !!citaLocal.mensajeEnviado, // <--- CAMBIO AQUÍ
             confirmado: citaLocal.confirmada 
         };
     }
