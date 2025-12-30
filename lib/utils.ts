@@ -1,13 +1,11 @@
 /**
- * 🛠️ UTILERÍAS CENTRALIZADAS SANSCE
- * Este archivo unifica la lógica de negocio para evitar errores 
- * de discrepancia entre módulos.
+ * 🛠️ UTILERÍAS CENTRALIZADAS SANSCE v2.0
+ * SSOT (Single Source of Truth) para lógica transversal.
  */
 
 /**
  * 1. NORMALIZACIÓN DE TEXTO
- * Limpia espacios y convierte a mayúsculas para asegurar
- * búsquedas consistentes en la base de datos.
+ * Limpia espacios y estandariza a mayúsculas para búsquedas.
  */
 export const normalizeText = (text: string | null | undefined): string => {
     if (!text) return "";
@@ -15,79 +13,117 @@ export const normalizeText = (text: string | null | undefined): string => {
 };
 
 /**
- * 2. LIMPIEZA DE PRECIOS Y MONTOS
- * Convierte strings con formato moneda ($1,200.00) en números puros
- * para realizar cálculos matemáticos seguros.
+ * 2. LIMPIEZA DE PRECIOS Y MONTOS (Robustecida)
+ * Maneja strings con símbolos ($ , %), números y valores nulos.
  */
-export const cleanPrice = (value: any): number => {
+export const cleanPrice = (value: string | number | null | undefined): number => {
     if (typeof value === 'number') return value;
     if (!value || value === "") return 0;
     
-    // Elimina $, comas y espacios
-    const cleaned = value.toString().replace(/[$,\s]/g, '');
+    // Elimina $, comas, porcentajes y espacios
+    const cleaned = value.toString().replace(/[$,%\s]/g, '');
     const parsed = parseFloat(cleaned);
     
     return isNaN(parsed) ? 0 : parsed;
 };
 
 /**
- * 3. CÁLCULO DE EDAD EXACTA
- * Calcula la edad basándose en la fecha de nacimiento (YYYY-MM-DD)
- * comparándola con la fecha actual del servidor.
+ * 3. FORMATEO DE MONEDA PARA UI
+ * Convierte un número en un string legible MXN (Ej: $1,250.00).
  */
-export const calculateAge = (birthDate: string | null | undefined): number => {
-    if (!birthDate) return 0;
+export const formatCurrency = (amount: number | string | null | undefined): string => {
+    const numericAmount = typeof amount === 'number' ? amount : cleanPrice(amount);
+    return new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+    }).format(numericAmount);
+};
+
+/**
+ * 4. CÁLCULO DE EDAD (Centralizado)
+ * Acepta string ISO (YYYY-MM-DD) o Date object.
+ */
+export const calculateAge = (birthDate: string | Date | null | undefined): number | string => {
+    if (!birthDate) return "?";
     
     const today = new Date();
     const birth = new Date(birthDate);
     
-    // Verificación de fecha válida
-    if (isNaN(birth.getTime())) return 0;
+    if (isNaN(birth.getTime())) return "?";
 
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
     
-    // Ajuste si aún no ha cumplido años en el mes actual
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
         age--;
     }
     
-    return age >= 0 ? age : 0;
+    return age >= 0 ? age : "?";
 };
 
 /**
- * 4. FORMATEO DE MONEDA PARA UI
- * Convierte un número en un string legible para el usuario (Ej: $1,250.00)
+ * 5. FORMATEO DE FECHA UNIVERSAL
+ * Maneja Firebase Timestamps ({seconds: number}), objetos Date y strings.
  */
-export const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: 'MXN',
-    }).format(amount);
+export const formatDate = (dateInput: any, format: 'short' | 'long' | 'iso' = 'short'): string => {
+    if (!dateInput) return "S/F";
+
+    let date: Date;
+
+    // Caso: Firebase Timestamp
+    if (dateInput.seconds) {
+        date = new Date(dateInput.seconds * 1000);
+    } 
+    // Caso: Objeto Date o String
+    else {
+        date = new Date(dateInput);
+    }
+
+    if (isNaN(date.getTime())) return "Fecha inválida";
+
+    if (format === 'iso') return date.toISOString().split('T')[0];
+
+    const options: Intl.DateTimeFormatOptions = format === 'long' 
+        ? { day: '2-digit', month: 'short', year: 'numeric' }
+        : { day: '2-digit', month: '2-digit', year: 'numeric' };
+
+    return date.toLocaleDateString('es-MX', options);
 };
 
 /**
- * 5. Genera un folio único combinando el código de proceso y el ID de Firebase
- * @param codigo Código del GEC-FR-02 (ej: CLI-FR-01)
- * @param docId ID generado por Firestore
+ * 6. MATEMÁTICA DE TIEMPO (Agenda)
+ * Suma cualquier cantidad de minutos (30, 60, 90, etc.) a un string de hora (HH:mm).
+ * La duración se toma automáticamente de lo que especifiques en tu catálogo de servicios.
  */
-export const generateFolio = (codigo: string, docId: string) => {
-  const cleanCode = codigo.replace(/-/g, '').toUpperCase(); // CLI-FR-01 -> CLIFR01
-  const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, ''); // 251226
-  const shortId = docId.slice(-6).toUpperCase(); // Últimos 6 de Firebase
+export const addMinutesToTime = (time: string, minutes: number): string => {
+    if (!time || !time.includes(':')) return time; // Protección por si la hora viene mal
+    const [h, m] = time.split(':').map(Number);
+    const totalMinutes = h * 60 + m + minutes;
+    const newH = Math.floor(totalMinutes / 60);
+    const newM = totalMinutes % 60;
+    // Devuelve la hora siempre con dos dígitos (ej: 09:05 en lugar de 9:5)
+    return `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
+};
+
+/**
+ * 7. GENERADOR DE FOLIOS (Norma GEC-FR-02)
+ */
+export const generateFolio = (codigo: string, docId: string): string => {
+  const cleanCode = codigo.replace(/-/g, '').toUpperCase();
+  const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+  const shortId = docId ? docId.slice(-6).toUpperCase() : "TEMP";
   return `${cleanCode}-${dateStr}-${shortId}`;
 };
 
 /**
- * 6. TRADUCTOR DE PLANTILLAS WHATSAPP
- * Sustituye etiquetas dinámicas del Excel por datos del sistema.
+ * 8. TRADUCTOR DE PLANTILLAS WHATSAPP
  */
 export const parseWhatsAppTemplate = (template: string, data: {
     pacienteNombre?: string,
     fecha?: string,
     hora?: string,
     doctorNombre?: string
-}) => {
+}): string => {
     if (!template) return "";
 
     return template
@@ -95,6 +131,5 @@ export const parseWhatsAppTemplate = (template: string, data: {
         .replace(/\[Hora\]/g, data.hora || "--:--")
         .replace(/\[Nombre\]/g, data.pacienteNombre || "Paciente")
         .replace(/\[Doctor\]/g, data.doctorNombre || "Profesional SANSCE")
-        // Soporte para variaciones de etiquetas detectadas en el Excel
         .replace(/\[nombrePaciente\]/g, data.pacienteNombre || "Paciente");
 };

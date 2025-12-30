@@ -8,6 +8,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase'; 
 import { getMedicos } from "./googleSheets";
 import { getMensajesWhatsApp } from "./googleSheets"; 
+import { addMinutesToTime } from './utils';
 
 // --- ACCIÓN 1: AGENDAR (Mantiene lógica original) ---
 export async function agendarCitaGoogle(cita: { 
@@ -102,7 +103,7 @@ const getBloqueosRaw = async (date: string, medicos: { id: string; calendarId: s
                         key: `${medico.id}|${horaFormateada}`,
                         googleEventId: evento.id
                     });
-                    current.setMinutes(current.getMinutes() + 30);
+                    current = new Date(current.getTime() + 30 * 60000);
                 }
             });
         }));
