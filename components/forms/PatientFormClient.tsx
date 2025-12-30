@@ -571,7 +571,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
         {/* === SECCIONES 2 y 3: DATOS COMPLEMENTARIOS (Acordeón simplificado) === */}
         <details className="group border rounded-lg bg-gray-50 mb-6">
             <summary className="cursor-pointer p-4 font-bold text-slate-700 list-none flex justify-between items-center">
-                <span>📋 Datos Demográficos y Marketing (Opcional)</span>
+                <span>📋 Datos Demográficos y Marketing</span>
                 <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
             </summary>
             <div className="p-4 pt-0 border-t grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">

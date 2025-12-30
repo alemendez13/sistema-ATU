@@ -277,7 +277,7 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
 
                         {/* Fila 4: Grupo Étnico (Destacado por ser obligatorio) */}
                         <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                        <label className={`${labelClass} text-blue-600`}>Grupo Étnico (Obligatorio)</label>
+                        <label className={`${labelClass} text-blue-600`}>Grupo Étnico</label>
                         <select 
                             className={inputClass} 
                             value={formData.grupoEtnico || ""} 
@@ -292,7 +292,7 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
                         {/* Fila 5: Marketing (Obligatorios) */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200">
                         <div>
-                            <label className={`${labelClass} text-blue-600`}>¿Cómo se enteró? (Obligatorio)</label>
+                            <label className={`${labelClass} text-blue-600`}>¿Cómo se enteró?</label>
                             <select 
                             className={inputClass} 
                             value={formData.medioMarketing || ""} 
@@ -306,7 +306,7 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
                             </select>
                         </div>
                         <div>
-                            <label className={`${labelClass} text-blue-600`}>Nombre del referente / Recomendado por (Obligatorio)</label>
+                            <label className={`${labelClass} text-blue-600`}>Nombre del referente / Recomendado por</label>
                             <input 
                             type="text" 
                             className={inputClass} 
