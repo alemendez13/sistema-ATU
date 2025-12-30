@@ -2,13 +2,13 @@
 import { useState, useEffect, useMemo } from "react";
 import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { generateFolio } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Button from "../../../../components/ui/Button"; // Ajusta ruta si es necesario
 import { agendarCitaGoogle } from "../../../../lib/actions"; 
 import { descontarStockPEPS } from "../../../../lib/inventoryController";
-import { Descuento } from "../../../../types"; 
+import { Descuento } from "../../../../types";
+import { generateFolio, cleanPrice } from "@/lib/utils"; 
 
 interface Props {
   pacienteId: string;
@@ -90,7 +90,7 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
   const descuentoSeleccionado = descuentos.find(d => d.id === descuentoId);
 
   // 2. Lógica de Precios
-  const precioOriginal = servicioSeleccionado ? parseFloat(servicioSeleccionado.precio) : 0;
+  const precioOriginal = cleanPrice(servicioSeleccionado?.precio);
   let montoDescuento = 0;
   let precioFinal = precioOriginal;
 

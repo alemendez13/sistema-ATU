@@ -6,6 +6,7 @@ import ProtectedRoute from "../../../components/ProtectedRoute";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { cleanPrice, formatCurrency } from "../../../lib/utils";
 
 export default function CambioTurnoPage() {
   const router = useRouter();
@@ -78,7 +79,7 @@ export default function CambioTurnoPage() {
 
       snapIngresos.forEach(doc => {
         const data = doc.data();
-        const monto = parseFloat(data.monto) || 0;
+        const monto = cleanPrice(data.monto);
         const metodo = data.metodoPago || "No especificado";
 
         total += monto;

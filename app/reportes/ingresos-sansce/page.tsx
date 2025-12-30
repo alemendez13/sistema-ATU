@@ -5,6 +5,7 @@ import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
 import { toast } from "sonner";
+import { formatCurrency, cleanPrice, formatDate } from "../../../lib/utils";
 
 export default function ReporteIngresosPage() {
   // Estado para la fecha (por defecto HOY)
@@ -40,9 +41,9 @@ export default function ReporteIngresosPage() {
 
       // Mapeamos los datos básicos primero
       const datosBasicos = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return { id: doc.id, ...data, monto: Number(data.monto) || 0 };
-      });
+  const data = doc.data();
+  return { id: doc.id, ...data, monto: cleanPrice(data.monto) };
+});
 
       // --- ENRIQUECIMIENTO DE DATOS (NUEVO) ---
       // Buscamos información extra que no está en la operación (Factura y Médico)
@@ -88,7 +89,7 @@ export default function ReporteIngresosPage() {
           nombrePS,       // <--- NUEVO CAMPO
           requiereFactura, // <--- NUEVO CAMPO
           concepto: op.servicioNombre || "Atención", // <--- NUEVO CAMPO (Concepto)
-          hora: op.fecha?.seconds ? new Date(op.fecha.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'
+          hora: formatDate(op.fecha).split(' ')[0] // Extrae solo la parte de tiempo si es necesario o usa op.fecha
         };
       }));
 

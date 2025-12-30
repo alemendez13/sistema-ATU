@@ -5,6 +5,7 @@ import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
 import { toast } from "sonner";
+import { formatDate, formatCurrency, cleanPrice } from "../../../lib/utils";
 
 export default function ReporteCajaChicaPage() {
   // Por defecto, mostramos el mes actual completo
@@ -42,20 +43,17 @@ export default function ReporteCajaChicaPage() {
       
       let suma = 0;
       const datos = snapshot.docs.map(doc => {
-        const data = doc.data();
-        const monto = Number(data.monto) || 0;
-        suma += monto;
+  const data = doc.data();
+  const monto = cleanPrice(data.monto);
+  suma += monto;
 
-        return {
-          id: doc.id,
-          ...data,
-          monto: monto,
-          // Formateamos la fecha para que sea legible
-          fechaLegible: data.fecha?.seconds 
-            ? new Date(data.fecha.seconds * 1000).toLocaleDateString('es-MX') 
-            : 'S/F'
-        };
-      });
+  return {
+    id: doc.id,
+    ...data,
+    monto: monto,
+    fechaLegible: formatDate(data.fecha) // Usa la función maestra
+  };
+});
 
       setGastos(datos);
       setTotalGasto(suma);
