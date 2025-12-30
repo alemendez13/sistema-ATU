@@ -1,16 +1,21 @@
 "use client";
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, updateDoc, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase"; // Uso de alias @/
 import CorteDia from "@/components/finanzas/CorteDia";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Operacion } from "@/types";
 import Link from "next/link";
+import { useAuth } from "../../hooks/useAuth"; 
+import { cleanPrice, formatCurrency } from "../../lib/utils";
+import { toast } from "sonner";
 
 export default function FinanzasPage() {
   const [pendientes, setPendientes] = useState<Operacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
+  const { user } = useAuth() as any; 
+  const [verCarteraVencida, setVerCarteraVencida] = useState(false);
 
   useEffect(() => {
     cargarPendientes();
@@ -19,10 +24,16 @@ export default function FinanzasPage() {
   const cargarPendientes = async () => {
     setLoading(true);
     try {
-      // Búsqueda de operaciones pendientes
+      // Definimos el inicio del día de hoy
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+
+      // Lógica de filtro: Si verCarteraVencida es true, busca lo anterior a hoy
       const q = query(
-        collection(db, "operaciones"), 
-        where("estatus", "==", "Pendiente de Pago")
+        collection(db, "operaciones"),
+        where("estatus", "==", "Pendiente de Pago"),
+        where("fecha", verCarteraVencida ? "<" : ">=", hoy), 
+        orderBy("fecha", "desc")
       );
       
       const querySnapshot = await getDocs(q);
@@ -39,24 +50,31 @@ export default function FinanzasPage() {
     }
   };
 
-  const handleCobrar = async (id: string, metodo: string) => {
-    if(!confirm(`¿Confirmas recibir el pago en ${metodo}?`)) return;
+const handleCobrar = async (id: string, metodo: string, op: Operacion) => {
+        if(!confirm(`¿Confirmas recibir el pago en ${metodo}?`)) return;
 
-    setProcesandoId(id);
-    try {
-      const docRef = doc(db, "operaciones", id);
-      await updateDoc(docRef, {
-        estatus: "Pagado",
-        metodoPago: metodo,
-        fechaPago: serverTimestamp() 
-      });
-      cargarPendientes();
-    } catch (error) {
-      console.error("Error al cobrar:", error);
-    } finally {
-      setProcesandoId(null);
-    }
-  };
+        setProcesandoId(id);
+        try {
+          const datosCobro = {
+              estatus: "Pagado",
+              metodoPago: metodo,
+              fechaPago: new Date(),
+              elaboradoPor: user?.email || "Usuario Desconocido", 
+              montoPagado: metodo === 'Cortesía' ? 0 : cleanPrice(op.monto) 
+          };
+
+          // Corregido: Usamos 'id' (el parámetro de la función) en lugar de 'opId'
+          await updateDoc(doc(db, "operaciones", id), datosCobro);
+          
+          cargarPendientes();
+          toast.success("Pago registrado correctamente"); // Ahora toast ya funcionará
+        } catch (error) {
+          console.error("Error al cobrar:", error);
+          toast.error("No se pudo registrar el pago");
+        } finally {
+          setProcesandoId(null);
+        }
+    };
 
   return (
     <ProtectedRoute>
@@ -79,6 +97,20 @@ export default function FinanzasPage() {
 
           <CorteDia />
 
+          <div className="flex gap-2 mb-4">
+              <button 
+                  onClick={() => setVerCarteraVencida(false)}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${!verCarteraVencida ? 'bg-blue-600 text-white shadow' : 'bg-white text-slate-500 border'}`}
+              >
+                  📅 COBRANZA DEL DÍA
+              </button>
+              <button 
+                  onClick={() => setVerCarteraVencida(true)}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${verCarteraVencida ? 'bg-red-600 text-white shadow' : 'bg-white text-slate-500 border'}`}
+              >
+                  🚨 CARTERA VENCIDA (Anteriores)
+              </button>
+          </div>
           {/* TABLA DE PENDIENTES (INTEGRIDAD TOTAL) */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-8">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
@@ -133,11 +165,17 @@ export default function FinanzasPage() {
                                         {procesandoId === op.id ? (
                                             <div className="text-center text-slate-400 text-xs italic">Registrando...</div>
                                         ) : (
-                                            <div className="flex justify-center gap-1">
-                                                <button onClick={() => handleCobrar(op.id!, 'Efectivo')} className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-[10px] font-black hover:bg-green-200 transition-colors">💵 EFEC.</button>
-                                                <button onClick={() => handleCobrar(op.id!, 'Tarjeta')} className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-[10px] font-black hover:bg-blue-200 transition-colors">💳 TARJ.</button>
-                                                {/* REINSTALADA: Botón Transferencia */}
-                                                <button onClick={() => handleCobrar(op.id!, 'Transferencia')} className="bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-[10px] font-black hover:bg-purple-200 transition-colors">🏦 TRANSF.</button>
+                                            <div className="flex flex-wrap gap-1 justify-end">
+                                                {/* Usamos op.id! para asegurar a TS que el ID existe */}
+                                                <button onClick={() => handleCobrar(op.id!, 'Efectivo', op)} className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold">EFECTIVO</button>
+                                                <button onClick={() => handleCobrar(op.id!, 'Tarjeta', op)} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold">TARJETA</button>
+                                                <button onClick={() => handleCobrar(op.id!, 'Transferencia', op)} className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold">TRANSF</button>
+                                                <button onClick={() => handleCobrar(op.id!, 'Vale', op)} className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold">🎟️ VALE</button>
+                                                <button onClick={() => {
+                                                    if(confirm("¿Aplicar CORTESÍA? El ingreso se registrará en $0.00")) {
+                                                        handleCobrar(op.id!, 'Cortesía', op);
+                                                    }
+                                                }} className="bg-slate-800 text-white px-2 py-1 rounded text-[10px] font-bold">🎁 CORTESÍA</button>
                                             </div>
                                         )}
                                     </td>
