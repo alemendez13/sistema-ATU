@@ -5,6 +5,7 @@ import { db } from "../lib/firebase";
 import { agendarCitaGoogle, cancelarCitaGoogle } from "../lib/actions";
 import { toast } from "sonner";
 import { addMinutesToTime } from "../lib/utils";
+import { useAuth } from "../hooks/useAuth";
 
 interface ModalProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
   const [busqueda, setBusqueda] = useState("");
   const [resultados, setResultados] = useState<any[]>([]);
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<any>(null);
+  const { user } = useAuth() as any;
 
   // Reset al abrir
   useEffect(() => {
@@ -266,6 +268,7 @@ const esLaboratorio =
             hora: horaActual,
             creadoEn: new Date(),
             googleEventId: googleId,
+            elaboradoPor: user?.email || "Usuario Desconocido",
             confirmada: citaExistente?.confirmada || false,        
             mensajeEnviado: citaExistente?.mensajeEnviado || false
           });
@@ -282,6 +285,7 @@ const esLaboratorio =
         estatus: "Pendiente de Pago",
         fecha: serverTimestamp(),
         origen: "Agenda (Editada)",
+        elaboradoPor: user?.email || "Usuario Desconocido",
         doctorId: data.doctor.id,
         doctorNombre: data.doctor.nombre
       });
