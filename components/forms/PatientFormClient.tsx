@@ -629,7 +629,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                     />
                 </div>
                 <div>
-                    <label className={labelStyle}>Grupo Étnico (Obligatorio)</label>
+                    <label className={labelStyle}>Grupo Étnico</label>
                     <select className={inputStyle} {...register("grupoEtnico", { required: true })}>
                         <option value="">Seleccionar...</option>
                         {GRUPOS_ETNICOS.map(e => <option key={e} value={e}>{e}</option>)}
@@ -639,7 +639,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                 
                 {/* Campos Marketing */}
                 <div>
-                    <label className={labelStyle}>¿Cómo se enteró? (Obligatorio)</label>
+                    <label className={labelStyle}>¿Cómo se enteró?</label>
                     <select className={inputStyle} {...register("medioMarketing", { required: true })}>
                         <option value="">Seleccionar...</option>
                         {MEDIOS_MARKETING.map(e => <option key={e} value={e}>{e}</option>)}
@@ -647,7 +647,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                     {errors.medioMarketing && <span className="text-[10px] text-red-500 font-bold">Campo requerido</span>}
                 </div>
                 <div>
-                    <label className={labelStyle}>Nombre del referente / Recomendado por (Obligatorio)</label>
+                    <label className={labelStyle}>Nombre del referente / Recomendado por</label>
                     <input type="text" className={inputStyle} {...register("referidoPor", { required: true })} placeholder="Escribe el nombre completo" />
                     {errors.referidoPor && <span className="text-[10px] text-red-500 font-bold">Campo requerido</span>}
                 </div>
