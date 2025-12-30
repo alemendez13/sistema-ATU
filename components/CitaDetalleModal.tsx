@@ -154,12 +154,20 @@ export default function CitaDetalleModal({ isOpen, onClose, cita, onEditar }: Mo
           {/* Detalles */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-blue-50 p-3 rounded-lg">
-               <label className="text-[10px] uppercase font-bold text-blue-600">Doctor</label>
-               <p className="font-medium text-slate-800">{cita.doctorNombre}</p>
+              <label className="text-[10px] uppercase font-bold text-blue-600">Doctor</label>
+              <p className="font-medium text-slate-800">{cita.doctorNombre}</p>
             </div>
             <div className="bg-slate-50 p-3 rounded-lg">
-               <label className="text-[10px] uppercase font-bold text-slate-500">Motivo</label>
-               <p className="font-medium text-slate-800">{cita.motivo || "Consulta General"}</p>
+              <label className="text-[10px] uppercase font-bold text-slate-500">Motivo</label>
+              <p className="font-medium text-slate-800">{cita.motivo || "Consulta General"}</p>
+            </div>
+            <div className="col-span-2 mt-2 px-1 flex items-center gap-2 border-t border-slate-100 pt-3">
+              <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold uppercase">
+                  Registro elaborado por:
+              </span>
+              <span className="text-xs text-slate-600 italic font-medium">
+                  {cita.elaboradoPor || "Usuario del Sistema / Histórico"}
+              </span>
             </div>
           </div>
 

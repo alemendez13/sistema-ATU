@@ -28,6 +28,7 @@ interface Cita {
   confirmada?: boolean; 
   mensajeEnviado?: boolean; 
   telefonoCelular?: string;
+  elaboradoPor?: string;
 }
 
 // 👇 MODIFICACIÓN: Agregamos servicios a las props
