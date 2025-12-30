@@ -126,7 +126,12 @@ export const parseWhatsAppTemplate = (template: string, data: {
 }): string => {
     if (!template) return "";
 
-    return template
+    // Limpieza de caracteres extraños que vienen de Google Sheets
+    const cleanTemplate = template
+        .normalize("NFC")
+        .replace(/\uFFFD/g, ''); // Elimina el símbolo de rombo si ya viene roto
+
+    return cleanTemplate
         .replace(/\[Día de la semana y fecha\]/g, data.fecha || "Próximamente")
         .replace(/\[Hora\]/g, data.hora || "--:--")
         .replace(/\[Nombre\]/g, data.pacienteNombre || "Paciente")
