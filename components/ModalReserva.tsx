@@ -4,6 +4,7 @@ import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, dele
 import { db } from "../lib/firebase";
 import { agendarCitaGoogle, cancelarCitaGoogle } from "../lib/actions";
 import { toast } from "sonner";
+import { addMinutesToTime } from "../lib/utils";
 
 interface ModalProps {
   isOpen: boolean;
@@ -128,7 +129,7 @@ const verificarDisponibilidadMultiples = async (
             }
         }
 
-        horaCheck = sumarMinutos(horaCheck, 30); 
+        horaCheck = addMinutesToTime(horaCheck, 30); 
     }
     return true; 
 };

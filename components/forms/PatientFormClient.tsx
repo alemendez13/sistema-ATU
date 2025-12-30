@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../../lib/firebase"; 
 import SmartAvatarUploader from "../ui/SmartAvatarUploader";
+import { cleanPrice, calculateAge } from "../../lib/utils";
 
 // --- CATÁLOGOS ESTÁTICOS ---
 const ESTADOS_MX = ["Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango", "Estado de México", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas", "Extranjero"];
@@ -175,9 +176,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
     setEsServicioMedico(esAgenda);
 
     // Limpieza precio
-    let precioBase = typeof servicioSeleccionado.precio === 'string' 
-        ? parseFloat(servicioSeleccionado.precio.replace(/[$,]/g, '')) 
-        : Number(servicioSeleccionado.precio);
+    let precioBase = cleanPrice(servicioSeleccionado.precio); 
     
     // Descuento
     if (descuentoSeleccionado && precioBase > 0) {
@@ -192,15 +191,11 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
 
   // Cálculo de edad (Se mantiene igual, no lo toques)
   useEffect(() => {
-    if (fechaNacimiento) {
-      const today = new Date();
-      const birthDate = new Date(fechaNacimiento);
-      let calculatedAge = today.getFullYear() - birthDate.getFullYear();
-      const m = today.getMonth() - birthDate.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) calculatedAge--;
-      setAge(calculatedAge);
-    }
-  }, [fechaNacimiento]);
+  if (fechaNacimiento) {
+    const edadCalculada = calculateAge(fechaNacimiento);
+    setAge(typeof edadCalculada === 'number' ? edadCalculada : 0);
+  }
+}, [fechaNacimiento]);
 
   const handleServicioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const sku = e.target.value;
