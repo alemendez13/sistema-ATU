@@ -47,6 +47,8 @@ export interface Cita {
   hora: string;  // Formato HH:MM
   creadoEn?: any;
   googleEventId?: string | null;
+  mensajeEnviado?: boolean;
+  telefonoCelular?: string;
 }
 
 // Definición de una OPERACIÓN (Deuda o Pago)
