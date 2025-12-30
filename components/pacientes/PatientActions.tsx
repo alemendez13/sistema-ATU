@@ -28,6 +28,7 @@ const REGIMENES_FISCALES = [
   "626 - Régimen Simplificado de Confianza"
 ];
 const USOS_CFDI = ["G01 - Adquisición de mercancías", "G03 - Gastos en general", "D01 - Honorarios médicos, dentales y gastos hospitalarios", "D02 - Gastos médicos por incapacidad o discapacidad", "S01 - Sin efectos fiscales", "CP01 - Pagos"];
+const GRUPOS_ETNICOS = ["Nahuas", "Mayas", "Zapotecas", "Mixtecas", "Otomíes", "Totonacas", "Tsotsiles", "Tzeltales", "Mazahuas", "Mazatecos", "Hispanos", "Latinoamericanos", "Anglosajones", "Otros"];
 
 interface Props {
   pacienteId: string;
@@ -217,59 +218,107 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
                 </div>
               )}
 
-              {/* --- PESTAÑA DEMOGRÁFICOS --- */}
-              {activeTab === "demo" && (
-                <div className="space-y-4 animate-fade-in">
-                    <div className="grid grid-cols-2 gap-4">
+              {/* --- PESTAÑA DEMOGRÁFICOS CORREGIDA --- */}
+                    {activeTab === "demo" && (
+                    <div className="space-y-6 animate-fade-in">
+                        {/* Fila 1: Origen y Residencia */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className={labelClass}>Lugar Nacimiento</label>
                             <select className={inputClass} value={formData.lugarNacimiento || ""} onChange={e => setFormData({...formData, lugarNacimiento: e.target.value})}>
-                                <option value="">Seleccionar...</option>
-                                {ESTADOS_MX.map(x => <option key={x} value={x}>{x}</option>)}
+                            <option value="">Seleccionar...</option>
+                            {ESTADOS_MX.map(x => <option key={x} value={x}>{x}</option>)}
                             </select>
                         </div>
                         <div>
                             <label className={labelClass}>Lugar Residencia</label>
                             <select className={inputClass} value={formData.lugarResidencia || ""} onChange={e => setFormData({...formData, lugarResidencia: e.target.value})}>
-                                <option value="">Seleccionar...</option>
-                                {ESTADOS_MX.map(x => <option key={x} value={x}>{x}</option>)}
+                            <option value="">Seleccionar...</option>
+                            {ESTADOS_MX.map(x => <option key={x} value={x}>{x}</option>)}
                             </select>
                         </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
+                        </div>
+
+                        {/* Fila 2: Estado Civil y Ocupación */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className={labelClass}>Estado Civil</label>
                             <select className={inputClass} value={formData.estadoCivil || ""} onChange={e => setFormData({...formData, estadoCivil: e.target.value})}>
-                                <option value="">Seleccionar...</option>
-                                {ESTADO_CIVIL.map(x => <option key={x} value={x}>{x}</option>)}
+                            <option value="">Seleccionar...</option>
+                            {ESTADO_CIVIL.map(x => <option key={x} value={x}>{x}</option>)}
                             </select>
                         </div>
                         <div>
                             <label className={labelClass}>Ocupación</label>
                             <select className={inputClass} value={formData.ocupacion || ""} onChange={e => setFormData({...formData, ocupacion: e.target.value})}>
-                                <option value="">Seleccionar...</option>
-                                {OCUPACIONES.map(x => <option key={x} value={x}>{x}</option>)}
+                            <option value="">Seleccionar...</option>
+                            {OCUPACIONES.map(x => <option key={x} value={x}>{x}</option>)}
                             </select>
                         </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                         <div>
+                        </div>
+
+                        {/* Fila 3: Religión y Escolaridad */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
                             <label className={labelClass}>Religión</label>
                             <select className={inputClass} value={formData.religion || ""} onChange={e => setFormData({...formData, religion: e.target.value})}>
-                                <option value="">Seleccionar...</option>
-                                {RELIGIONES.map(x => <option key={x} value={x}>{x}</option>)}
+                            <option value="">Seleccionar...</option>
+                            {RELIGIONES.map(x => <option key={x} value={x}>{x}</option>)}
                             </select>
                         </div>
                         <div>
                             <label className={labelClass}>Escolaridad</label>
                             <select className={inputClass} value={formData.escolaridad || ""} onChange={e => setFormData({...formData, escolaridad: e.target.value})}>
-                                <option value="">Seleccionar...</option>
-                                {ESCOLARIDAD.map(x => <option key={x} value={x}>{x}</option>)}
+                            <option value="">Seleccionar...</option>
+                            {ESCOLARIDAD.map(x => <option key={x} value={x}>{x}</option>)}
                             </select>
                         </div>
+                        </div>
+
+                        {/* Fila 4: Grupo Étnico (Destacado por ser obligatorio) */}
+                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                        <label className={`${labelClass} text-blue-600`}>Grupo Étnico (Obligatorio)</label>
+                        <select 
+                            className={inputClass} 
+                            value={formData.grupoEtnico || ""} 
+                            onChange={e => setFormData({...formData, grupoEtnico: e.target.value})}
+                            required
+                        >
+                            <option value="">Seleccionar...</option>
+                            {GRUPOS_ETNICOS.map(x => <option key={x} value={x}>{x}</option>)}
+                        </select>
+                        </div>
+
+                        {/* Fila 5: Marketing (Obligatorios) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200">
+                        <div>
+                            <label className={`${labelClass} text-blue-600`}>¿Cómo se enteró? (Obligatorio)</label>
+                            <select 
+                            className={inputClass} 
+                            value={formData.medioMarketing || ""} 
+                            onChange={e => setFormData({...formData, medioMarketing: e.target.value})}
+                            required
+                            >
+                            <option value="">Seleccionar...</option>
+                            {["Pacientes", "Google", "Doctoralia", "Facebook", "Instagram", "Página Web", "WhatsApp", "Recomendación Familiar", "Recomendación Profesional Salud", "Otro"].map(m => (
+                                <option key={m} value={m}>{m}</option>
+                            ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className={`${labelClass} text-blue-600`}>Nombre del referente / Recomendado por (Obligatorio)</label>
+                            <input 
+                            type="text" 
+                            className={inputClass} 
+                            value={formData.referidoPor || ""} 
+                            onChange={e => setFormData({...formData, referidoPor: e.target.value.toUpperCase()})}
+                            placeholder="Nombre completo"
+                            required
+                            />
+                        </div>
+                        </div>
                     </div>
-                </div>
-              )}
+                    )}
 
               {/* --- PESTAÑA FISCALES --- */}
               {activeTab === "fiscal" && formData.datosFiscales && (
@@ -279,6 +328,25 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
+                        {/* BOTÓN INTELIGENTE DE AUTO-RELLENADO */}
+                            <div className="md:col-span-2 mb-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setFormData({
+                                            ...formData,
+                                            datosFiscales: {
+                                                ...formData.datosFiscales!,
+                                                razonSocial: formData.nombreCompleto.toUpperCase()
+                                            }
+                                        });
+                                        toast.info("Nombre del paciente copiado a Razón Social");
+                                    }}
+                                    className="text-[10px] bg-blue-100 text-blue-700 px-3 py-1 rounded font-bold hover:bg-blue-200 transition"
+                                >
+                                    👤 ¿EL PACIENTE ES LA PERSONA QUE FACTURA? (Clic para copiar nombre)
+                                </button>
+                            </div>
                         <div>
                             <label className={labelClass}>RFC</label>
                             <input className={inputClass} value={formData.datosFiscales.rfc || ""} 
