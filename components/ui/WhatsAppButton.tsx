@@ -48,7 +48,7 @@ export default function WhatsAppButton({
     // 1. Abrir WhatsApp INMEDIATAMENTE (Para que se sienta rápido)
     const numeroLimpio = formatearCelular(telefono);
     const textoCodificado = encodeURIComponent(mensaje);
-    const url = `https://wa.me/${numeroLimpio}?text=${textoCodificado}`;
+    const url = `https://api.whatsapp.com/send?phone=${numeroLimpio}&text=${encodeURIComponent(mensaje)}`;
     window.open(url, "_blank");
 
     // 2. Activar bloqueo visual

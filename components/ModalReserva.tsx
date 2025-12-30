@@ -259,6 +259,7 @@ const esLaboratorio =
             doctorNombre: data.doctor.nombre,
             paciente: nombreFinal,
             pacienteId: idFinal !== "EXTERNO" ? idFinal : null,
+            // --- COPIAR TELÉFONO DEL EXPEDIENTE A LA CITA ---
             telefonoCelular: modo === 'buscar' ? pacienteSeleccionado?.telefonoCelular : null,
             motivo: i === 0 ? tituloCita : "(Continuación)", 
             fecha: fechaSeleccionada,
