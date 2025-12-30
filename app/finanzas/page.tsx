@@ -1,13 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, doc, updateDoc, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Uso de alias @/
+import { db } from "@/lib/firebase"; 
 import CorteDia from "@/components/finanzas/CorteDia";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Operacion } from "@/types";
 import Link from "next/link";
 import { useAuth } from "../../hooks/useAuth"; 
-import { cleanPrice, formatCurrency } from "../../lib/utils";
+import { cleanPrice, formatCurrency, formatDate } from "../../lib/utils";
 import { toast } from "sonner";
 
 export default function FinanzasPage() {
@@ -17,18 +17,17 @@ export default function FinanzasPage() {
   const { user } = useAuth() as any; 
   const [verCarteraVencida, setVerCarteraVencida] = useState(false);
 
+  // Reacciona al cambio de botones
   useEffect(() => {
     cargarPendientes();
-  }, []);
+  }, [verCarteraVencida]); 
 
   const cargarPendientes = async () => {
     setLoading(true);
     try {
-      // Definimos el inicio del día de hoy
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
 
-      // Lógica de filtro: Si verCarteraVencida es true, busca lo anterior a hoy
       const q = query(
         collection(db, "operaciones"),
         where("estatus", "==", "Pendiente de Pago"),
@@ -45,43 +44,42 @@ export default function FinanzasPage() {
       setPendientes(docs);
     } catch (error) {
       console.error("Error cargando finanzas:", error);
+      toast.error("Error al filtrar la cobranza.");
     } finally {
       setLoading(false);
     }
   };
 
-const handleCobrar = async (id: string, metodo: string, op: Operacion) => {
-        if(!confirm(`¿Confirmas recibir el pago en ${metodo}?`)) return;
+  const handleCobrar = async (id: string, metodo: string, op: Operacion) => {
+    if(!confirm(`¿Confirmas recibir el pago en ${metodo}?`)) return;
 
-        setProcesandoId(id);
-        try {
-          const datosCobro = {
-              estatus: "Pagado",
-              metodoPago: metodo,
-              fechaPago: new Date(),
-              elaboradoPor: user?.email || "Usuario Desconocido", 
-              montoPagado: metodo === 'Cortesía' ? 0 : cleanPrice(op.monto) 
-          };
+    setProcesandoId(id);
+    try {
+      const datosCobro = {
+          estatus: "Pagado",
+          metodoPago: metodo,
+          fechaPago: new Date(),
+          elaboradoPor: user?.email || "Usuario Desconocido", 
+          montoPagado: metodo === 'Cortesía' ? 0 : cleanPrice(op.monto) 
+      };
 
-          // Corregido: Usamos 'id' (el parámetro de la función) en lugar de 'opId'
-          await updateDoc(doc(db, "operaciones", id), datosCobro);
-          
-          cargarPendientes();
-          toast.success("Pago registrado correctamente"); // Ahora toast ya funcionará
-        } catch (error) {
-          console.error("Error al cobrar:", error);
-          toast.error("No se pudo registrar el pago");
-        } finally {
-          setProcesandoId(null);
-        }
-    };
+      await updateDoc(doc(db, "operaciones", id), datosCobro);
+      
+      cargarPendientes();
+      toast.success(`Pago en ${metodo} registrado correctamente`);
+    } catch (error) {
+      console.error("Error al cobrar:", error);
+      toast.error("No se pudo registrar el pago");
+    } finally {
+      setProcesandoId(null);
+    }
+  };
 
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-slate-50 p-4 md:p-8">
         <div className="max-w-6xl mx-auto">
           
-          {/* HEADER CON SUB-NAVBAR M8 */}
           <header className="mb-8 flex flex-col md:flex-row justify-between items-end gap-4">
             <div>
               <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Módulo 8: Finanzas</h1>
@@ -97,26 +95,28 @@ const handleCobrar = async (id: string, metodo: string, op: Operacion) => {
 
           <CorteDia />
 
-          <div className="flex gap-2 mb-4">
+          {/* Selector de filtros */}
+          <div className="flex gap-2 mb-4 mt-8">
               <button 
                   onClick={() => setVerCarteraVencida(false)}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${!verCarteraVencida ? 'bg-blue-600 text-white shadow' : 'bg-white text-slate-500 border'}`}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border ${!verCarteraVencida ? 'bg-blue-600 text-white shadow-lg border-blue-700' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
               >
                   📅 COBRANZA DEL DÍA
               </button>
               <button 
                   onClick={() => setVerCarteraVencida(true)}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${verCarteraVencida ? 'bg-red-600 text-white shadow' : 'bg-white text-slate-500 border'}`}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border ${verCarteraVencida ? 'bg-red-600 text-white shadow-lg border-red-700' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
               >
                   🚨 CARTERA VENCIDA (Anteriores)
               </button>
           </div>
-          {/* TABLA DE PENDIENTES (INTEGRIDAD TOTAL) */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-8">
+
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-red-600">🔴 Cuentas por Cobrar</h2>
-                {/* REINSTALACIÓN: Badge de conteo */}
-                <span className="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">
+                <h2 className={`text-xl font-bold ${verCarteraVencida ? 'text-red-600' : 'text-blue-600'}`}>
+                    {verCarteraVencida ? "⚠️ Cartera Vencida" : "🔴 Cuentas por Cobrar"}
+                </h2>
+                <span className={`${verCarteraVencida ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'} text-xs font-bold px-3 py-1 rounded-full`}>
                     {pendientes.length} Pendientes
                 </span>
             </div>
@@ -126,7 +126,7 @@ const handleCobrar = async (id: string, metodo: string, op: Operacion) => {
             ) : pendientes.length === 0 ? (
                 <div className="p-16 text-center text-slate-400">
                     <p className="text-5xl mb-4">🎉</p>
-                    <p className="font-medium text-slate-500">¡Todo al día! No hay cobros pendientes.</p>
+                    <p className="font-medium text-slate-500">¡Todo al día! No hay cobros en esta sección.</p>
                 </div>
             ) : (
                 <div className="overflow-x-auto">
@@ -135,10 +135,10 @@ const handleCobrar = async (id: string, metodo: string, op: Operacion) => {
                             <tr>
                                 <th className="p-4">Paciente</th>
                                 <th className="p-4">Servicio</th>
-                                <th className="p-4">Responsable</th> {/* REINSTALADA */}
+                                <th className="p-4">Responsable</th>
                                 <th className="p-4">Monto</th>
-                                <th className="p-4">Fecha</th> {/* REINSTALADA */}
-                                <th className="p-4 text-center">Acción (Cobrar)</th>
+                                <th className="p-4">Fecha Solicitud</th>
+                                <th className="p-4 text-right">Acción (Cobrar)</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -150,32 +150,29 @@ const handleCobrar = async (id: string, metodo: string, op: Operacion) => {
                                             {op.servicioNombre}
                                         </span>
                                     </td>
-                                    {/* REINSTALADA: Lógica de médico */}
                                     <td className="p-4 text-xs text-slate-400 italic">
                                         {op.doctorNombre || "N/A"}
                                     </td>
                                     <td className="p-4 font-mono text-base font-bold text-slate-900">
-                                        ${op.monto}
+                                        {formatCurrency(op.monto)}
                                     </td>
-                                    {/* REINSTALADA: Lógica de fecha formateada */}
                                     <td className="p-4 text-[10px] text-slate-400 font-mono">
-                                        {op.fecha?.seconds ? new Date(op.fecha.seconds * 1000).toLocaleDateString() : 'Hoy'}
+                                        {formatDate(op.fecha)}
                                     </td>
                                     <td className="p-4">
                                         {procesandoId === op.id ? (
-                                            <div className="text-center text-slate-400 text-xs italic">Registrando...</div>
+                                            <div className="text-center text-slate-400 text-xs italic">Procesando...</div>
                                         ) : (
                                             <div className="flex flex-wrap gap-1 justify-end">
-                                                {/* Usamos op.id! para asegurar a TS que el ID existe */}
-                                                <button onClick={() => handleCobrar(op.id!, 'Efectivo', op)} className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold">EFECTIVO</button>
-                                                <button onClick={() => handleCobrar(op.id!, 'Tarjeta', op)} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold">TARJETA</button>
-                                                <button onClick={() => handleCobrar(op.id!, 'Transferencia', op)} className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold">TRANSF</button>
-                                                <button onClick={() => handleCobrar(op.id!, 'Vale', op)} className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold">🎟️ VALE</button>
+                                                <button onClick={() => handleCobrar(op.id!, 'Efectivo', op)} className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-green-200 transition">EFECTIVO</button>
+                                                <button onClick={() => handleCobrar(op.id!, 'Tarjeta', op)} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200 transition">TARJETA</button>
+                                                <button onClick={() => handleCobrar(op.id!, 'Transferencia', op)} className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-purple-200 transition">TRANSF</button>
+                                                <button onClick={() => handleCobrar(op.id!, 'Vale', op)} className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-orange-200 transition">🎟️ VALE</button>
                                                 <button onClick={() => {
                                                     if(confirm("¿Aplicar CORTESÍA? El ingreso se registrará en $0.00")) {
                                                         handleCobrar(op.id!, 'Cortesía', op);
                                                     }
-                                                }} className="bg-slate-800 text-white px-2 py-1 rounded text-[10px] font-bold">🎁 CORTESÍA</button>
+                                                }} className="bg-slate-800 text-white px-2 py-1 rounded text-[10px] font-bold hover:bg-black transition">🎁 CORTESÍA</button>
                                             </div>
                                         )}
                                     </td>
