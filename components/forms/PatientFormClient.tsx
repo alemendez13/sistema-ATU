@@ -21,6 +21,7 @@ const RELIGIONES = ["Ninguna", "Catolicismo", "Cristianismo", "Testigo de Jehov�
 const ESCOLARIDAD = ["Analfabeta", "Sabe leer y escribir", "Preescolar", "Primaria", "Secundaria", "Preparatoria", "Licenciatura", "Postgrado", "Otro"];
 const OCUPACIONES = ["Empleado", "Empresario", "Comerciante", "Profesional de la salud", "Oficinista", "Obrero", "Ama de casa", "Desempleado", "Estudiante", "Jubilado", "Otro"];
 const MEDIOS_MARKETING = ["Pacientes", "Google", "Doctoralia", "Facebook", "Instagram", "Página Web", "WhatsApp", "Recomendación Familiar", "Recomendación Profesional Salud", "Otro"];
+const GRUPOS_ETNICOS = ["Nahuas", "Mayas", "Zapotecas", "Mixtecas", "Otomíes", "Totonacas", "Tsotsiles", "Tzeltales", "Mazahuas", "Mazatecos", "Hispanos", "Latinoamericanos", "Anglosajones", "Otros"];
 const REGIMENES_FISCALES = [
   "601 - General de Ley Personas Morales",
   "603 - Personas Morales con Fines no Lucrativos",
@@ -628,26 +629,27 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                     />
                 </div>
                 <div>
-                    <label className={labelStyle}>Grupo Étnico</label>
-                    <input 
-                        type="text" 
-                        className={inputStyle} 
-                        {...register("grupoEtnico")} 
-                        placeholder="Ej. Náhuatl, Maya, N/A"
-                    />
+                    <label className={labelStyle}>Grupo Étnico (Obligatorio)</label>
+                    <select className={inputStyle} {...register("grupoEtnico", { required: true })}>
+                        <option value="">Seleccionar...</option>
+                        {GRUPOS_ETNICOS.map(e => <option key={e} value={e}>{e}</option>)}
+                    </select>
+                    {errors.grupoEtnico && <span className="text-[10px] text-red-500 font-bold">Campo requerido</span>}
                 </div>
                 
                 {/* Campos Marketing */}
                 <div>
-                    <label className={labelStyle}>¿Cómo se enteró?</label>
-                    <select className={inputStyle} {...register("medioMarketing")}>
+                    <label className={labelStyle}>¿Cómo se enteró? (Obligatorio)</label>
+                    <select className={inputStyle} {...register("medioMarketing", { required: true })}>
                         <option value="">Seleccionar...</option>
                         {MEDIOS_MARKETING.map(e => <option key={e} value={e}>{e}</option>)}
                     </select>
+                    {errors.medioMarketing && <span className="text-[10px] text-red-500 font-bold">Campo requerido</span>}
                 </div>
                 <div>
-                    <label className={labelStyle}>Referido Por</label>
-                    <input type="text" className={inputStyle} {...register("referidoPor")} placeholder="Opcional" />
+                    <label className={labelStyle}>Nombre del referente / Recomendado por (Obligatorio)</label>
+                    <input type="text" className={inputStyle} {...register("referidoPor", { required: true })} placeholder="Escribe el nombre completo" />
+                    {errors.referidoPor && <span className="text-[10px] text-red-500 font-bold">Campo requerido</span>}
                 </div>
             </div>
         </details>
@@ -665,6 +667,19 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
             {requiereFactura && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-lg border border-slate-200 animate-fade-in-down">
                     <div>
+                        <div className="md:col-span-3 mb-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const nombreCompleto = `${watch("nombres")} ${watch("apellidoPaterno")} ${watch("apellidoMaterno") || ""}`.trim().toUpperCase();
+                                    setValue("razonSocial", nombreCompleto);
+                                    toast.info("Nombre del paciente copiado a Razón Social");
+                                }}
+                                className="text-[10px] bg-blue-100 text-blue-700 px-3 py-1 rounded font-bold hover:bg-blue-200 transition"
+                            >
+                                👤 ¿EL PACIENTE ES LA PERSONA QUE FACTURA? (Clic aquí para auto-rellenar nombre)
+                            </button>
+                        </div>
                         <label className={labelStyle}>Tipo de Persona</label>
                         <select className={inputStyle} {...register("tipoPersona", { required: requiereFactura })}>
                             <option value="Fisica">Física</option>
