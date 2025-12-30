@@ -9,6 +9,7 @@ import { agendarCitaGoogle } from "../../../../lib/actions";
 import { descontarStockPEPS } from "../../../../lib/inventoryController";
 import { Descuento } from "../../../../types";
 import { generateFolio, cleanPrice } from "@/lib/utils"; 
+import { useAuth } from "@/hooks/useAuth";
 
 interface Props {
   pacienteId: string;
@@ -20,6 +21,7 @@ interface Props {
 export default function VentaForm({ pacienteId, servicios, medicos, descuentos }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const { user } = useAuth() as any;
   
   // Estados del Formulario
   const [servicioSku, setServicioSku] = useState("");
@@ -161,6 +163,7 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
         requiereFactura, 
         servicioSku: servicioSeleccionado?.sku,
         servicioNombre: servicioSeleccionado?.nombre,
+        elaboradoPor: user?.email || "Usuario Desconocido",
         
         // Bloque financiero
         montoOriginal: precioOriginal,
@@ -210,7 +213,8 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
             motivo: servicioSeleccionado?.nombre,
             fecha: fechaCita,
             hora: horaCita,
-            creadoEn: new Date()
+            creadoEn: new Date(),
+            elaboradoPor: user?.email || "Usuario Desconocido"
         });
 
         const duracion = parseInt(servicioSeleccionado?.duracion || "30");
