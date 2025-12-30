@@ -15,6 +15,7 @@ interface WhatsAppButtonProps {
   pacienteId?: string;    // Para saber a quién le escribimos
   pacienteNombre?: string; // Para reportes legibles
   tipo?: "Confirmación" | "Cobranza" | "Información" | "Otro"; // Para clasificar
+  onSuccess?: () => void;
 }
 
 export default function WhatsAppButton({ 
@@ -24,7 +25,8 @@ export default function WhatsAppButton({
   compact = false,
   pacienteId = "EXTERNO",
   pacienteNombre = "Desconocido",
-  tipo = "Información"
+  tipo = "Información",
+  onSuccess
 }: WhatsAppButtonProps) {
   
   const [bloqueado, setBloqueado] = useState(false);
@@ -66,6 +68,7 @@ export default function WhatsAppButton({
         });
         console.log("✅ Envío registrado en bitácora");
         // No mostramos toast aquí para no saturar, es un proceso de fondo.
+        if (onSuccess) onSuccess();
     } catch (error) {
         console.error("Error registrando mensaje:", error);
     }

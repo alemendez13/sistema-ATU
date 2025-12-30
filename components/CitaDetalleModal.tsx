@@ -1,8 +1,7 @@
 /* components/CitaDetalleModal.tsx */
 "use client";
 import { useState } from "react";
-// Importamos las herramientas necesarias para buscar y borrar
-import { doc, updateDoc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { toast } from "sonner";
 import WhatsAppButton from "./ui/WhatsAppButton";
@@ -95,6 +94,28 @@ export default function CitaDetalleModal({ isOpen, onClose, cita, onEditar }: Mo
     }
   };
 
+  const handleMarcarMensajeEnviado = async () => {
+    try {
+        const batch = writeBatch(db);
+        // Buscamos todos los bloques de esta cita (por si dura más de 30 min)
+        const q = query(
+            collection(db, "citas"), 
+            where("googleEventId", "==", cita.googleEventId)
+        );
+        const snap = await getDocs(q);
+        
+        snap.forEach((doc) => {
+            batch.update(doc.ref, { mensajeEnviado: true });
+        });
+
+        await batch.commit();
+        // Cerramos el modal para que el usuario vea el cambio en la agenda
+        onClose(); 
+    } catch (e) {
+        console.error("Error al marcar envío:", e);
+    }
+};
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
@@ -153,6 +174,7 @@ export default function CitaDetalleModal({ isOpen, onClose, cita, onEditar }: Mo
                         label="Enviar Recordatorio"
                         pacienteNombre={cita.paciente}
                         tipo="Confirmación"
+                        onSuccess={handleMarcarMensajeEnviado}
                     />
                 ) : (
                     <div className="text-xs text-orange-500 bg-orange-50 p-2 rounded border border-orange-100 text-center">
