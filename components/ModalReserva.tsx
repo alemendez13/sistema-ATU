@@ -284,6 +284,7 @@ const esLaboratorio =
         monto: Number(precioFinal), 
         estatus: "Pendiente de Pago",
         fecha: serverTimestamp(),
+        fechaCita: fechaSeleccionada,
         origen: "Agenda (Editada)",
         elaboradoPor: user?.email || "Usuario Desconocido",
         doctorId: data.doctor.id,
