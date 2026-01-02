@@ -3,6 +3,7 @@
 import { useState } from "react";
 import WhatsAppButton from "@/components/ui/WhatsAppButton";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import Link from "next/link";
 
 export default function WhatsAppExpress() {
     const [nombre, setNombre] = useState("");
@@ -13,12 +14,18 @@ export default function WhatsAppExpress() {
 
     return (
         <ProtectedRoute>
-            <div className="max-w-md mx-auto mt-12 p-8 bg-white rounded-3xl shadow-xl border border-slate-100">
-                <div className="text-center mb-8">
-                    <div className="bg-indigo-100 text-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">📲</div>
-                    <h2 className="text-2xl font-bold text-slate-800">Registro Express</h2>
-                    <p className="text-sm text-slate-500 mt-1">Envío de formulario a paciente nuevo.</p>
-                </div>
+            <div className="max-w-md mx-auto mt-12 px-4">
+                {/* 👇 Enlace de regreso al Módulo 4 */}
+                <Link href="/pacientes" className="flex items-center gap-2 text-slate-400 hover:text-indigo-600 font-bold text-sm mb-4 transition-all">
+                    <span>←</span> Volver al Control de Pacientes
+                </Link>
+
+                <div className="p-8 bg-white rounded-3xl shadow-xl border border-slate-100">
+                    <div className="text-center mb-8">
+                        <div className="bg-indigo-100 text-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">📲</div>
+                        <h2 className="text-2xl font-bold text-slate-800">Registro Express</h2>
+                        <p className="text-sm text-slate-500 mt-1">Envío de formulario a paciente nuevo.</p>
+                    </div>
                 
                 <div className="space-y-5">
                     <div>
@@ -53,6 +60,7 @@ export default function WhatsAppExpress() {
                             * Esta acción no crea un expediente en el sistema hasta que el paciente complete el formulario.
                         </p>
                     </div>
+                </div>
                 </div>
             </div>
         </ProtectedRoute>

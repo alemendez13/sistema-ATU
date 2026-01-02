@@ -1,6 +1,7 @@
 /* app/pacientes/profesionales/page.tsx - Versión "Google Calendar Style" */
 import { getMedicosAction } from "@/lib/actions";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import Link from "next/link";
 
 const DIAS_NOM = ["-", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const HORAS_DISPLAY = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
@@ -43,9 +44,17 @@ export default async function CatalogoProfesionales() {
     return (
         <ProtectedRoute>
             <div className="max-w-7xl mx-auto p-4 md:p-8">
-                <header className="mb-10">
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Disponibilidad de Profesionales</h1>
-                    <p className="text-slate-500 font-medium italic">Vista de agenda semanal por especialista</p>
+                <header className="mb-10 flex items-center gap-4">
+                    {/* 👇 Flecha de vinculación de regreso al Módulo 4 */}
+                    <Link href="/pacientes" className="text-slate-400 hover:text-blue-600 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-8 h-8">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                        </svg>
+                    </Link>
+                    <div>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Agenda Semanal de Profesionales</h1>
+                        <p className="text-slate-500 font-medium italic">Vista de agenda semanal por especialista</p>
+                    </div>
                 </header>
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
