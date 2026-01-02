@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 
 export default function Home() {
+  // Mantenemos tu lista maestra de módulos (ID 1 al 8)
   const modulos = [
     { id: 1, name: "Configuración", desc: "Cerebro GEC-FR-02 y Roles", icon: <Settings />, href: "/configuracion/conocimiento", color: "bg-slate-100 text-slate-600" },
     { id: 2, name: "Planeación", desc: "Misión, FODA y Metas", icon: <Target />, href: "/planeacion", color: "bg-blue-50 text-blue-600" },
@@ -20,28 +21,39 @@ export default function Home() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-slate-50 p-6">
-        <div className="max-w-7xl mx-auto">
+      <div className="min-h-screen p-2 md:p-6">
+        <div className="max-w-[1400px] mx-auto"> {/* 👈 Aumentamos el ancho máximo para aprovechar el Sidebar */}
           <header className="mb-10">
             <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase">
-              SANSCE <span className="text-blue-600">OS</span>
+              BIENVENIDO A SANSCE <span className="text-blue-600">OS</span>
             </h1>
-            <p className="text-slate-500 font-medium italic">Sistema Operativo de Gestión Integral</p>
+            <p className="text-slate-500 font-medium italic">Gestión Integral de la Clínica</p>
           </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* 👈 GRID AJUSTADO: 
+              - 1 columna en móvil
+              - 2 columnas en tablets
+              - 3 columnas en laptops (lg)
+              - 4 columnas en monitores ultra-wide (2xl) 
+          */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
             {modulos.map((m) => (
-              <Link key={m.id} href={m.href} className="group bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl transition-all hover:-translate-y-1">
-                <div className={`w-12 h-12 ${m.color} rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                  {m.icon}
-                </div>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Módulo {m.id}</span>
-                    <h3 className="text-lg font-bold text-slate-800 leading-tight">{m.name}</h3>
-                    <p className="text-xs text-slate-500 mt-1">{m.desc}</p>
+              <Link 
+                key={m.id} 
+                href={m.href} 
+                className="group bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-xl hover:border-blue-200 transition-all hover:-translate-y-1 flex flex-col justify-between h-48"
+              >
+                <div>
+                  <div className={`w-12 h-12 ${m.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                    {m.icon}
                   </div>
-                  <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Módulo {m.id}</span>
+                  <h3 className="text-xl font-bold text-slate-800 leading-tight">{m.name}</h3>
+                </div>
+                
+                <div className="flex justify-between items-end mt-4">
+                  <p className="text-xs text-slate-500 line-clamp-1">{m.desc}</p>
+                  <ChevronRight size={18} className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
                 </div>
               </Link>
             ))}

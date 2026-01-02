@@ -18,3 +18,22 @@ body {
   background-color: #f8fafc;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11"; /* Mejora legibilidad Inter */
 }
+
+/* --- Phase 1: Sidebar Layout & Responsiveness --- */
+:root {
+  --sidebar-width: 260px;
+}
+
+/* Esta clase se aplicará al contenedor principal en el layout.
+  En pantallas grandes (md), empuja el contenido 260px a la derecha.
+*/
+@media (min-width: 768px) {
+  .with-sidebar {
+    padding-left: var(--sidebar-width) !important;
+  }
+}
+
+/* Suaviza la transición al navegar entre módulos */
+main {
+  transition: padding-left 0.3s ease-in-out;
+}
