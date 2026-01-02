@@ -11,11 +11,11 @@ interface WhatsAppButtonProps {
   mensaje: string;
   label?: string; 
   compact?: boolean; 
-  // 👇 DATOS NUEVOS PARA EL RASTREO
   pacienteId?: string;    // Para saber a quién le escribimos
   pacienteNombre?: string; // Para reportes legibles
   tipo?: "Confirmación" | "Cobranza" | "Información" | "Otro"; // Para clasificar
   onSuccess?: () => void;
+  soloEnvio?: boolean;
 }
 
 export default function WhatsAppButton({ 
@@ -26,7 +26,8 @@ export default function WhatsAppButton({
   pacienteId = "EXTERNO",
   pacienteNombre = "Desconocido",
   tipo = "Información",
-  onSuccess
+  onSuccess,
+  soloEnvio = false
 }: WhatsAppButtonProps) {
   
   const [bloqueado, setBloqueado] = useState(false);
@@ -45,33 +46,37 @@ export default function WhatsAppButton({
   const handleClick = async () => {
     if (!telefono) return alert("Este paciente no tiene celular registrado.");
     
-    // 1. Abrir WhatsApp INMEDIATAMENTE (Para que se sienta rápido)
+    // 1. Abrir WhatsApp (Se mantiene igual)
     const numeroLimpio = formatearCelular(telefono);
-    const textoCodificado = encodeURIComponent(mensaje);
     const url = `https://api.whatsapp.com/send?phone=${numeroLimpio}&text=${encodeURIComponent(mensaje)}`;
     window.open(url, "_blank");
 
-    // 2. Activar bloqueo visual
+    // 2. Bloqueo visual (Se mantiene igual)
     setBloqueado(true);
     setContador(5);
 
-    // 3. 🕵️ EL ESPÍA: Guardar el registro en Firebase (Silenciosamente)
-    try {
-        await addDoc(collection(db, "historial_mensajes"), {
-            pacienteId,
-            pacienteNombre,
-            telefono: numeroLimpio,
-            tipo, // Confirmación, Cobranza, etc.
-            fecha: serverTimestamp(),
-            fechaLegible: new Date().toLocaleDateString('es-MX'),
-            usuario: "Sistema" // Aquí podríamos poner el usuario logueado si quisieras
-        });
-        console.log("✅ Envío registrado en bitácora");
-        // No mostramos toast aquí para no saturar, es un proceso de fondo.
-        if (onSuccess) onSuccess();
-    } catch (error) {
-        console.error("Error registrando mensaje:", error);
+    // 3. 🕵️ EL ESPÍA: Solo guarda si NO es envío express
+    if (!soloEnvio) { // 👈 AGREGAR ESTE IF AQUÍ
+        try {
+            await addDoc(collection(db, "historial_mensajes"), {
+                pacienteId,
+                pacienteNombre,
+                telefono: numeroLimpio,
+                tipo,
+                fecha: serverTimestamp(),
+                fechaLegible: new Date().toLocaleDateString('es-MX'),
+                usuario: "Sistema"
+            });
+            console.log("✅ Envío registrado en bitácora");
+        } catch (error) {
+            console.error("Error registrando mensaje:", error);
+        }
+    } else {
+        console.log("🚀 Envío express: Sin registro en base de datos."); //
     }
+    
+    // El éxito se dispara independientemente de si se guardó o no
+    if (onSuccess) onSuccess(); 
   };
 
   // Diseño Visual
