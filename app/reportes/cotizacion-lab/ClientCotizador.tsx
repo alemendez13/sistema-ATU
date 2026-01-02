@@ -93,7 +93,7 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
         {/* IZQUIERDA: DATOS */}
         <div className="space-y-6">
             <div className="flex items-center gap-4">
-                <Link href="/reportes" className="text-2xl text-slate-400 hover:text-blue-600">←</Link>
+                <Link href="/pacientes" className="text-2xl text-slate-400 hover:text-blue-600">←</Link>
                 <h1 className="text-2xl font-bold text-slate-800">Cotizador de Laboratorio</h1>
             </div>
 

@@ -49,7 +49,7 @@ export default function HojaFrontalPage() {
         <div className="max-w-4xl mx-auto">
             
             <div className="flex items-center gap-4 mb-8">
-                <Link href="/reportes" className="text-slate-400 hover:text-blue-600 text-2xl font-bold">←</Link>
+                <Link href="/pacientes" className="text-slate-400 hover:text-blue-600 text-2xl font-bold">←</Link>
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Hoja Frontal de Expediente</h1>
                     <p className="text-slate-500">Generación de carátula para archivo físico</p>

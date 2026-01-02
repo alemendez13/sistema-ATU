@@ -95,7 +95,7 @@ export default function ReporteFacturacionPage() {
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
             <div className="flex items-center gap-4">
-                <Link href="/reportes" className="text-slate-400 hover:text-blue-600 font-bold text-2xl">←</Link>
+                <Link href="/pacientes" className="text-slate-400 hover:text-blue-600 font-bold text-2xl">←</Link>
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">Control de Facturación</h1>
                     <p className="text-slate-500">Gestión de solicitudes de factura de pacientes.</p>

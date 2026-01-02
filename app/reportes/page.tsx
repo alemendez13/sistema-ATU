@@ -5,18 +5,15 @@ import { toast } from "sonner";
 
 // Definimos la lista de reportes solicitados
 const reportesMenu = [
-  { id: 'a', titulo: "Hoja Frontal Paciente", icono: "📄", ruta: "/reportes/hoja-frontal", desc: "Datos generales y contacto" },
   { id: 'b', titulo: "Cambio de Turno", icono: "🔄", ruta: "/reportes/cambio-turno", desc: "Bitácora de novedades" },
   { id: 'c', titulo: "Ingresos SANSCE", icono: "🏥", ruta: "/reportes/ingresos-sansce", desc: "Reporte diario global" },
   { id: 'd', titulo: "Ingresos Profesionales", icono: "👨‍⚕️", ruta: "/reportes/ingresos-medicos", desc: "Esquema de renta/comisión" },
   { id: 'e', titulo: "Caja Chica", icono: "💸", ruta: "/reportes/caja-chica", desc: "Control de gastos menores" },
   { id: 'f', titulo: "Origen Pacientes", icono: "📢", ruta: "/reportes/marketing", desc: "Reporte semanal marketing" },
-  { id: 'g', titulo: "Cotización Lab", icono: "🧪", ruta: "/reportes/cotizacion-lab", desc: "Generador de presupuestos" },
   { id: 'h', titulo: "Conciliación Lab", icono: "🤝", ruta: "/reportes/conciliacion-lab", desc: "Cruce mensual de estudios" },
   { id: 'i', titulo: "Corte Factura Global", icono: "🧾", ruta: "/reportes/factura-global", desc: "Cierre de mes fiscal" },
   { id: 'j', titulo: "Archivo Muerto", icono: "🗄️", ruta: "/reportes/archivo-muerto", desc: "Expedientes inactivos" },
   { id: 'k', titulo: "Radar Estratégico", icono: "📡", ruta: "/reportes/radar", desc: "Retención y pacientes en riesgo" },
-  { id: 'l', titulo: "Control Facturación", icono: "📑", ruta: "/reportes/facturacion", desc: "Solicitudes y datos fiscales" },
   { id: 'm', titulo: "Respaldo Google", icono: "☁️", ruta: "/reportes/google-contacts", desc: "Exportar a contactos.google.com" },
 ];
 
