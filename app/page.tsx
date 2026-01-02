@@ -10,13 +10,13 @@ export default function Home() {
   // Mantenemos tu lista maestra de módulos (ID 1 al 8)
   const modulos = [
     { id: 1, name: "Configuración", desc: "Cerebro GEC-FR-02 y Roles", icon: <Settings />, href: "/configuracion/conocimiento", color: "bg-slate-100 text-slate-600" },
-    { id: 2, name: "Planeación", desc: "Misión, FODA y Metas", icon: <Target />, href: "/planeacion", color: "bg-blue-50 text-blue-600" },
+    { id: 2, name: "Metas / Kpis", desc: "Misión, FODA y Metas", icon: <Target />, href: "/planeacion", color: "bg-blue-50 text-blue-600" },
     { id: 3, name: "Procesos y Mejora", desc: "Repositorio y Auditoría", icon: <GitBranch />, href: "/procesos", color: "bg-purple-50 text-purple-600" },
-    { id: 4, name: "CRM Atn. Usuarios", desc: "Pacientes y Agenda Médica", icon: <HeartPulse />, href: "/pacientes", color: "bg-red-50 text-red-600" },
-    { id: 5, name: "Manejo del Personal", desc: "Control de RRHH", icon: <Users />, href: "/personal", color: "bg-orange-50 text-orange-600" },
-    { id: 6, name: "Materiales y Stock", desc: "Inventarios e Insumos", icon: <Package />, href: "/inventarios", color: "bg-amber-50 text-amber-600" },
-    { id: 7, name: "Mantenimiento", desc: "Limpieza e Infraestructura", icon: <Trash2 />, href: "/mantenimiento", color: "bg-emerald-50 text-emerald-600" },
-    { id: 8, name: "Admin. y Finanzas", desc: "Caja, Reportes y Cobranza", icon: <Landmark />, href: "/finanzas", color: "bg-indigo-50 text-indigo-600" },
+    { id: 4, name: "Control diario de Pacientes", desc: "Pacientes y Agenda Médica", icon: <HeartPulse />, href: "/pacientes", color: "bg-red-50 text-red-600" },
+    { id: 5, name: "Capacitaciones y Expedientes", desc: "Control de RRHH", icon: <Users />, href: "/personal", color: "bg-orange-50 text-orange-600" },
+    { id: 6, name: "Solicitudes de Materiales y Mantenimiento", desc: "Inventarios e Insumos", icon: <Package />, href: "/inventarios", color: "bg-amber-50 text-amber-600" },
+    { id: 7, name: "Minuta", desc: "Limpieza e Infraestructura", icon: <Trash2 />, href: "/mantenimiento", color: "bg-emerald-50 text-emerald-600" },
+    { id: 8, name: "Reportes", desc: "Caja, Reportes y Cobranza", icon: <Landmark />, href: "/finanzas", color: "bg-indigo-50 text-indigo-600" },
   ];
 
   return (
