@@ -25,14 +25,15 @@ export default function FinanzasPage() {
   const cargarPendientes = async () => {
     setLoading(true);
     try {
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
+      // 1. Obtenemos el string de hoy (ej: "2026-01-02")
+      const hoyISO = new Date().toISOString().split('T')[0];
 
       const q = query(
         collection(db, "operaciones"),
         where("estatus", "==", "Pendiente de Pago"),
-        where("fecha", verCarteraVencida ? "<" : ">=", hoy), 
-        orderBy("fecha", "desc")
+        // 2. 👇 CAMBIO CLAVE: Filtramos por la fecha de la cita (fechaCita)
+        where("fechaCita", verCarteraVencida ? "<" : "==", hoyISO), 
+        orderBy("fechaCita", "desc")
       );
       
       const querySnapshot = await getDocs(q);
