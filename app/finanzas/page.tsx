@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, doc, updateDoc, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, updateDoc, orderBy, limit } from "firebase/firestore"; // 👈 AGREGA 'limit' AQUÍ
 import { db } from "@/lib/firebase"; 
 import CorteDia from "@/components/finanzas/CorteDia";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -76,6 +76,51 @@ export default function FinanzasPage() {
     }
   };
 
+// --- SCRIPT DE LIMPIEZA PROFUNDA (EJECUTAR UNA VEZ) ---
+  const ejecutarLimpiezaCaja = async () => {
+    setLoading(true);
+    try {
+      // 1. Obtenemos todas las operaciones que son citas y están pendientes
+      const qOps = query(
+        collection(db, "operaciones"), 
+        where("estatus", "==", "Pending de Pago"),
+        where("esCita", "==", true)
+      );
+      const snapOps = await getDocs(qOps);
+      let corregidos = 0;
+
+      for (const docOp of snapOps.docs) {
+        const dataOp = docOp.data();
+        
+        // 2. 🔍 CRUCE DE DATOS: Buscamos la cita real en la base de 'citas'
+        // Usamos el pacienteId y doctorId para asegurar que sea la correcta
+        const qCitas = query(
+          collection(db, "citas"),
+          where("pacienteNombre", "==", dataOp.pacienteNombre),
+          where("doctorId", "==", dataOp.doctorId),
+          limit(1)
+        );
+        const snapCitas = await getDocs(qCitas);
+
+        if (!snapCitas.empty) {
+          const dataCita = snapCitas.docs[0].data();
+          // 3. ✅ ALINEACIÓN: Sincronizamos la fecha de la operacion con la de la cita
+          await updateDoc(doc(db, "operaciones", docOp.id), {
+            fechaCita: dataCita.fecha // Esto pone "2026-01-03" en lugar de la fecha de hoy
+          });
+          corregidos++;
+        }
+      }
+      toast.success(`Caja saneada: ${corregidos} cobros movidos a su fecha real.`);
+      cargarPendientes(); // Refrescar la vista
+    } catch (error) {
+      console.error(error);
+      toast.error("Error en la limpieza");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-slate-50 p-4 md:p-8">
@@ -85,6 +130,12 @@ export default function FinanzasPage() {
             <div>
               <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Módulo 8: Finanzas</h1>
               <p className="text-slate-500 text-sm">Corte del día y registro de movimientos.</p>
+              <button 
+      onClick={ejecutarLimpiezaCaja}
+      className="mt-2 text-[10px] bg-slate-200 text-slate-500 px-2 py-1 rounded hover:bg-slate-800 hover:text-white transition-all font-bold"
+    >
+      ⚙️ SINCRONIZAR FECHAS DE COBRO
+    </button>
             </div>
             
             <div className="flex gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
