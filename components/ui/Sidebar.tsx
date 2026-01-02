@@ -16,14 +16,14 @@ export default function Sidebar() {
   // Lista maestra de módulos extraída de tu Dashboard (page.tsx)
   const menuItems = [
     { id: 0, name: "Inicio (Dashboard)", icon: <LayoutDashboard size={20} />, href: "/", color: "text-slate-500" },
-    { id: 1, name: "M1: Sistema", icon: <Settings size={20} />, href: "/configuracion/conocimiento", color: "text-slate-600" },
-    { id: 2, name: "M2: Estrategia", icon: <Target size={20} />, href: "/planeacion", color: "text-blue-600" },
-    { id: 3, name: "M3: Procesos", icon: <GitBranch size={20} />, href: "/procesos", color: "text-purple-600" },
-    { id: 4, name: "M4: CRM", icon: <HeartPulse size={20} />, href: "/pacientes", color: "text-red-600" },
-    { id: 5, name: "M5: RRHH", icon: <Users size={20} />, href: "/personal", color: "text-orange-600" },
-    { id: 6, name: "M6: Insumos", icon: <Package size={20} />, href: "/inventarios", color: "text-amber-600" },
-    { id: 7, name: "M7: Mantto.", icon: <Trash2 size={20} />, href: "/mantenimiento", color: "text-emerald-600" },
-    { id: 8, name: "M8: Finanzas", icon: <Landmark size={20} />, href: "/finanzas", color: "text-indigo-600" },
+    { id: 1, name: "Configuración", icon: <Settings size={20} />, href: "/configuracion/conocimiento", color: "text-slate-600" },
+    { id: 2, name: "Metas / Kpis", icon: <Target size={20} />, href: "/planeacion", color: "text-blue-600" },
+    { id: 3, name: "Procesos y Mejoras", icon: <GitBranch size={20} />, href: "/procesos", color: "text-purple-600" },
+    { id: 4, name: "Control Diario de Pacientes", icon: <HeartPulse size={20} />, href: "/pacientes", color: "text-red-600" },
+    { id: 5, name: "Capacitaciones y Expedientes", icon: <Users size={20} />, href: "/personal", color: "text-orange-600" },
+    { id: 6, name: "Solicitud de Insumos y Mantenimiento", icon: <Package size={20} />, href: "/inventarios", color: "text-amber-600" },
+    { id: 7, name: "Minuta", icon: <Trash2 size={20} />, href: "/mantenimiento", color: "text-emerald-600" },
+    { id: 8, name: "Reportes", icon: <Landmark size={20} />, href: "/finanzas", color: "text-indigo-600" },
   ];
 
   return (
