@@ -143,6 +143,7 @@ export default function FinanzasPage() {
                                 <th className="p-4">Responsable</th>
                                 <th className="p-4">Monto</th>
                                 <th className="p-4">Fecha Solicitud</th>
+                                <th className="p-4">Fecha Cita</th>
                                 <th className="p-4 text-right">Acción (Cobrar)</th>
                             </tr>
                         </thead>
@@ -169,8 +170,8 @@ export default function FinanzasPage() {
                                       <td className="p-4 font-mono text-base font-bold text-slate-900">
                                           {formatCurrency(op.monto)}
                                       </td>
-                                      <td className="p-4 text-[10px] text-slate-400 font-mono">
-                                          {formatDate(op.fecha)}
+                                      <td className="p-4 text-[11px] text-blue-600 font-black font-mono">
+                                          {op.fechaCita || "S/F"} 
                                       </td>
                                       <td className="p-4">
                                           {procesandoId === op.id ? (
