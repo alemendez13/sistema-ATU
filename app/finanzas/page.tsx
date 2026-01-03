@@ -54,12 +54,16 @@ export default function FinanzasPage() {
     if(!confirm(`¿Confirmas recibir el pago en ${metodo}?`)) return;
     setProcesandoId(id);
     try {
+      // 1. 👇 DEFINIMOS LA VARIABLE PRIMERO (Calculamos el monto)
+      const montoNumerico = metodo === 'Cortesía' ? 0 : Number(cleanPrice(op.monto));
+
+      // 2. 👇 USAMOS LA VARIABLE EN EL OBJETO
       const datosCobro = {
           estatus: "Pagado",
           metodoPago: metodo,
           fechaPago: new Date(),
           elaboradoPor: user?.email || "Usuario Desconocido", 
-          montoPagado: metodo === 'Cortesía' ? 0 : cleanPrice(op.monto) 
+          montoPagado: montoNumerico // ✅ Aquí reemplazas la línea anterior
       };
 
       await updateDoc(doc(db, "operaciones", id), datosCobro);
