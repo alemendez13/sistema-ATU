@@ -25,7 +25,7 @@ export default function FinanzasPage() {
   const cargarPendientes = async () => {
     setLoading(true);
     try {
-      const hoyISO = new Date().toISOString().split('T')[0];
+      const hoyISO = new Date().toLocaleDateString('en-CA'); // "YYYY-MM-DD" local
 
       const q = query(
         collection(db, "operaciones"),
@@ -170,9 +170,17 @@ export default function FinanzasPage() {
                                       <td className="p-4 font-mono text-base font-bold text-slate-900">
                                           {formatCurrency(op.monto)}
                                       </td>
-                                      <td className="p-4 text-[11px] text-blue-600 font-black font-mono">
-                                          {op.fechaCita || "S/F"} 
+                                      
+                                      {/* 👇 CELDA 5: FECHA SOLICITUD (Registro) */}
+                                      <td className="p-4 text-[10px] text-slate-400 font-mono">
+                                        {formatDate(op.fecha)}
                                       </td>
+                                      {/* 👇 CELDA 6: FECHA CITA (Para el filtro) */}
+                                      <td className="p-4 text-[11px] text-blue-600 font-black font-mono">
+                                        {op.fechaCita || "S/F"}
+                                      </td>
+                                      {/* 👇 CELDA 7: ACCIONES DE COBRO */}
+
                                       <td className="p-4">
                                           {procesandoId === op.id ? (
                                               <div className="text-center text-slate-400 text-xs italic">Procesando...</div>
