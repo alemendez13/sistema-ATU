@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../../lib/firebase"; 
 import SmartAvatarUploader from "../ui/SmartAvatarUploader";
-import { cleanPrice, calculateAge } from "../../lib/utils";
+import { cleanPrice, calculateAge, generateSearchTags } from "../../lib/utils";
 
 // --- CATÁLOGOS ESTÁTICOS ---
 const ESTADOS_MX = ["Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango", "Estado de México", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas", "Extranjero"];
@@ -248,18 +248,19 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
       // 4. PREPARAR DATOS DEL PACIENTE (Mejorado: Nuevos Campos)
       const nombreConstruido = `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno || ''}`.trim().toUpperCase();
 
-      const patientData = {
+    const patientData = {
         nombres: data.nombres.toUpperCase(),
         apellidoPaterno: data.apellidoPaterno.toUpperCase(),
         apellidoMaterno: data.apellidoMaterno ? data.apellidoMaterno.toUpperCase() : "",
         nombreCompleto: nombreConstruido,
+        searchKeywords: generateSearchTags(nombreConstruido),
         fechaNacimiento: data.fechaNacimiento,
         edad: age || 0,
         genero: data.genero,
         tutor: (age !== null && age < 18) ? (data.tutor || null) : null,
         fotoUrl, 
         constanciaFiscalUrl: constanciaUrl, // ✅ Nuevo
-        
+
         telefonoCelular: data.telefonoCelular,
         telefonoFijo: data.telefonoFijo || null,
         email: data.email,
