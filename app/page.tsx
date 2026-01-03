@@ -6,12 +6,6 @@ import {
   Users, Package, ClipboardList, BarChart3,
   Calendar, FolderOpen, FileText
 } from "lucide-react";
-import { useState } from "react";
-import { collection, getDocs, writeBatch, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { generateSearchTags } from "@/lib/utils";
-import { toast } from "sonner";
-import { Database } from "lucide-react"; // Asegúrate de tenerlo en tus imports
 
 export default function Home() {
   // Lista de módulos consolidada (Módulos administrativos + Accesos rápidos)
@@ -29,43 +23,6 @@ export default function Home() {
     { id: 8, name: "Reportes", desc: "Caja, Reportes y Cobranza", icon: <BarChart3 />, href: "/finanzas", color: "bg-indigo-50 text-indigo-600" },
   ];
 
-const [migrando, setMigrando] = useState(false);
-
-  const ejecutarReparacionExterna = async () => {
-    if (!confirm("¿Deseas reparar los registros de la App Externa? Esto generará etiquetas para los nombres que faltan.")) return;
-    
-    setMigrando(true);
-    try {
-      const querySnapshot = await getDocs(collection(db, "pacientes"));
-      const batch = writeBatch(db);
-      let contador = 0;
-
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        // Solo reparamos si NO tiene el campo searchKeywords
-        if (data.nombreCompleto && !data.searchKeywords) {
-          const tags = generateSearchTags(data.nombreCompleto);
-          batch.update(doc(db, "pacientes", docSnap.id), {
-            searchKeywords: tags
-          });
-          contador++;
-        }
-      });
-
-      if (contador > 0) {
-        await batch.commit();
-        toast.success(`Se repararon ${contador} registros externos.`);
-      } else {
-        toast.info("Todos los registros están al día.");
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error("Error en la reparación.");
-    } finally {
-      setMigrando(false);
-    }
-  };
-
   return (
     <ProtectedRoute>
       <div className="min-h-screen p-2 md:p-6">
@@ -76,16 +33,6 @@ const [migrando, setMigrando] = useState(false);
               Gestion Integral de la Clínica
             </h1>
             <p className="text-slate-500 font-medium italic">SANSCE OS v2.0</p>
-
-<button 
-  onClick={ejecutarReparacionExterna}
-  disabled={migrando}
-  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-all"
->
-  <Database size={14} className={migrando ? "animate-spin" : ""} />
-  {migrando ? "REPARANDO..." : "REPARAR REGISTROS EXTERNOS"}
-</button>
-
           </header>
 
           {/* Cuadrícula de módulos */}
