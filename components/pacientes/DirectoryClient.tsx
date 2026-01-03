@@ -1,5 +1,3 @@
-/* components/pacientes/DirectoryClient.tsx */
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -89,52 +87,43 @@ export default function DirectoryClient({ mensajesPredefinidos }: { mensajesPred
     }
   };
 
-  // 3. BUSCADOR EN SERVIDOR
-const realizarBusqueda = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!busqueda.trim()) {
-      cargarPacientesIniciales();
-      setBuscando(false);
-      return;
-  }
+  // 3. BUSCADOR EN SERVIDOR (Reemplaza al filtro local)
+  const realizarBusqueda = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!busqueda.trim()) {
+        cargarPacientesIniciales();
+        setBuscando(false);
+        return;
+    }
 
-  setLoading(true);
-  setBuscando(true);
-  setHayMas(false);
-  
-  try {
-      const palabrasBusqueda = busqueda.trim().toUpperCase().split(/\s+/);
-      const primerTermino = palabrasBusqueda[0];
-      
-      const q = query(
-          collection(db, "pacientes"),
-          // 👇 BUSQUEDA INTELIGENTE: Busca si el array contiene la palabra
-          where("searchKeywords", "array-contains", primerTermino),
-          limit(30) 
-      );
+    setLoading(true);
+    setBuscando(true);
+    setHayMas(false);
+    
+    try {
+        const termino = busqueda.toUpperCase();
+        
+        const q = query(
+            collection(db, "pacientes"),
+            orderBy("nombreCompleto"), // Requiere índice simple (automático en Firebase)
+            where("nombreCompleto", ">=", termino),
+            where("nombreCompleto", "<=", termino + '\uf8ff'),
+            limit(20)
+        );
 
-      const snapshot = await getDocs(q);
-      let resultados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Paciente[];
+        const snapshot = await getDocs(q);
+        const resultados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Paciente[];
+        setPacientes(resultados);
 
-      // Si el usuario escribió más de una palabra, refinamos el resultado localmente
-      if (palabrasBusqueda.length > 1) {
-          resultados = resultados.filter(p => 
-              palabrasBusqueda.every(palabra => 
-                  p.nombreCompleto.toUpperCase().includes(palabra)
-              )
-          );
-      }
+        if (resultados.length === 0) toast.info("No se encontraron pacientes con ese nombre.");
 
-      setPacientes(resultados);
-      if (resultados.length === 0) toast.info("No se encontraron coincidencias.");
-
-  } catch (error) {
-      console.error("Error en búsqueda:", error);
-      toast.error("Error al buscar");
-  } finally {
-      setLoading(false);
-  }
-};
+    } catch (error) {
+        console.error(error);
+        toast.error("Error en la búsqueda");
+    } finally {
+        setLoading(false);
+    }
+  };
 
   // Reset al borrar búsqueda
   useEffect(() => {

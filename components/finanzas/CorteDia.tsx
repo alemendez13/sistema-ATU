@@ -18,9 +18,7 @@ export default function CorteDia() {
       collection(db, "operaciones"),
       where("estatus", "==", "Pagado"),
       where("fechaPago", ">=", inicioDia),
-      orderBy("fechaPago", "desc") 
-      // 💡 Nota: Si quieres agrupar también aquí por doctor, 
-      // debes añadir orderBy("doctorNombre", "asc") y crear el índice.
+      orderBy("fechaPago", "desc")
     );
 
     // 2. Escuchar GASTOS (De hoy)
@@ -31,14 +29,14 @@ export default function CorteDia() {
     );
 
     // Suscripciones en tiempo real
-   const unsubscribeIngresos = onSnapshot(qIngresos, (snap) => {
+    const unsubscribeIngresos = onSnapshot(qIngresos, (snap) => {
       setIngresos(snap.docs.map(d => d.data()));
-    }, (error) => console.error("Error en Ingresos:", error));
+    });
 
     const unsubscribeGastos = onSnapshot(qGastos, (snap) => {
       setGastos(snap.docs.map(d => d.data()));
       setLoading(false);
-    }, (error) => console.error("Error en Gastos:", error));
+    });
 
     return () => {
       unsubscribeIngresos();
@@ -47,14 +45,28 @@ export default function CorteDia() {
   }, []);
 
   // --- CÁLCULOS MATEMÁTICOS ---
-  // Función para limpiar precios
-  const sumarMonto = (arr: any[]) => 
-    arr.reduce((acc, curr) => acc + (Number(curr.montoPagado) || Number(curr.monto) || 0), 0);
+  // Función auxiliar para limpiar precios
+  const limpiarPrecio = (precio: any) => {
+      if (typeof precio === 'number') return precio;
+      if (!precio) return 0;
+      return parseFloat(precio.toString().replace(/[$,]/g, '')) || 0;
+  };
 
-  const totalVendido = sumarMonto(ingresos);
-  const efectivoEntrada = sumarMonto(ingresos.filter(i => i.metodoPago === 'Efectivo'));
-  const dineroBanco = totalVendido - efectivoEntrada;
-  const totalGastos = sumarMonto(gastos);
+  // 1. Total Ingresos (Todo)
+  const totalVendido = ingresos.reduce((acc, curr) => acc + limpiarPrecio(curr.monto), 0);
+
+  // 2. Ingresos Efectivo
+  const efectivoEntrada = ingresos
+    .filter(i => i.metodoPago === 'Efectivo')
+    .reduce((acc, curr) => acc + limpiarPrecio(curr.monto), 0);
+
+  // 3. Ingresos Digitales (Lo que va al banco directo)
+const dineroBanco = totalVendido - efectivoEntrada;
+
+  // 4. Total Gastos
+  const totalGastos = gastos.reduce((acc, curr) => acc + limpiarPrecio(curr.monto), 0);
+
+  // 5. EL GRAN TOTAL (Lo que debe haber físicamente)
   const balanceCaja = efectivoEntrada - totalGastos;
 
   if (loading) return <div className="p-4 text-center text-slate-400">Calculando corte...</div>;
