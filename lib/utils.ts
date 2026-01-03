@@ -138,3 +138,15 @@ export const parseWhatsAppTemplate = (template: string, data: {
         .replace(/\[Doctor\]/g, data.doctorNombre || "Profesional SANSCE")
         .replace(/\[nombrePaciente\]/g, data.pacienteNombre || "Paciente");
 };
+
+/**
+ * 9. GENERADOR DE TAGS DE BÚSQUEDA
+ * Convierte "Juan Perez Garcia" en ["JUAN", "PEREZ", "GARCIA"]
+ */
+export const generateSearchTags = (nombre: string): string[] => {
+    if (!nombre) return [];
+    // Limpiamos espacios extra y dividimos por palabras
+    const palabras = nombre.trim().toUpperCase().split(/\s+/);
+    // Retornamos un array sin duplicados
+    return Array.from(new Set(palabras));
+};
