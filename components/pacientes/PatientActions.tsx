@@ -1,3 +1,4 @@
+/* components/pacientes/PatientActions.tsx */
 "use client";
 
 import { useState } from "react";
@@ -8,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Paciente } from "../../types"; 
 import SmartAvatarUploader from "../ui/SmartAvatarUploader";
+import { cleanPrice, generateSearchTags } from "../../lib/utils";
 
 // --- CATÁLOGOS COMPLETOS ---
 const ESTADOS_MX = ["Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango", "Estado de México", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas", "Extranjero"];
@@ -96,11 +98,14 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
       }
 
       // 2. Preparar objeto para actualizar
+
+      const nombreNormalizado = formData.nombreCompleto.toUpperCase();
+
       const dataToUpdate = {
         ...formData,
         fotoUrl: finalFotoUrl, // Guardamos la URL actualizada
         nombreCompleto: formData.nombreCompleto.toUpperCase(),
-        // Lógica Fiscal: Si tiene RFC se guarda, si no, se pone null
+        searchKeywords: generateSearchTags(nombreNormalizado),
         datosFiscales: formData.datosFiscales?.rfc ? {
             ...formData.datosFiscales,
             razonSocial: formData.datosFiscales.razonSocial.toUpperCase(),
