@@ -1,10 +1,10 @@
 "use client";
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   Settings, Target, GitBranch, HeartPulse, 
-  Users, Package, Trash2, Landmark, LayoutDashboard 
+  Users, Package, ClipboardList, BarChart3, 
+  LayoutDashboard, Calendar, FolderOpen, FileText 
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -16,14 +16,17 @@ export default function Sidebar() {
   // Lista maestra de módulos extraída de tu Dashboard (page.tsx)
   const menuItems = [
     { id: 0, name: "Inicio (Dashboard)", icon: <LayoutDashboard size={20} />, href: "/", color: "text-slate-500" },
-    { id: 1, name: "Configuración", icon: <Settings size={20} />, href: "/configuracion/conocimiento", color: "text-slate-600" },
+    { id: 1, name: "Configuración", icon: <Settings size={20} />, href: "/configuracion/conocimiento", color: "text-slate-600" },   
+    { id: 10, name: "Agenda Médica", icon: <Calendar size={20} />, href: "/agenda", color: "text-blue-600" }, // ✨ Nuevo acceso directo
+    { id: 11, name: "Directorio", icon: <FolderOpen size={20} />, href: "/pacientes", color: "text-emerald-600" }, // ✨ Nuevo acceso directo
     { id: 2, name: "Metas / Kpis", icon: <Target size={20} />, href: "/planeacion", color: "text-blue-600" },
-    { id: 3, name: "Procesos y Mejoras", icon: <GitBranch size={20} />, href: "/procesos", color: "text-purple-600" },
+    { id: 3, name: "Sistema de gestión", icon: <GitBranch size={20} />, href: "/procesos", color: "text-purple-600" },
     { id: 4, name: "Control Diario de Pacientes", icon: <HeartPulse size={20} />, href: "/pacientes", color: "text-red-600" },
-    { id: 5, name: "Capacitaciones y Expedientes", icon: <Users size={20} />, href: "/personal", color: "text-orange-600" },
+    { id: 12, name: "Expediente Clínico", icon: <FileText size={20} />, href: "/expedientes", color: "text-indigo-600" }, // 🩺 Preparación Módulo
+    { id: 5, name: "Recursos humanos", icon: <Users size={20} />, href: "/personal", color: "text-orange-600" },
     { id: 6, name: "Solicitud de Insumos y Mantenimiento", icon: <Package size={20} />, href: "/inventarios", color: "text-amber-600" },
-    { id: 7, name: "Minuta", icon: <Trash2 size={20} />, href: "/mantenimiento", color: "text-emerald-600" },
-    { id: 8, name: "Reportes", icon: <Landmark size={20} />, href: "/finanzas", color: "text-indigo-600" },
+    { id: 7, name: "Minuta", icon: <ClipboardList size={20} />, href: "/mantenimiento", color: "text-emerald-600" }, // ✅ Icono corregido
+    { id: 8, name: "Reportes", icon: <BarChart3 size={20} />, href: "/finanzas", color: "text-indigo-600" }, // ✅ Icono corregido
   ];
 
   return (

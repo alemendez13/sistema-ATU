@@ -29,10 +29,13 @@ export default function Navbar() {
   const menuItems = [
   { name: "Dashboard", href: "/" },
   { name: "Configuración", href: "/configuracion/conocimiento" }, // El Cerebro
+  { name: "Agenda Médica", href: "/agenda" },
+  { name: "Directorio", href: "/pacientes" },
+  { name: "Expediente Clínico", href: "/expedientes" },
   { name: "Metas / Kpis", href: "/planeacion" },
-  { name: "Procesos y Mejoras", href: "/procesos" },
+  { name: "Sistema de gestión", href: "/procesos" },
   { name: "Control Diario de Pacientes", href: "/pacientes" }, // Directorio y Agenda
-  { name: "Capacitaciones y Expedientes", href: "/personal" },
+  { name: "Recursos humanos", href: "/personal" },
   { name: "Solicitudes de materiales y mantenimiento", href: "/inventarios" }, // Almacén y Stock
   { name: "Minuta", href: "/mantenimiento" },
   { name: "Reportes", href: "/finanzas" }, // Caja y Reportes
