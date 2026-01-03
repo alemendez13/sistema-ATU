@@ -25,15 +25,14 @@ export default function FinanzasPage() {
   const cargarPendientes = async () => {
     setLoading(true);
     try {
-      // 1. Obtenemos el string de hoy (ej: "2026-01-02")
       const hoyISO = new Date().toISOString().split('T')[0];
 
       const q = query(
         collection(db, "operaciones"),
         where("estatus", "==", "Pendiente de Pago"),
-        // 2. 👇 CAMBIO CLAVE: Filtramos por la fecha de la cita (fechaCita)
         where("fechaCita", verCarteraVencida ? "<" : "==", hoyISO), 
-        orderBy("fechaCita", "desc")
+        orderBy("fechaCita", "desc"), 
+        orderBy("doctorNombre", "asc") 
       );
       
       const querySnapshot = await getDocs(q);
@@ -73,6 +72,9 @@ export default function FinanzasPage() {
       setProcesandoId(null);
     }
   };
+
+  let ultimoDoctor = "";
+  let colorAlternado = false;
 
   return (
     <ProtectedRoute>
@@ -141,42 +143,51 @@ export default function FinanzasPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {pendientes.map((op) => (
-                                <tr key={op.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="p-4 font-bold text-slate-800">{op.pacienteNombre}</td>
-                                    <td className="p-4">
-                                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] font-bold border border-blue-100">
-                                            {op.servicioNombre}
-                                        </span>
-                                    </td>
-                                    <td className="p-4 text-xs text-slate-400 italic">
-                                        {op.doctorNombre || "N/A"}
-                                    </td>
-                                    <td className="p-4 font-mono text-base font-bold text-slate-900">
-                                        {formatCurrency(op.monto)}
-                                    </td>
-                                    <td className="p-4 text-[10px] text-slate-400 font-mono">
-                                        {formatDate(op.fecha)}
-                                    </td>
-                                    <td className="p-4">
-                                        {procesandoId === op.id ? (
-                                            <div className="text-center text-slate-400 text-xs italic">Procesando...</div>
-                                        ) : (
-                                            <div className="flex flex-wrap gap-1 justify-end">
-                                                <button onClick={() => handleCobrar(op.id!, 'Efectivo', op)} className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-green-200 transition">EFECTIVO</button>
-                                                <button onClick={() => handleCobrar(op.id!, 'Tarjeta', op)} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200 transition">TARJETA</button>
-                                                <button onClick={() => handleCobrar(op.id!, 'Transferencia', op)} className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-purple-200 transition">TRANSF</button>
-                                                <button onClick={() => handleCobrar(op.id!, 'Vale', op)} className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-orange-200 transition">🎟️ VALE</button>
-                                                <button onClick={() => {
-                                                    if(confirm("¿Aplicar CORTESÍA? El ingreso se registrará en $0.00")) {
-                                                        handleCobrar(op.id!, 'Cortesía', op);
-                                                    }
-                                                }} className="bg-slate-800 text-white px-2 py-1 rounded text-[10px] font-bold hover:bg-black transition">🎁 CORTESÍA</button>
-                                            </div>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
+                            {pendientes.map((op) => {
+                                // Lógica de agrupación visual
+                                if (op.doctorNombre !== ultimoDoctor) {
+                                  colorAlternado = !colorAlternado;
+                                  ultimoDoctor = op.doctorNombre || "N/A";
+                                }
+                                const bgClass = colorAlternado ? "bg-white" : "bg-blue-50/40";
+
+                                return (
+                                  <tr key={op.id} className={`${bgClass} hover:bg-slate-100 transition-colors`}>
+                                      <td className="p-4 font-bold text-slate-800">{op.pacienteNombre}</td>
+                                      <td className="p-4">
+                                          <span className="bg-white text-blue-700 px-2 py-1 rounded text-[10px] font-bold border border-blue-100">
+                                              {op.servicioNombre}
+                                          </span>
+                                      </td>
+                                      <td className="p-4 text-xs font-bold text-slate-600 uppercase">
+                                          {op.doctorNombre || "N/A"}
+                                      </td>
+                                      <td className="p-4 font-mono text-base font-bold text-slate-900">
+                                          {formatCurrency(op.monto)}
+                                      </td>
+                                      <td className="p-4 text-[10px] text-slate-400 font-mono">
+                                          {formatDate(op.fecha)}
+                                      </td>
+                                      <td className="p-4">
+                                          {procesandoId === op.id ? (
+                                              <div className="text-center text-slate-400 text-xs italic">Procesando...</div>
+                                          ) : (
+                                              <div className="flex flex-wrap gap-1 justify-end">
+                                                  <button onClick={() => handleCobrar(op.id!, 'Efectivo', op)} className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-green-200 transition">EFECTIVO</button>
+                                                  <button onClick={() => handleCobrar(op.id!, 'Tarjeta', op)} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200 transition">TARJETA</button>
+                                                  <button onClick={() => handleCobrar(op.id!, 'Transferencia', op)} className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-purple-200 transition">TRANSF</button>
+                                                  <button onClick={() => handleCobrar(op.id!, 'Vale', op)} className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-orange-200 transition">🎟️ VALE</button>
+                                                  <button onClick={() => {
+                                                      if(confirm("¿Aplicar CORTESÍA? El ingreso se registrará en $0.00")) {
+                                                          handleCobrar(op.id!, 'Cortesía', op);
+                                                      }
+                                                  }} className="bg-slate-800 text-white px-2 py-1 rounded text-[10px] font-bold hover:bg-black transition">🎁 CORTESÍA</button>
+                                              </div>
+                                          )}
+                                      </td>
+                                  </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
