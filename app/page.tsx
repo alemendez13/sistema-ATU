@@ -46,9 +46,7 @@ export default function Home() {
                   {/* Icono centrado */}
                   <div className={`w-14 h-14 ${m.color} rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm`}>
                     {m.icon}
-                  </div>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Módulo {m.id}</span>
-                  
+                  </div>                  
                   {/* Título centrado con text-balance para evitar cortes feos */}
                   <h3 className="text-lg lg:text-xl font-bold text-slate-800 leading-tight w-full text-balance">
                     {m.name}
