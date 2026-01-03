@@ -340,6 +340,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
         descuentoAplicado: descuentoSeleccionado ? descuentoSeleccionado.nombre : null,
         
         fecha: serverTimestamp(),
+        fechaCita: data.fechaCita || null,
         estatus: montoFinal === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago", 
         
         esCita: esServicioMedico,

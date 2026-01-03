@@ -63,6 +63,7 @@ export interface Operacion {
   metodoPago?: "Efectivo" | "Tarjeta" | "Transferencia" | "Otro";
   fecha: any;
   fechaPago?: any;
+  fechaCita?: string;
   // Para vincular la venta con un responsable de seguimiento (Laboratorio o Consulta)
   doctorId?: string | null;
   doctorNombre?: string | null;
