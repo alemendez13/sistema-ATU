@@ -48,14 +48,25 @@ export default function CorteDia() {
 
   // --- CÁLCULOS MATEMÁTICOS ---
   // Función para limpiar precios
+  // 1. Definición de la función de suma técnica
   const sumarMonto = (arr: any[]) => 
-    arr.reduce((acc, curr) => acc + (Number(curr.montoPagado) || Number(curr.monto) || 0), 0);
+    arr.reduce((acc, curr) => {
+        // 🎯 Verificamos si existe el cobro final (montoPagado), incluso si es 0.
+        // Si no existe (está pendiente), usamos el monto base de la cita.
+        const valorFinal = (curr.montoPagado !== undefined && curr.montoPagado !== null) 
+            ? Number(curr.montoPagado) 
+            : Number(curr.monto);
+            
+        // Sumamos solo si es un número válido para evitar el error "NaN"
+        return acc + (isNaN(valorFinal) ? 0 : valorFinal);
+    }, 0);
 
-  const totalVendido = sumarMonto(ingresos);
+  // 2. Mantenimiento de variables originales para el reporte
+  const totalVendido    = sumarMonto(ingresos);
   const efectivoEntrada = sumarMonto(ingresos.filter(i => i.metodoPago === 'Efectivo'));
-  const dineroBanco = totalVendido - efectivoEntrada;
-  const totalGastos = sumarMonto(gastos);
-  const balanceCaja = efectivoEntrada - totalGastos;
+  const dineroBanco     = totalVendido - efectivoEntrada;
+  const totalGastos     = sumarMonto(gastos);
+  const balanceCaja     = efectivoEntrada - totalGastos;
 
   if (loading) return <div className="p-4 text-center text-slate-400">Calculando corte...</div>;
 
