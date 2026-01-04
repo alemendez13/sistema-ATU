@@ -1,3 +1,4 @@
+// app/pacientes/[id]/venta/VentaForm.tsx
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from "firebase/firestore";
@@ -156,7 +157,7 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
       const esTodoElDia = esLaboratorio && !horaCita;
 
       // 3. Crear OPERACIÓN con Descuentos
-      // 1. CREAR OPERACIÓN (Paso Inicial)
+      // >>> INICIO: NORMALIZACIÓN DE OPERACIÓN FINANCIERA <<<
       const docRef = await addDoc(collection(db, "operaciones"), {
         pacienteId,
         pacienteNombre: pNombre,
@@ -165,26 +166,26 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
         servicioNombre: servicioSeleccionado?.nombre,
         elaboradoPor: user?.email || "Usuario Desconocido",
         
-        // Bloque financiero
         montoOriginal: precioOriginal,
         descuentoAplicado: descuentoSeleccionado ? {
             id: descuentoSeleccionado.id,
             nombre: descuentoSeleccionado.nombre,
             monto: montoDescuento
         } : null,
-        monto: precioFinal,
+        monto: Number(precioFinal),
         
-        // El folio inicia vacío o temporal
         folioInterno: generateFolio("FIN-FR-09", ""), 
         fecha: serverTimestamp(),
-        estatus: precioFinal === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
+        // 🎯 Corrección: Si es 0, se marca como pagado para no ensuciar Cartera Vencida
+        estatus: Number(precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
         
         esCita: esServicio,
         doctorId: medicoId || null,
         doctorNombre: medicoElegido?.nombre || null,
-        fechaCita: fechaCita || null,
+        fechaCita: fechaCita, // 📅 Asegurado como String "YYYY-MM-DD"
         horaCita: horaCita || null
       });
+// >>> FIN: NORMALIZACIÓN <<<
 
       // 2. VINCULACIÓN DE FOLIO (Paso Final de Unificación)
       // Usamos el ID real que Firebase acaba de darnos (docRef.id)

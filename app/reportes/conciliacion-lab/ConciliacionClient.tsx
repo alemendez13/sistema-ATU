@@ -1,3 +1,4 @@
+// ARCHIVO: app/reportes/conciliacion-lab/ConciliacionClient.tsx
 "use client";
 import { useState } from "react";
 import { collection, query, where, getDocs, orderBy, limit, startAfter } from "firebase/firestore";

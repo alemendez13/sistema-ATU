@@ -1,3 +1,4 @@
+// app/finanzas/gastos/page.tsx
 import GastosManager from "../../../components/finanzas/GastosManager";
 
 export default function GastosPage() {

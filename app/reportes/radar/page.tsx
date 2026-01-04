@@ -1,3 +1,4 @@
+/* app/reportes/radar/page.tsx */
 "use client";
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, orderBy, getDoc, doc, limit } from "firebase/firestore";

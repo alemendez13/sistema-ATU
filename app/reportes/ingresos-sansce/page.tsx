@@ -1,3 +1,4 @@
+/* app/reportes/ingresos-sansce/page.tsx */
 "use client";
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, orderBy, doc, getDoc } from "firebase/firestore"; 

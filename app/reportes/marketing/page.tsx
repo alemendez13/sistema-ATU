@@ -1,3 +1,4 @@
+/* app/reportes/marketing/page.tsx */
 "use client";
 import { useState } from "react"; // Quitamos useEffect
 import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";

@@ -1,3 +1,4 @@
+// app/pacientes/[id]/page.tsx
 "use client"; // 👈 ESTO ES LA CLAVE: Le dice a Next.js que esto corre en el navegador
 
 import { useState, useEffect } from "react";

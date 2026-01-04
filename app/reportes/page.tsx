@@ -1,3 +1,4 @@
+// ARCHIVO: app/reportes/page.tsx
 "use client";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import Link from "next/link";

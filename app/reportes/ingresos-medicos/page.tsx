@@ -1,3 +1,4 @@
+/* app/reportes/ingresos-medico/page.tsx */
 "use client";
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, orderBy, getDoc, doc } from "firebase/firestore"; 

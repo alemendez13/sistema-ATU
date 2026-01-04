@@ -1,3 +1,4 @@
+// app/pacientes/page.tsx
 import { getMensajesWhatsApp } from "@/lib/googleSheets";
 import DirectoryClient from "@/components/pacientes/DirectoryClient";
 import ProtectedRoute from "@/components/ProtectedRoute"; 

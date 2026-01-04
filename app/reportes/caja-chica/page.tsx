@@ -1,3 +1,4 @@
+// ARCHIVO: app/reportes/caja-chica/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, orderBy, Timestamp } from "firebase/firestore";

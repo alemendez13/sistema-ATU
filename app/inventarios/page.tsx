@@ -1,3 +1,4 @@
+// app/inventarios/page.tsx
 import { getCatalogos } from "../../lib/googleSheets";
 import InventoryManager from "../../components/inventarios/InventoryManager";
 import ProtectedRoute from "../../components/ProtectedRoute";

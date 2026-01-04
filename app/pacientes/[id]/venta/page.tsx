@@ -1,3 +1,4 @@
+// app/pacientes/[id]/venta/page.tsx
 import { getCatalogos } from "../../../../lib/googleSheets";
 import VentaForm from "./VentaForm";
 

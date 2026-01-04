@@ -1,3 +1,4 @@
+// ARCHIVO: app/prueba-stock/page.tsx
 import { consultarStockExterno } from "../../lib/googleSheets";
 
 // Esta página funciona escribiendo el SKU en la URL
