@@ -4,7 +4,7 @@ import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, dele
 import { db } from "../lib/firebase";
 import { agendarCitaGoogle, cancelarCitaGoogle } from "../lib/actions";
 import { toast } from "sonner";
-import { addMinutesToTime } from "../lib/utils";
+import { addMinutesToTime, cleanPrice } from "../lib/utils";
 import { useAuth } from "../hooks/useAuth";
 
 interface ModalProps {
@@ -136,13 +136,31 @@ const verificarDisponibilidadMultiples = async (
     return true; 
 };
 
-  // Buscador
+    // >>> INICIO: BÚSQUEDA INTELIGENTE POR TOKENS <<<
   useEffect(() => {
     const buscarPacientes = async () => {
       if (busqueda.length < 3) { setResultados([]); return; }
-      const q = query(collection(db, "pacientes"), where("nombreCompleto", ">=", busqueda.toUpperCase()), where("nombreCompleto", "<=", busqueda.toUpperCase() + '\uf8ff'), limit(5));
+      
+      // Dividimos la búsqueda en palabras para usar el primer token
+      const tokensBusqueda = busqueda.trim().toUpperCase().split(/\s+/);
+      const primerToken = tokensBusqueda[0];
+
+      const q = query(
+        collection(db, "pacientes"), 
+        where("searchKeywords", "array-contains", primerToken), // 🎯 Cambio: Ahora usa tokens
+        limit(20)
+      );
+      
       const snap = await getDocs(q);
-      setResultados(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Refinamiento local para múltiples palabras (Nombre + Apellido)
+      if (tokensBusqueda.length > 1) {
+          docs = docs.filter((p: any) => 
+              tokensBusqueda.every(token => p.nombreCompleto.includes(token))
+          );
+      }
+      setResultados(docs);
     };
     const timer = setTimeout(buscarPacientes, 300);
     return () => clearTimeout(timer);
@@ -185,7 +203,6 @@ const verificarDisponibilidadMultiples = async (
         bloquesNecesarios,
         citaExistente?.googleEventId
       );
-      // >>> --- FIN CORRECCIÓN --- <<<
       
       if (!hayEspacio) {
           alert(`⛔ AGENDA OCUPADA.\n\nEl horario seleccionado ya no está disponible.`);
@@ -253,20 +270,19 @@ const esLaboratorio =
       
       const googleId = resultadoGoogle.googleEventId || null;
 
-      // Guardamos los nuevos bloques en Firebase
+      // >>> INICIO: CREACIÓN DE CITA Y OPERACIÓN CON TRAZABILIDAD <<<
       let horaActual = horaSeleccionada;
       for (let i = 0; i < bloquesNecesarios; i++) {
           await addDoc(collection(db, "citas"), {
-            doctorId: data.doctor.id,
+            doctorId: data.doctor.id, // 🆔 ID Real del médico
             doctorNombre: data.doctor.nombre,
             paciente: nombreFinal,
-            pacienteId: idFinal !== "EXTERNO" ? idFinal : null,
-            // --- COPIAR TELÉFONO DEL EXPEDIENTE A LA CITA ---
-            telefonoCelular: modo === 'buscar' ? pacienteSeleccionado?.telefonoCelular : null,
+            pacienteId: idFinal !== "EXTERNO" ? idFinal : null, // 🆔 ID Real del paciente
+            telefonoCelular: modo === 'buscar' ? (pacienteSeleccionado?.telefonoCelular || null) : null,
             motivo: i === 0 ? tituloCita : "(Continuación)", 
-            fecha: fechaSeleccionada,
+            fecha: fechaSeleccionada, // 📅 String ISO: "2026-01-03"
             hora: horaActual,
-            creadoEn: new Date(),
+            creadoEn: serverTimestamp(),
             googleEventId: googleId,
             elaboradoPor: user?.email || "Usuario Desconocido",
             confirmada: citaExistente?.confirmada || false,        
@@ -275,21 +291,23 @@ const esLaboratorio =
           horaActual = sumarMinutos(horaActual, 30);
       }
 
-      // Generamos el nuevo cargo en Caja
+      // Generamos el cargo en Caja sincronizado
       await addDoc(collection(db, "operaciones"), {
+        pacienteId: idFinal, // 🆔 Vínculo maestro
         pacienteNombre: nombreFinal, 
-        pacienteId: idFinal, 
         servicioSku: servicioDetalle?.sku,
         servicioNombre: tituloCita, 
         monto: Number(precioFinal), 
-        estatus: "Pendiente de Pago",
+        montoOriginal: Number(cleanPrice(servicioDetalle?.precio)),
+        estatus: Number(precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
         fecha: serverTimestamp(),
-        fechaCita: fechaSeleccionada,
-        origen: "Agenda (Editada)",
-        elaboradoPor: user?.email || "Usuario Desconocido",
+        fechaCita: fechaSeleccionada, // 📅 Crucial para FinanzasPage
+        requiereFactura: pacienteSeleccionado?.datosFiscales?.rfc ? true : false,
         doctorId: data.doctor.id,
-        doctorNombre: data.doctor.nombre
+        doctorNombre: data.doctor.nombre,
+        origen: citaExistente ? "Agenda (Editada)" : "Agenda"
       });
+// >>> FIN: BLOQUE DE TRAZABILIDAD <<<
 
       if (data.waitingListId) { try { await deleteDoc(doc(db, "lista_espera", data.waitingListId)); } catch (e) {} }
 
