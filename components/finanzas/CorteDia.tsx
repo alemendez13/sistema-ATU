@@ -15,10 +15,10 @@ export default function CorteDia() {
 
     // 1. Escuchar INGRESOS (Pagados hoy)
     const qIngresos = query(
-      collection(db, "operaciones"),
-      where("estatus", "==", "Pagado"),
-      where("fechaPago", ">=", inicioDia),
-      orderBy("fechaPago", "desc") 
+  collection(db, "operaciones"),
+  where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]), // 🎯 Ahora detecta ambos
+  where("fechaPago", ">=", inicioDia),
+  orderBy("fechaPago", "desc")
       // 💡 Nota: Si quieres agrupar también aquí por doctor, 
       // debes añadir orderBy("doctorNombre", "asc") y crear el índice.
     );
