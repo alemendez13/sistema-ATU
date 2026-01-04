@@ -27,9 +27,8 @@ export default function ReporteIngresosPage() {
 
       const q = query(
         collection(db, "operaciones"),
-        where("estatus", "==", "Pagado"),
-        where("fecha", ">=", start),
-        where("fecha", "<=", end),
+        where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]), // 🎯 Incluye cortesías
+        where("fechaCita", "==", fechaSeleccionada), // 🎯 Busca por el string exacto YYYY-MM-DD
         orderBy("fecha", "desc")
       );
 

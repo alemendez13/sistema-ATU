@@ -35,6 +35,7 @@ export default function ReporteIngresosMedicos() {
   }, []);
 
   // 2. Generar Reporte (Versión "Experiencia 5 Estrellas" ⭐)
+  // 2. Generar Reporte (Versión Corregida 2026 - Trazabilidad Total)
   const generarCorte = async () => {
     if (!medicoId) return toast.warning("Selecciona un médico");
     
@@ -47,89 +48,79 @@ export default function ReporteIngresosMedicos() {
       // Limpieza del porcentaje
       const porcentaje = parseFloat((medicoSelected?.porcentajeComision || "0").toString().replace('%', '')) / 100;
 
-      const start = new Date(`${fechaInicio}T00:00:00`);
-      const end = new Date(`${fechaFin}T23:59:59`);
-
-      console.log("🔥 LECTURA EJECUTADA EN: [NOMBRE_DEL_ARCHIVO] - " + new Date().toLocaleTimeString());
-
-      // 🟢 1. CONSULTA "ARPÓN" (Ya optimizada con índice)
+      // 🟢 1. CONSULTA UNIFICADA POR FECHA CITA (String ISO)
+      // Buscamos directamente por el día que ocurrió la cita, no por el registro
       const q = query(
         collection(db, "operaciones"),
-        where("estatus", "==", "Pagado"),
-        where("doctorId", "==", medicoId), // Filtro directo en servidor
-        where("fechaPago", ">=", start),
-        where("fechaPago", "<=", end),
-        orderBy("fechaPago", "desc")
+        where("doctorId", "==", medicoId),
+        where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]), // 🎯 Incluye las cortesías de $0
+        where("fechaCita", ">=", fechaInicio), // 🎯 Filtro por String "YYYY-MM-DD"
+        where("fechaCita", "<=", fechaFin),
+        orderBy("fechaCita", "desc")
       );
 
       const snapshot = await getDocs(q);
-      let totalCobrado = 0;
 
-      // 🧠 MEMORIA TEMPORAL (Caché de Pacientes)
-      // Esto evita buscar al mismo paciente múltiples veces
+      // 🧠 MEMORIA TEMPORAL (Caché de Pacientes para búsqueda de RFC)
       const cachePacientes: Record<string, any> = {};
 
-      // Procesamiento
+      // 🟢 2. PROCESAMIENTO DE FILAS Y ENRIQUECIMIENTO
       const promesas = snapshot.docs.map(async (docOp) => {
         const data = docOp.data();
-        
-        // Nota: Como ya filtramos por doctorId en la query, 
-        // ya no necesitamos los "if (coincideID...)" aquí. Todos son de este médico.
-            
-        // --- LÓGICA DE FACTURA OPTIMIZADA ---
         let pideFactura = "No";
         
         if (data.pacienteId && data.pacienteId !== "EXTERNO") {
             try {
-                // VERIFICAMOS SI YA LO BUSCAMOS ANTES (Caché)
                 if (!cachePacientes[data.pacienteId]) {
-                    // Si no está en memoria, lo buscamos y guardamos la promesa
                     const pacRef = doc(db, "pacientes", data.pacienteId);
                     cachePacientes[data.pacienteId] = getDoc(pacRef).then(snap => snap.exists() ? snap.data() : null);
                 }
-
-                // Usamos el dato de la memoria (Instantáneo si ya se cargó)
                 const pData = await cachePacientes[data.pacienteId];
-                
                 if (pData?.datosFiscales?.rfc && pData.datosFiscales.rfc.length > 10) {
                     pideFactura = "Sí";
                 }
             } catch (e) { console.warn("Error verificando factura", e); }
         }
 
-        const monto = Number(data.monto) || 0;
-        totalCobrado += monto;
-        
+        // Devolvemos el objeto procesado (El monto se suma después para evitar errores)
         return {
             id: docOp.id,
-            fecha: data.fechaPago?.seconds ? new Date(data.fechaPago.seconds * 1000).toLocaleDateString('es-MX') : "S/F",
+            fecha: data.fechaCita || "S/F", // 🎯 Usamos la fecha de la cita para el reporte
             paciente: data.pacienteNombre,
             concepto: data.servicioNombre,
-            formaPago: data.metodoPago || "No especificado",
+            formaPago: data.metodoPago || (Number(data.monto) === 0 ? "Cortesía" : "No especificado"),
             factura: pideFactura,
-            monto: monto
+            monto: Number(data.monto) || 0
         };
       });
 
-      const resultados = await Promise.all(promesas);
-      // Filtramos nulos por si acaso (aunque con la nueva query no debería haber)
-      const filtrados = resultados.filter(r => r !== null);
+      // Esperamos a que terminen todas las búsquedas de RFC
+      const resultadosPrevios = await Promise.all(promesas);
+      const resultadosFiltrados = resultadosPrevios.filter(r => r !== null);
 
-      const comision = totalCobrado * porcentaje;
-      const aPagar = totalCobrado - comision;
+      // 🟢 3. CÁLCULO MATEMÁTICO BLINDADO
+      // Realizamos la suma una vez que tenemos todos los datos finales
+      const totalCobradoReal = resultadosFiltrados.reduce((acc, curr) => acc + curr.monto, 0);
+      const comision = totalCobradoReal * porcentaje;
+      const aPagar = totalCobradoReal - comision;
 
-      setMovimientos(filtrados);
+      // 🟢 4. ACTUALIZACIÓN DE INTERFAZ
+      setMovimientos(resultadosFiltrados);
       setResumen({
-        cobrado: totalCobrado,
+        cobrado: totalCobradoReal,
         comisionSansce: comision,
         aPagarMedico: aPagar
       });
 
-      if (filtrados.length === 0) toast.info("No se encontraron movimientos para este médico en el periodo.");
+      if (resultadosFiltrados.length === 0) {
+          toast.info("No se encontraron movimientos para este médico en el periodo.");
+      } else {
+          toast.success("Liquidación calculada con éxito.");
+      }
 
-    } catch (error) {
-      console.error(error);
-      toast.error("Error generando el corte.");
+    } catch (error: any) {
+      console.error("Error en liquidación:", error);
+      toast.error("Error al generar el reporte: " + error.message);
     } finally {
       setLoading(false);
     }
