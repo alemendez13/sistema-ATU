@@ -302,6 +302,8 @@ const esLaboratorio =
         estatus: Number(precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
         fecha: serverTimestamp(),
         fechaCita: fechaSeleccionada, // 📅 Crucial para FinanzasPage
+        fechaPago: Number(precioFinal) === 0 ? serverTimestamp() : null, // ✅ Crucial para CorteDia.tsx
+        metodoPago: Number(precioFinal) === 0 ? "Cortesía" : null,
         requiereFactura: pacienteSeleccionado?.datosFiscales?.rfc ? true : false,
         doctorId: data.doctor.id,
         doctorNombre: data.doctor.nombre,
