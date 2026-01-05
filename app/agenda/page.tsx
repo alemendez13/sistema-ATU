@@ -4,7 +4,7 @@ import AgendaBoard from "@/components/AgendaBoard";
 import Link from "next/link";
 
 export default async function AgendaPage() {
-  const { medicos, servicios } = await getCatalogos();
+  const { medicos, servicios, descuentos } = await getCatalogos(); // ✅ Ahora traemos los descuentos
 
   return (
     <main className="max-w-full mx-auto px-4 md:px-8 pt-4">
@@ -29,7 +29,7 @@ export default async function AgendaPage() {
           <Link href="/pacientes/express-wa" className="text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 px-4 py-2 rounded-xl text-xs font-medium transition-all">📲 Autollenado WA</Link>
         </div>
 
-        <AgendaBoard medicos={medicos} servicios={servicios} />
+        <AgendaBoard medicos={medicos} servicios={servicios} descuentos={descuentos} /> {/* ✅ Se pasan como prop */}
     </main>
   );
 }

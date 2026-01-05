@@ -126,6 +126,29 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
     !servicioSeleccionado?.area || m.especialidad === servicioSeleccionado.area || m.especialidad === "General"
   );
 
+  useEffect(() => {
+      const aplicarConvenioAutomatico = async () => {
+          if (!pacienteId) return;
+          
+          try {
+              const pSnap = await getDoc(doc(db, "pacientes", pacienteId));
+              if (pSnap.exists()) {
+                  const pData = pSnap.data();
+                  // Si el paciente tiene un convenio guardado...
+                  if (pData.convenioId) {
+                      setDescuentoId(pData.convenioId);
+                      // Buscamos el nombre para avisar al usuario
+                      const nombreDesc = descuentos.find(d => d.id === pData.convenioId)?.nombre;
+                      toast.info(`Convenio aplicado: ${nombreDesc}`);
+                  }
+              }
+          } catch (error) {
+              console.error("Error leyendo convenio:", error);
+          }
+      };
+      aplicarConvenioAutomatico();
+  }, [pacienteId, descuentos]);
+
   const handleVenta = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!servicioSku) return;

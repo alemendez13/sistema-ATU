@@ -6,6 +6,7 @@ import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebas
 import { db } from "../../../lib/firebase";
 // Ajusta esta importación si tus tipos están en otro lado, según tu estructura es correcto:
 import { Paciente, Operacion } from "../../../types"; 
+import { getCatalogos } from "../../../lib/googleSheets"; // ✅ Necesario para cargar convenios
 import Link from "next/link";
 import DownloadReciboButton from "../../../components/pdf/DownloadReciboButton";
 import PatientActions from "../../../components/pacientes/PatientActions";
@@ -39,6 +40,7 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
   const [datos, setDatos] = useState<Paciente | null>(null);
   const [historial, setHistorial] = useState<Operacion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [descuentos, setDescuentos] = useState<any[]>([]); // ✅ Estado para guardar convenios
   const [error, setError] = useState(false);
 
   // 2. Efecto de Carga (Se ejecuta al montar el componente en el navegador)
@@ -61,6 +63,9 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
         const rawData = { id: docSnap.id, ...docSnap.data() };
         const datosLimpios = serializarPaciente(rawData);
         setDatos(datosLimpios);
+        // C. Cargar Catálogo de Descuentos (para la edición)
+        const { descuentos: listaDesc } = await getCatalogos();
+        setDescuentos(listaDesc);
 
         // B. Cargar Historial (Pagos)
         const qPagos = query(
@@ -164,6 +169,7 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
                     <PatientActions 
                         pacienteId={params.id} 
                         datosActuales={datos} 
+                        descuentos={descuentos}
                     />
                 </div>
             </div>
@@ -193,7 +199,17 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
                     <div>
                         <h3 className={sectionTitle}>📞 Contacto</h3>
                         <div className="space-y-3 text-sm">
-                            <div><p className={labelStyle}>Celular</p><p className="text-blue-600 font-bold text-lg">{datos.telefonoCelular}</p></div>
+                            <div>
+                                <p className={labelStyle}>Teléfono Principal</p>
+                                <p className="text-blue-600 font-bold text-lg">
+                                    {/* ✅ Muestra el primer teléfono de la lista o el viejo si no hay lista */}
+                                    {datos.telefonos && datos.telefonos.length > 0 ? datos.telefonos[0] : datos.telefonoCelular}
+                                </p>
+                                {/* ✅ Muestra si tiene más números registrados */}
+                                {datos.telefonos && datos.telefonos.length > 1 && (
+                                    <p className="text-[10px] text-slate-400 mt-1 italic">+ {datos.telefonos.length - 1} número(s) adicional(es)</p>
+                                )}
+                            </div>
                             <div><p className={labelStyle}>Email</p><p className={valueStyle}>{datos.email || "No registrado"}</p></div>
                             <div><p className={labelStyle}>Residencia</p><p className={valueStyle}>{datos.lugarResidencia || "-"}</p></div>
                         </div>
