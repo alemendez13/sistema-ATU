@@ -35,6 +35,7 @@ interface Cita {
 interface AgendaBoardProps {
   medicos: Medico[];
   servicios: any[]; 
+  descuentos: any[];
 }
 
 // ... (Las funciones auxiliares parsearReglas y generarBloques se quedan IGUAL) ...
@@ -71,7 +72,7 @@ const generarBloques = (inicio: string, fin: string) => {
 };
 
 // 👇 RECIBIMOS SERVICIOS AQUÍ
-export default function AgendaBoard({ medicos, servicios }: AgendaBoardProps) {
+export default function AgendaBoard({ medicos, servicios, descuentos }: AgendaBoardProps) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [citas, setCitas] = useState<Cita[]>([]);
   const [bloqueos, setBloqueos] = useState<any[]>([]); 
@@ -344,6 +345,7 @@ export default function AgendaBoard({ medicos, servicios }: AgendaBoardProps) {
             data={selectedSlot}
             catalogoServicios={servicios} 
             bloqueos={bloqueos}
+            descuentos={descuentos}
             citaExistente={citaParaEditar} // 🆕 Pasamos la cita a editar
         />
         

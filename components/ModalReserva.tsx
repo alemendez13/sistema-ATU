@@ -19,6 +19,7 @@ interface ModalProps {
   } | null;
   catalogoServicios: any[];
   bloqueos: any[]; 
+  descuentos: any[]; 
   citaExistente?: any;
 }
 
@@ -30,7 +31,7 @@ const sumarMinutos = (hora: string, minutos: number) => {
   return `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
 };
 
-export default function ModalReserva({ isOpen, onClose, data, catalogoServicios, bloqueos, citaExistente 
+export default function ModalReserva({ isOpen, onClose, data, catalogoServicios, bloqueos, descuentos, citaExistente 
 
   }: ModalProps) {
   // Estados Generales
@@ -41,6 +42,7 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
   const [horaSeleccionada, setHoraSeleccionada] = useState("");
   const [precioFinal, setPrecioFinal] = useState<number | "">(""); 
   const [notaInterna, setNotaInterna] = useState(""); 
+  const [descuentoId, setDescuentoId] = useState("");
   const [historialCitas, setHistorialCitas] = useState<number>(0); 
 
   // Estados Paciente
@@ -67,16 +69,33 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
     }
   }, [isOpen, data]);
 
-  // Lógica de Precios e Historial
+  // 🧠 LÓGICA DE PRECIOS E HISTORIAL (VERSIÓN UNIFICADA)
   useEffect(() => {
     const calcularDatosInteligentes = async () => {
         if (!servicioSku) return;
+        
+        // 1. CÁLCULO DE PRECIO CON DESCUENTO
         const servicio = catalogoServicios.find(s => s.sku === servicioSku);
-        if (servicio) setPrecioFinal(servicio.precio || 0);
+        if (servicio) {
+            let precioBase = cleanPrice(servicio.precio);
+            // Buscamos si hay un descuento/convenio seleccionado
+            const desc = descuentos.find((d: any) => d.id === descuentoId);
+            if (desc) {
+                precioBase = desc.tipo === "Porcentaje" 
+                    ? precioBase - (precioBase * desc.valor / 100)
+                    : precioBase - desc.valor;
+            }
+            setPrecioFinal(Math.max(0, precioBase));
+        }
 
+        // 2. REVISIÓN DE HISTORIAL (Se mantiene tu lógica original)
         if (pacienteSeleccionado && pacienteSeleccionado.id && servicioSku) {
             try {
-                const qHistorial = query(collection(db, "operaciones"), where("pacienteId", "==", pacienteSeleccionado.id), where("servicioSku", "==", servicioSku));
+                const qHistorial = query(
+                    collection(db, "operaciones"), 
+                    where("pacienteId", "==", pacienteSeleccionado.id), 
+                    where("servicioSku", "==", servicioSku)
+                );
                 const snap = await getDocs(qHistorial);
                 setHistorialCitas(snap.size);
             } catch (e) { console.error("Error historial", e); }
@@ -85,7 +104,7 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
         }
     };
     calcularDatosInteligentes();
-  }, [servicioSku, pacienteSeleccionado, catalogoServicios]);
+  }, [servicioSku, descuentoId, pacienteSeleccionado, catalogoServicios, descuentos]); // ✅ Agregamos dependencias
 
 
   // --- 🛡️ FUNCIÓN BLINDADA V2: Firebase + Google ---
@@ -298,6 +317,7 @@ const esLaboratorio =
         servicioSku: servicioDetalle?.sku,
         servicioNombre: tituloCita, 
         monto: Number(precioFinal), 
+        descuentoAplicado: descuentos.find(d => d.id === descuentoId)?.nombre || null, // ✅ Guarda el nombre del convenio usado
         montoOriginal: Number(cleanPrice(servicioDetalle?.precio)),
         estatus: Number(precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
         fecha: serverTimestamp(),
@@ -369,7 +389,19 @@ const esLaboratorio =
               {resultados.length > 0 && !pacienteSeleccionado && (
                 <ul className="mt-1 border rounded bg-white shadow-lg max-h-40 overflow-y-auto absolute w-full max-w-xs z-10">
                   {resultados.map(p => (
-                    <li key={p.id} className="p-2 hover:bg-blue-50 cursor-pointer text-sm border-b" onClick={() => { setPacienteSeleccionado(p); setBusqueda(p.nombreCompleto); setResultados([]); }}>
+                    <li key={p.id} className="p-2 hover:bg-blue-50 cursor-pointer text-sm border-b" 
+                    onClick={() => { 
+                    setPacienteSeleccionado(p); 
+                    setBusqueda(p.nombreCompleto); 
+                    setResultados([]); 
+                    // ✅ AUTO-LECTURA DE CONVENIO:
+                    if (p.convenioId) {
+                        setDescuentoId(p.convenioId);
+                        toast.info(`Convenio detectado: ${descuentos.find(d => d.id === p.convenioId)?.nombre || "Activo"}`);
+                    } else {
+                        setDescuentoId(""); // Limpia si el paciente no tiene convenio
+                    }
+    }}>
                       <span className="font-bold block">{p.nombreCompleto}</span>
                     </li>
                   ))}

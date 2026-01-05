@@ -90,6 +90,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
   const [age, setAge] = useState<number | null>(null);
   const [esLaboratorio, setEsLaboratorio] = useState(false);
   const router = useRouter();
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB límite para Plan Spark
   
   // --- ESTADOS PARA SELECCIÓN EN CASCADA (NUEVO) ---
   const [selectedArea, setSelectedArea] = useState("");
@@ -204,6 +205,22 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
     setServicioSeleccionado(servicio || null);
   };
 
+  const [listaTelefonos, setListaTelefonos] = useState<string[]>([""]);
+
+  const agregarTelefono = () => setListaTelefonos([...listaTelefonos, ""]);
+  
+  const actualizarTelefono = (index: number, valor: string) => {
+    const nuevos = [...listaTelefonos];
+    nuevos[index] = valor;
+    setListaTelefonos(nuevos);
+  };
+
+  const eliminarTelefono = (index: number) => {
+    if (listaTelefonos.length > 1) {
+      setListaTelefonos(listaTelefonos.filter((_, i) => i !== index));
+    }
+  };
+
   const onSubmit = async (data: any) => {
     // 1. VALIDACIONES INICIALES
     if (!servicioSeleccionado) return toast.warning("Por favor completa la selección del servicio.");
@@ -220,6 +237,10 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
 
     setIsSubmitting(true);
     
+if (constanciaFile && constanciaFile.size > MAX_FILE_SIZE) {
+    return toast.error("La constancia fiscal excede los 2MB. Por favor comprímela.");
+}
+
     try {
       // 2. STOCK (Conservado)
       if (servicioSeleccionado.tipo === "Producto") {
@@ -261,7 +282,8 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
         fotoUrl, 
         constanciaFiscalUrl: constanciaUrl, // ✅ Nuevo
 
-        telefonoCelular: data.telefonoCelular,
+        telefonos: listaTelefonos.filter(t => t.trim() !== ""), 
+        convenioId: descuentoSeleccionado?.id || null,
         telefonoFijo: data.telefonoFijo || null,
         email: data.email,
 
@@ -451,21 +473,26 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
           </div>
 
           {/* DESCUENTO Y TOTAL */}
-          <div className="flex flex-col md:flex-row gap-4 items-end bg-white p-4 rounded border border-blue-100">
-             <div className="flex-1 w-full">
-                <label className={labelStyle}>🏷️ Descuento / Convenio</label>
+          <div className="flex-1 w-full bg-white p-4 rounded border border-blue-100">
+                <label className={labelStyle}>🏷️ Convenio / Descuento Permanente</label>
                 <select 
                     className={inputStyle}
-                    onChange={(e) => setDescuentoSeleccionado(descuentos.find(d => d.id === e.target.value) || null)}
+                    onChange={(e) => {
+                        const desc = descuentos.find((d: any) => d.id === e.target.value);
+                        setDescuentoSeleccionado(desc || null);
+                    }}
                 >
-                    <option value="">-- Ninguno (Precio Lista) --</option>
+                    <option value="">Ninguno (Precio Lista)</option>
                     {descuentos.map((d: any) => (
                         <option key={d.id} value={d.id}>
                             {d.nombre} ({d.tipo === 'Porcentaje' ? `-${d.valor}%` : `-$${d.valor}`})
                         </option>
                     ))}
                 </select>
-             </div>
+                <p className="text-[9px] text-slate-400 mt-1 italic">
+                    * Este descuento se sugerirá automáticamente en todas las ventas de este paciente.
+                </p>
+            </div>
              
              {servicioSeleccionado && (
                  <div className="text-right">
@@ -476,7 +503,6 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                     <p className="text-3xl font-bold text-blue-700">${montoFinal.toFixed(2)}</p>
                  </div>
              )}
-          </div>
 
           {/* AGENDA (Solo si aplica) */}
           {esServicioMedico && (
@@ -551,9 +577,35 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
                         {GENEROS.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
                 </div>
-                <div>
-                    <label className={labelStyle}>Celular (WhatsApp)</label>
-                    <input type="tel" className={inputStyle} {...register("telefonoCelular", { required: true })} />
+                <div className="md:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                    <label className={labelStyle}>Teléfonos de Contacto (WhatsApp)</label>
+                    {listaTelefonos.map((tel, index) => (
+                        <div key={index} className="flex gap-2 mb-2">
+                            <input 
+                                type="tel" 
+                                className={inputStyle} 
+                                value={tel} 
+                                onChange={(e) => actualizarTelefono(index, e.target.value)}
+                                placeholder="Ej. 5512345678"
+                            />
+                            {index > 0 && (
+                                <button 
+                                    type="button" 
+                                    onClick={() => eliminarTelefono(index)} 
+                                    className="text-red-500 font-bold px-2 hover:bg-red-50 rounded"
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                    <button 
+                        type="button" 
+                        onClick={agregarTelefono} 
+                        className="text-[10px] text-blue-600 font-bold uppercase hover:underline flex items-center gap-1"
+                    >
+                        + Agregar otro número
+                    </button>
                 </div>
                 <div>
                     <label className={labelStyle}>Email Personal</label>

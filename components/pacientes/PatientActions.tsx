@@ -35,9 +35,10 @@ const GRUPOS_ETNICOS = ["Nahuas", "Mayas", "Zapotecas", "Mixtecas", "Otomíes", 
 interface Props {
   pacienteId: string;
   datosActuales: Paciente;
+  descuentos: any[];
 }
 
-export default function PatientActions({ pacienteId, datosActuales }: Props) {
+export default function PatientActions({ pacienteId, datosActuales, descuentos }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -45,6 +46,23 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
   
   // Estado para capturar la nueva foto si el usuario decide cambiarla
   const [newFotoFile, setNewFotoFile] = useState<File | null>(null);
+
+  // Cargamos los teléfonos actuales o creamos una lista vacía si es un paciente viejo
+  const [listaTelefonos, setListaTelefonos] = useState<string[]>(
+    datosActuales.telefonos && datosActuales.telefonos.length > 0 
+    ? datosActuales.telefonos 
+    : [datosActuales.telefonoCelular || ""]
+  );
+
+  const agregarTelefono = () => setListaTelefonos([...listaTelefonos, ""]);
+  const actualizarTelefono = (index: number, valor: string) => {
+    const nuevos = [...listaTelefonos];
+    nuevos[index] = valor;
+    setListaTelefonos(nuevos);
+  };
+  const eliminarTelefono = (index: number) => {
+    if (listaTelefonos.length > 1) setListaTelefonos(listaTelefonos.filter((_, i) => i !== index));
+  };
 
   // Inicializamos el formulario con los datos actuales
   const [formData, setFormData] = useState<Paciente>({
@@ -103,6 +121,8 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
 
       const dataToUpdate = {
         ...formData,
+        telefonos: listaTelefonos.filter(t => t.trim() !== ""), // ✅ Guarda la nueva lista
+        convenioId: formData.convenioId || null, // ✅ Guarda el convenio seleccionado
         fotoUrl: finalFotoUrl, // Guardamos la URL actualizada
         nombreCompleto: formData.nombreCompleto.toUpperCase(),
         searchKeywords: generateSearchTags(nombreNormalizado),
@@ -194,6 +214,22 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
                         <label className={labelClass}>Nombre Completo</label>
                         <input className={inputClass} value={formData.nombreCompleto} onChange={e => setFormData({...formData, nombreCompleto: e.target.value})} />
                     </div>
+
+                    {/* [NUEVO: SELECTOR DE CONVENIO] */}
+                    <div>
+                        <label className={labelClass}>Convenio Permanente</label>
+                        <select 
+                            className={inputClass} 
+                            value={formData.convenioId || ""} 
+                            onChange={e => setFormData({...formData, convenioId: e.target.value})}
+                        >
+                            <option value="">Ninguno (Precio Lista)</option>
+                            {descuentos.map((d: any) => (
+                                <option key={d.id} value={d.id}>{d.nombre}</option>
+                            ))}
+                        </select>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className={labelClass}>Fecha Nacimiento</label>
@@ -207,10 +243,23 @@ export default function PatientActions({ pacienteId, datosActuales }: Props) {
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className={labelClass}>Celular (WhatsApp)</label>
-                            <input className={inputClass} value={formData.telefonoCelular} onChange={e => setFormData({...formData, telefonoCelular: e.target.value})} />
-                        </div>
+                        {/* [NUEVO: BLOQUE DINÁMICO DE TELÉFONOS] */}
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <label className={labelClass}>Teléfonos (WhatsApp)</label>
+                        {listaTelefonos.map((tel, index) => (
+                            <div key={index} className="flex gap-2 mb-2">
+                                <input 
+                                    className={inputClass} 
+                                    value={tel} 
+                                    onChange={(e) => actualizarTelefono(index, e.target.value)} 
+                                />
+                                {index > 0 && (
+                                    <button type="button" onClick={() => eliminarTelefono(index)} className="text-red-500 font-bold px-2">✕</button>
+                                )}
+                            </div>
+                        ))}
+                        <button type="button" onClick={agregarTelefono} className="text-[10px] text-blue-600 font-bold uppercase">+ Agregar número</button>
+                    </div>
                         <div>
                             <label className={labelClass}>Email</label>
                             <input className={inputClass} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
