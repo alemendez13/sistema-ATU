@@ -64,7 +64,7 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
         const datosLimpios = serializarPaciente(rawData);
         setDatos(datosLimpios);
         // C. Cargar Catálogo de Descuentos (para la edición)
-        const { descuentos: listaDesc } = await getCatalogos();
+        const listaDesc = await getDescuentosAction();
         setDescuentos(listaDesc);
 
         // B. Cargar Historial (Pagos)
