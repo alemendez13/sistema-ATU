@@ -6,7 +6,7 @@ import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebas
 import { db } from "../../../lib/firebase";
 // Ajusta esta importación si tus tipos están en otro lado, según tu estructura es correcto:
 import { Paciente, Operacion } from "../../../types"; 
-import { getCatalogos } from "../../../lib/googleSheets"; // ✅ Necesario para cargar convenios
+import { getDescuentosAction } from "../../../lib/actions"; // ✅ Ahora usamos el puente seguro
 import Link from "next/link";
 import DownloadReciboButton from "../../../components/pdf/DownloadReciboButton";
 import PatientActions from "../../../components/pacientes/PatientActions";
