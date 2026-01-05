@@ -9,6 +9,7 @@ import { db } from './firebase';
 import { getMedicos } from "./googleSheets";
 import { getMensajesWhatsApp } from "./googleSheets"; 
 import { addMinutesToTime } from './utils';
+import { getCatalogos } from "./googleSheets";
 
 // --- ACCIÓN 1: AGENDAR (Mantiene lógica original) ---
 export async function agendarCitaGoogle(cita: { 
@@ -239,6 +240,17 @@ export async function getMensajesConfigAction() {
     return JSON.parse(JSON.stringify(mensajes));
   } catch (error) {
     console.error("Error en getMensajesConfigAction:", error);
+    return [];
+  }
+}
+
+export async function getDescuentosAction() {
+  try {
+    const { descuentos } = await getCatalogos();
+    // Lo convertimos a texto y de regreso para que pase seguro por el puente
+    return JSON.parse(JSON.stringify(descuentos));
+  } catch (error) {
+    console.error("Error en getDescuentosAction:", error);
     return [];
   }
 }
