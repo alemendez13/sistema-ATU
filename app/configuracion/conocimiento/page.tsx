@@ -5,6 +5,7 @@ import { Pencil, Trash2, Plus, ExternalLink, FileText, AppWindow, Loader2, X } f
 import { db } from '@/lib/firebase'; // Uso de Alias @/
 import { collection, onSnapshot, query, orderBy, doc, deleteDoc, setDoc, addDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { useAuth } from "@/hooks/useAuth";
 
 // --- SUSTITUCIÓN: LISTADO COMPLETO GEC-FR-02 (136 DOCUMENTOS) ---
 const initialDocs = [
@@ -197,6 +198,7 @@ const initialDocs = [
 ];
 
 export default function ListadoConocimiento() {
+  const { user } = useAuth(); 
   const [docs, setDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -211,21 +213,34 @@ export default function ListadoConocimiento() {
   });
 
   useEffect(() => {
+    if (!user) return; // Guardia de seguridad
+
     const q = query(collection(db, "conocimiento"), orderBy("codigo", "asc"));
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      if (snapshot.empty) {
-        // Lógica de sembrado automático si la DB está virgen
-        for (const docInit of initialDocs) {
-          await addDoc(collection(db, "conocimiento"), docInit);
+    
+    // onSnapshot recibe (query, callback_exito, callback_error)
+    const unsubscribe = onSnapshot(q, 
+      async (snapshot) => {
+        if (snapshot.empty) {
+          // Si no hay datos, sembramos los initialDocs [cite: 158]
+          for (const docInit of initialDocs) {
+            await addDoc(collection(db, "conocimiento"), docInit);
+          }
+        } else {
+          const docsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          setDocs(docsData);
         }
-      } else {
-        const docsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        setDocs(docsData);
+        setLoading(false);
+      }, 
+      (error) => {
+        // Manejo de errores de permisos al cerrar sesión 
+        if (error.code !== 'permission-denied') {
+          console.error("Error en Firestore:", error);
+        }
       }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+    );
+
+    return () => unsubscribe(); // Limpieza del listener
+  }, [user]); // Se ejecuta cada vez que el usuario cambia
 
   // --- FUNCIÓN: GUARDAR NUEVO DOCUMENTO ---
   const handleSave = async (e: React.FormEvent) => {
