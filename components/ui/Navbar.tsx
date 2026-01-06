@@ -43,15 +43,20 @@ export default function Navbar() {
 
   // Función de Cerrar Sesión (NUEVA)
   const handleLogout = async () => {
-    try {
+  try {
+    // Forzamos la redirección visual primero para desmontar componentes con listeners
+    router.push("/login"); 
+    
+    // Esperamos un breve instante para que el router inicie el desmontaje
+    setTimeout(async () => {
       await signOut(auth);
       toast.success("Sesión cerrada correctamente");
-      router.push("/login");
-    } catch (error) {
-      console.error("Error al salir:", error);
-      toast.error("Error al cerrar sesión");
-    }
-  };
+    }, 100);
+  } catch (error) {
+    console.error("Error al salir:", error);
+    toast.error("Error al cerrar sesión");
+  }
+};
 
   return (
     // 1. Agregamos md:pl-[260px] para que los iconos de perfil no choquen con el sidebar
