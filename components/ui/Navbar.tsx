@@ -43,20 +43,25 @@ export default function Navbar() {
 
   // Función de Cerrar Sesión (NUEVA)
   const handleLogout = async () => {
-  try {
-    // Forzamos la redirección visual primero para desmontar componentes con listeners
-    router.push("/login"); 
-    
-    // Esperamos un breve instante para que el router inicie el desmontaje
-    setTimeout(async () => {
-      await signOut(auth);
-      toast.success("Sesión cerrada correctamente");
-    }, 100);
-  } catch (error) {
-    console.error("Error al salir:", error);
-    toast.error("Error al cerrar sesión");
-  }
-};
+    try {
+      // 1. Borramos la cookie "gafete" inmediatamente
+      document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
+
+      // 2. Redirigimos visualmente antes de cerrar sesión en Firebase
+      // Esto desmonta los componentes que tienen listeners activos
+      router.push("/login");
+
+      // 3. Cerramos la sesión en Firebase tras un breve delay
+      setTimeout(async () => {
+        await signOut(auth);
+        toast.success("Sesión cerrada correctamente");
+      }, 100);
+
+    } catch (error) {
+      console.error("Error al salir:", error);
+      toast.error("Error al cerrar sesión");
+    }
+  };
 
   return (
     // 1. Agregamos md:pl-[260px] para que los iconos de perfil no choquen con el sidebar
