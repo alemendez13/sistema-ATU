@@ -20,8 +20,9 @@ export default function FinanzasPage() {
 
   // Reacciona al cambio de botones
   useEffect(() => {
+    if (!user) return; // 🛡️ Guardia: Si no hay usuario, no intentes cargar datos
     cargarPendientes();
-  }, [verCarteraVencida]); 
+  }, [verCarteraVencida, user]); // ✅ Añadimos 'user' aquí 
 
   const cargarPendientes = async () => {
     setLoading(true);
@@ -43,10 +44,14 @@ export default function FinanzasPage() {
       })) as Operacion[];
 
       setPendientes(docs);
-    } catch (error) {
-      console.error("Error cargando finanzas:", error);
-      toast.error("Error al filtrar la cobranza.");
-    } finally {
+    } catch (error: any) {
+      // Si el error es por permisos denegados al salir, no lo mostramos como error fatal
+      if (error.code !== 'permission-denied') {
+        console.error("Error cargando finanzas:", error);
+        toast.error("Error al filtrar la cobranza.");
+      }
+    }
+      finally {
       setLoading(false);
     }
   };
