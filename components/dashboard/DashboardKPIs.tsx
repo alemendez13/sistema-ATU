@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { collection, getDocs, query, where, getCountFromServer, limit } from 'firebase/firestore';
 import { db } from '../../lib/firebase'; // 👈 ESTA SE QUEDA
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'; // 👈 ESTA SE QUEDA
+import { useAuth } from "../../hooks/useAuth";
 
 export default function DashboardKPIs() {
+  const { user } = useAuth();
   const [totalPacientes, setTotalPacientes] = useState(0);
   const [ingresosMes, setIngresosMes] = useState(0);
   const [dataMarketing, setDataMarketing] = useState<any[]>([]);
@@ -13,6 +15,7 @@ export default function DashboardKPIs() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) return;
     async function fetchData() {
       try {
         // 1. KPI: Total de Pacientes (OPTIMIZADO: Solo pide el número, costo mínimo)
@@ -89,15 +92,18 @@ export default function DashboardKPIs() {
 
         setIngresosPorMedico(arrayMedicos);
 
-      } catch (error) {
-        console.error("Error cargando dashboard:", error);
+      } catch (error: any) {
+        // 4. EVITA MOSTRAR EL ERROR EN CONSOLA SI ES POR CIERRE DE SESIÓN
+        if (error.code !== 'permission-denied') {
+            console.error("Error cargando dashboard:", error);
+        }
       } finally {
         setLoading(false);
       }
     }
 
     fetchData();
-  }, []);
+  }, [user]);
 
   if (loading) return <div className="p-10 text-center text-slate-400">Cargando inteligencia de negocio...</div>;
 
