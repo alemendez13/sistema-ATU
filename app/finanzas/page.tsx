@@ -17,6 +17,7 @@ export default function FinanzasPage() {
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
   const { user } = useAuth() as any; 
   const [verCarteraVencida, setVerCarteraVencida] = useState(false);
+  const [opParaTarjeta, setOpParaTarjeta] = useState<Operacion | null>(null);
 
   // Reacciona al cambio de botones
   useEffect(() => {
@@ -193,7 +194,7 @@ export default function FinanzasPage() {
                                           ) : (
                                               <div className="flex flex-wrap gap-1 justify-end">
                                                   <button onClick={() => handleCobrar(op.id!, 'Efectivo', op)} className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-green-200 transition">EFECTIVO</button>
-                                                  <button onClick={() => handleCobrar(op.id!, 'Tarjeta', op)} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200 transition">TARJETA</button>
+                                                  <button onClick={() => setOpParaTarjeta(op)} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200 transition">TARJETA</button>
                                                   <button onClick={() => handleCobrar(op.id!, 'Transferencia', op)} className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-purple-200 transition">TRANSF</button>
                                                   <button onClick={() => handleCobrar(op.id!, 'Vale', op)} className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-orange-200 transition">🎟️ VALE</button>
                                                   <button onClick={() => {
@@ -214,6 +215,42 @@ export default function FinanzasPage() {
           </div>
         </div>
       </div>
+
+      {/* 💳 BURBUJA DE SUB-MÉTODOS DE PAGO (Punto 5) */}
+      {opParaTarjeta && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+            <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xs animate-in zoom-in-95 duration-200">
+                <h3 className="text-center font-black text-slate-800 uppercase text-sm mb-4">Seleccionar Tarjeta</h3>
+                <div className="grid gap-2">
+                    <button 
+                        onClick={() => { handleCobrar(opParaTarjeta.id!, 'Tarjeta (Débito)', opParaTarjeta); setOpParaTarjeta(null); }}
+                        className="w-full py-3 bg-slate-50 hover:bg-blue-50 text-blue-700 rounded-xl font-bold text-xs border border-slate-100 transition-all flex justify-between px-4 items-center"
+                    >
+                        💳 DÉBITO <span>→</span>
+                    </button>
+                    <button 
+                        onClick={() => { handleCobrar(opParaTarjeta.id!, 'Tarjeta (Crédito)', opParaTarjeta); setOpParaTarjeta(null); }}
+                        className="w-full py-3 bg-slate-50 hover:bg-indigo-50 text-indigo-700 rounded-xl font-bold text-xs border border-slate-100 transition-all flex justify-between px-4 items-center"
+                    >
+                        💳 CRÉDITO <span>→</span>
+                    </button>
+                    <button 
+                        onClick={() => { handleCobrar(opParaTarjeta.id!, 'Tarjeta (Amex)', opParaTarjeta); setOpParaTarjeta(null); }}
+                        className="w-full py-3 bg-slate-50 hover:bg-amber-50 text-amber-700 rounded-xl font-bold text-xs border border-slate-100 transition-all flex justify-between px-4 items-center"
+                    >
+                        💙 AMEX <span>→</span>
+                    </button>
+                    <button 
+                        onClick={() => setOpParaTarjeta(null)}
+                        className="mt-2 w-full py-2 text-slate-400 font-bold text-[10px] uppercase hover:text-slate-600"
+                    >
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
     </ProtectedRoute> 
   );
 }
