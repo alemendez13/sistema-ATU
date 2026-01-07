@@ -5,7 +5,6 @@ export interface Paciente {
   fechaNacimiento: string;
   edad: number;
   genero: string;
-  telefonoCelular: string;
   email: string;
   fotoUrl?: string | null;
   telefonos: string[]; // Array para manejar múltiples números opcionales
@@ -14,11 +13,11 @@ export interface Paciente {
   // --- CAMPOS QUE FALTABAN ---
   tutor?: string | null; 
   lugarNacimiento?: string;
-  lugarResidencia?: string;  // <--- Faltaba
-  estadoCivil?: string;      // <--- Faltaba
-  religion?: string;         // <--- Faltaba
-  escolaridad?: string;      // <--- Faltaba
-  ocupacion?: string;        // <--- Faltaba
+  lugarResidencia?: string;  
+  estadoCivil?: string;      
+  religion?: string;         
+  escolaridad?: string;      
+  ocupacion?: string;        
   medioMarketing?: string;
   referidoPor?: string;
   curp?: string | null;
@@ -78,8 +77,8 @@ export interface ProductoCatalogo {
   precio: string; // Viene como texto desde Google Sheets ("$500")
   tipo: "Producto" | "Servicio" | "Equipo";
   duracion?: string;
-  observaciones?: string; // <--- NUEVO
-  area?: string;          // <--- NUEVO
+  observaciones?: string; 
+  area?: string;          
 }
 
 // ... (resto del código anterior)

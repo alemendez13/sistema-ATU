@@ -232,6 +232,41 @@ export async function cancelarCitaGoogle(datos: { calendarId: string; eventId: s
     }
 }
 
+// --- NUEVA ACCIÓN: ACTUALIZAR EVENTO EN GOOGLE ---
+export async function actualizarCitaGoogle(datos: { 
+    calendarId: string;
+    eventId: string;
+    fecha: string;
+    hora: string;
+    duracionMinutos: number;
+    pacienteNombre: string;
+    motivo: string;
+}) {
+    if (!datos.calendarId || !datos.eventId) return { success: false, error: "Faltan IDs para actualizar" };
+
+    const startDateTime = new Date(`${datos.fecha}T${datos.hora}:00-06:00`); 
+    const endDateTime = new Date(startDateTime.getTime() + datos.duracionMinutos * 60000);
+
+    const eventoActualizado = {
+        summary: datos.motivo,
+        description: `Paciente: ${datos.pacienteNombre}\n(Actualizado desde App SANSCE)`,
+        start: { dateTime: startDateTime.toISOString(), timeZone: 'America/Mexico_City' },
+        end: { dateTime: endDateTime.toISOString(), timeZone: 'America/Mexico_City' },
+    };
+
+    try {
+        await calendar.events.patch({
+            calendarId: datos.calendarId,
+            eventId: datos.eventId,
+            requestBody: eventoActualizado,
+        });
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error actualizando en Google:", error);
+        return { success: false, error: error.message };
+    }
+}
+
 // --- ACCIÓN 5: OBTENER PLANTILLAS WHATSAPP (Unificación) ---
 export async function getMensajesConfigAction() {
   try {

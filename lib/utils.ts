@@ -63,25 +63,29 @@ export const calculateAge = (birthDate: string | Date | null | undefined): numbe
 
 /**
  * 5. FORMATEO DE FECHA UNIVERSAL
- * Maneja Firebase Timestamps ({seconds: number}), objetos Date y strings.
+ * Maneja Firebase.
  */
 export const formatDate = (dateInput: any, format: 'short' | 'long' | 'iso' = 'short'): string => {
     if (!dateInput) return "S/F";
 
-    let date: Date;
+    // ✅ PROTECCIÓN: Si ya viene como string YYYY-MM-DD, lo devolvemos tal cual para evitar desfases (Caso Obed)
+    if (typeof dateInput === 'string' && dateInput.includes('-')) return dateInput;
 
-    // Caso: Firebase Timestamp
+    let date: Date;
     if (dateInput.seconds) {
         date = new Date(dateInput.seconds * 1000);
-    } 
-    // Caso: Objeto Date o String
-    else {
+    } else {
         date = new Date(dateInput);
     }
 
     if (isNaN(date.getTime())) return "Fecha inválida";
 
-    if (format === 'iso') return date.toISOString().split('T')[0];
+    // ✅ Forzamos el uso de la fecha local sin ajustes de UTC
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    if (format === 'iso') return `${year}-${month}-${day}`;
 
     const options: Intl.DateTimeFormatOptions = format === 'long' 
         ? { day: '2-digit', month: 'short', year: 'numeric' }
