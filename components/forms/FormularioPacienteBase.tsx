@@ -31,43 +31,57 @@ interface FormProps {
   setFotoFile: (f: File | null) => void;
   currentFotoUrl?: string;
   isEditing?: boolean;
+  datosActuales?: any; // ✅ Se añade para evitar el error ts(2304)
 }
 
 export default function FormularioPacienteBase({
   register, errors, watch, setValue, listaTelefonos, actualizarTelefono, 
   agregarTelefono, eliminarTelefono, descuentos, setDescuentoSeleccionado,
-  requiereFactura, setRequiereFactura, setFotoFile, currentFotoUrl
+  requiereFactura, setRequiereFactura, setFotoFile, currentFotoUrl,
+  isEditing,      // ✅ Se añade aquí para que la función la reconozca
+  datosActuales   // ✅ Se añade aquí para que la función la reconozca
 }: FormProps) {
 
   const inputStyle = "w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 text-sm border uppercase";
   const labelStyle = "block text-xs font-bold text-slate-600 mb-1 uppercase";
   const sectionTitle = "text-lg font-bold text-slate-800 border-b pb-2 mb-4 flex items-center gap-2";
-  const [duplicado, setDuplicado] = React.useState<{ id: string, nombre: string } | null>(null);
 
-    // ✅ CONSERVAR ESTA VERSIÓN (Línea 66 en adelante)
-    const validarDuplicado = async (campo: string, valor: string) => {
-        const valorLimpio = valor.trim().toUpperCase();
+  // 🧠 ESTADOS PARA CONTROL DE LECTURAS (Solo una declaración para evitar ts2451)
+  const [duplicado, setDuplicado] = React.useState<{ id: string, nombre: string } | null>(null);
+  const [ultimaBusqueda, setUltimaBusqueda] = React.useState<Record<string, string>>({});
+
+  const validarDuplicado = async (campo: string, valor: string) => {
+    const valorLimpio = valor.trim().toUpperCase();
+    
+    // 🛡️ REGLA 1: Evitar búsquedas repetidas
+    if (!valorLimpio || valorLimpio.length < 3 || ultimaBusqueda[campo] === valorLimpio) return;
+    
+    // 🛡️ REGLA 2: No buscar si el valor es igual al original (Ahorra lecturas en edición)
+    if (isEditing && datosActuales?.[campo]?.toUpperCase() === valorLimpio) return;
+
+    try {
+        const q = query(
+            collection(db, "pacientes"), 
+            where(campo, "==", valorLimpio), 
+            limit(1)
+        );
+        const snap = await getDocs(q);
         
-        // Si es nombre o apellido, pedimos al menos 3 letras. Si es CURP, al menos 5.
-        const minLength = campo === 'curp' ? 5 : 3;
-        if (!valorLimpio || valorLimpio.length < minLength) return;
-        
-        try {
-            const q = query(
-                collection(db, "pacientes"), 
-                where(campo, "==", valorLimpio), 
-                limit(1)
-            );
-            const snap = await getDocs(q);
-            
-            if (!snap.empty) {
-                const docPac = snap.docs[0];
-                setDuplicado({ id: docPac.id, nombre: docPac.data().nombreCompleto });
-            } else {
+        setUltimaBusqueda(prev => ({ ...prev, [campo]: valorLimpio }));
+
+        if (!snap.empty) {
+            const docPac = snap.docs[0];
+            // 🛡️ REGLA 3: No marcar como duplicado si es el mismo paciente que editamos
+            if (isEditing && docPac.id === datosActuales?.id) {
                 setDuplicado(null);
+            } else {
+                setDuplicado({ id: docPac.id, nombre: docPac.data().nombreCompleto });
             }
-        } catch (e) { console.error("Error validando duplicado", e); }
-    };
+        } else {
+            setDuplicado(null);
+        }
+    } catch (e) { console.error("Error validando duplicado", e); }
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
