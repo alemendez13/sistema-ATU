@@ -202,12 +202,16 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
                             <div>
                                 <p className={labelStyle}>Teléfono Principal</p>
                                 <p className="text-blue-600 font-bold text-lg">
-                                    {/* ✅ Muestra el primer teléfono de la lista o el viejo si no hay lista */}
-                                    {datos.telefonos && datos.telefonos.length > 0 ? datos.telefonos[0] : datos.telefonoCelular}
+                                    {/* ✅ Trazabilidad dual: Detecta el array nuevo o el campo legado sin errores */}
+                                    {(datos as any).telefonos && (datos as any).telefonos.length > 0 
+                                        ? (datos as any).telefonos[0] 
+                                        : (datos as any).telefonoCelular || "S/N"}
                                 </p>
                                 {/* ✅ Muestra si tiene más números registrados */}
-                                {datos.telefonos && datos.telefonos.length > 1 && (
-                                    <p className="text-[10px] text-slate-400 mt-1 italic">+ {datos.telefonos.length - 1} número(s) adicional(es)</p>
+                                {(datos as any).telefonos && (datos as any).telefonos.length > 1 && (
+                                    <p className="text-[10px] text-slate-400 mt-1 italic">
+                                        + {(datos as any).telefonos.length - 1} número(s) adicional(es)
+                                    </p>
                                 )}
                             </div>
                             <div><p className={labelStyle}>Email</p><p className={valueStyle}>{datos.email || "No registrado"}</p></div>
