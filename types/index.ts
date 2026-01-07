@@ -8,6 +8,7 @@ export interface Paciente {
   email: string;
   fotoUrl?: string | null;
   telefonos: string[]; // Array para manejar múltiples números opcionales
+  telefonoCelular?: string;
   convenioId?: string | null; // Vínculo con catálogo de descuentos
 
   // --- CAMPOS QUE FALTABAN ---
