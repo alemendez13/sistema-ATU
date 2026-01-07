@@ -150,24 +150,24 @@ const realizarBusqueda = async (e: React.FormEvent) => {
         
         {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-6">
-              <div>
-                <Link href="/" className="text-slate-400 hover:text-slate-600 text-sm mb-2 inline-block font-medium">← Volver al Panel Principal</Link>
-                <h1 className="text-3xl font-bold text-slate-900">Directorio de Pacientes</h1>
-                <p className="text-slate-500 text-sm">Gestión de expedientes y comunicación.</p>
-              </div>
-              
-              <div className="flex gap-2"> {/* ✅ Contenedor para múltiples botones */}
-                  {/* BOTÓN DE DEPURACIÓN (NUEVO) */}
-                  <Link href="/pacientes/depurar" className="bg-orange-100 hover:bg-orange-200 text-orange-700 px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all flex items-center gap-2 border border-orange-200">
-                    <span>🧼</span> Depurar Duplicados
-                  </Link>
+            <div>
+              <Link href="/" className="text-slate-400 hover:text-slate-600 text-sm mb-2 inline-block font-medium">← Volver al Panel Principal</Link>
+              <h1 className="text-3xl font-bold text-slate-900">Directorio de Pacientes</h1>
+              <p className="text-slate-500 text-sm">Gestión de expedientes y comunicación.</p>
+            </div>
+            
+            <div className="flex gap-2"> {/* ✅ Contenedor para múltiples botones */}
+                {/* BOTÓN DE DEPURACIÓN (NUEVO) */}
+                <Link href="/pacientes/depurar" className="bg-orange-100 hover:bg-orange-200 text-orange-700 px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all flex items-center gap-2 border border-orange-200">
+                  <span>🧼</span> Depurar Duplicados
+                </Link>
 
-                  {/* BOTÓN DE NUEVO PACIENTE (EXISTENTE) */}
-                  <Link href="/pacientes/registro" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all flex items-center gap-2">
-                    <span>+</span> Nuevo Paciente
-                  </Link>
-              </div>
-          </div>
+                {/* BOTÓN DE NUEVO PACIENTE (EXISTENTE) */}
+                <Link href="/pacientes/registro" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all flex items-center gap-2">
+                  <span>+</span> Nuevo Paciente
+                </Link>
+            </div>
+        </div>
 
         {/* BARRA DE BÚSQUEDA */}
         <form onSubmit={realizarBusqueda} className="mb-8 relative">

@@ -73,9 +73,12 @@ export default function CitaDetalleModal({ isOpen, onClose, cita, onEditar }: Mo
               );
           }
           const snapshot = await getDocs(q);
-          snapshot.forEach(async (docOp) => {
+          
+          // ✅ Uso correcto de for...of para procesos asíncronos
+          for (const docOp of snapshot.docs) {
               await deleteDoc(doc(db, "operaciones", docOp.id));
-          });
+          }
+
       } catch (errFinanzas) {
           console.error("Nota: No se pudo limpiar finanzas", errFinanzas);
       }
@@ -175,9 +178,9 @@ export default function CitaDetalleModal({ isOpen, onClose, cita, onEditar }: Mo
           <div className="space-y-2">
              <label className="text-xs font-bold text-slate-400 uppercase">Comunicación</label>
              <div className="grid grid-cols-1 gap-2">
-                {cita.telefono || cita.telefonoCelular ? (
+                {cita.telefonos?.[0] || cita.telefonoCelular || cita.telefono ? (
                     <WhatsAppButton 
-                        telefono={cita.telefono || cita.telefonoCelular}
+                        telefono={cita.telefonos?.[0] || cita.telefonoCelular || cita.telefono}
                         mensaje={MENSAJES.RECORDATORIO(cita.paciente, cita.fecha, cita.hora)}
                         label="Enviar Recordatorio"
                         pacienteNombre={cita.paciente}
@@ -186,7 +189,7 @@ export default function CitaDetalleModal({ isOpen, onClose, cita, onEditar }: Mo
                     />
                 ) : (
                     <div className="text-xs text-orange-500 bg-orange-50 p-2 rounded border border-orange-100 text-center">
-                        ⚠️ No hay teléfono registrado en la cita.
+                        ⚠️ No hay teléfono registrado.
                     </div>
                 )}
              </div>
