@@ -1,11 +1,16 @@
 "use client";
 import { useState, useEffect } from "react";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, deleteDoc, doc } from "firebase/firestore";
-import { db } from "../lib/firebase";
-import { agendarCitaGoogle, cancelarCitaGoogle } from "../lib/actions";
+import { db, storage } from "../lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { agendarCitaGoogle, cancelarCitaGoogle, actualizarCitaGoogle } from "../lib/actions"; 
 import { toast } from "sonner";
-import { addMinutesToTime, cleanPrice } from "../lib/utils";
+import { addMinutesToTime, cleanPrice, generateSearchTags } from "../lib/utils";
 import { useAuth } from "../hooks/useAuth";
+import { useForm } from "react-hook-form";
+
+// COMPONENTES COMPARTIDOS
+import FormularioPacienteBase from "./forms/FormularioPacienteBase";
 
 interface ModalProps {
   isOpen: boolean;
@@ -31,153 +36,96 @@ const sumarMinutos = (hora: string, minutos: number) => {
   return `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
 };
 
-export default function ModalReserva({ isOpen, onClose, data, catalogoServicios, bloqueos, descuentos, citaExistente 
-
-  }: ModalProps) {
-  // Estados Generales
-  const [servicioSku, setServicioSku] = useState(""); 
+export default function ModalReserva({ isOpen, onClose, data, catalogoServicios, bloqueos, descuentos, citaExistente }: ModalProps) {
+  const { user } = useAuth() as any;
   const [loading, setLoading] = useState(false);
   
+  // Estados de Cita
+  const [servicioSku, setServicioSku] = useState(""); 
   const [fechaSeleccionada, setFechaSeleccionada] = useState("");
   const [horaSeleccionada, setHoraSeleccionada] = useState("");
   const [precioFinal, setPrecioFinal] = useState<number | "">(""); 
   const [notaInterna, setNotaInterna] = useState(""); 
-  const [descuentoId, setDescuentoId] = useState("");
   const [historialCitas, setHistorialCitas] = useState<number>(0); 
 
-  // Estados Paciente
+  // Estados de Paciente y Formulario Base
   const [modo, setModo] = useState<'nuevo' | 'buscar'>('buscar');
-  const [nombreNuevo, setNombreNuevo] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [resultados, setResultados] = useState<any[]>([]);
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<any>(null);
-  const { user } = useAuth() as any;
+  
+  // Props para FormularioPacienteBase
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm();
+  const [listaTelefonos, setListaTelefonos] = useState<string[]>([""]);
+  const [requiereFactura, setRequiereFactura] = useState(false);
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [descuentoId, setDescuentoId] = useState("");
+  const [descuentoSeleccionado, setDescuentoSeleccionado] = useState<any>(null);
 
-  // Reset al abrir
+  // Lógica Teléfonos
+  const agregarTelefono = () => setListaTelefonos([...listaTelefonos, ""]);
+  const actualizarTelefono = (i: number, v: string) => { const n = [...listaTelefonos]; n[i] = v; setListaTelefonos(n); };
+  const eliminarTelefono = (i: number) => { if (listaTelefonos.length > 1) setListaTelefonos(listaTelefonos.filter((_, idx) => idx !== i)); };
+
   useEffect(() => {
     if (isOpen) {
-        setServicioSku("");
-        setPrecioFinal("");
-        setNotaInterna("");
-        setHistorialCitas(0);
-        setFechaSeleccionada(data?.fecha || "");
-        setHoraSeleccionada(data?.hora || "");
-        if (data?.prefilledName) {
-            setModo('nuevo'); 
-            setNombreNuevo(data.prefilledName);
-        }
+        setServicioSku(""); setPrecioFinal(""); setNotaInterna(""); setHistorialCitas(0);
+        setFechaSeleccionada(data?.fecha || ""); setHoraSeleccionada(data?.hora || "");
+        if (data?.prefilledName) { setModo('nuevo'); setValue("nombres", data.prefilledName.toUpperCase()); }
     }
-  }, [isOpen, data]);
+  }, [isOpen, data, setValue]);
 
-  // 🧠 LÓGICA DE PRECIOS E HISTORIAL (VERSIÓN UNIFICADA)
+  // 🧠 CEREBRO FINANCIERO E HISTORIAL
   useEffect(() => {
     const calcularDatosInteligentes = async () => {
         if (!servicioSku) return;
-        
-        // 1. CÁLCULO DE PRECIO CON DESCUENTO
         const servicio = catalogoServicios.find(s => s.sku === servicioSku);
         if (servicio) {
             let precioBase = cleanPrice(servicio.precio);
-            // Buscamos si hay un descuento/convenio seleccionado
-            const desc = descuentos.find((d: any) => d.id === descuentoId);
+            const desc = descuentos.find((d: any) => d.id === (descuentoSeleccionado?.id || descuentoId));
             if (desc) {
-                precioBase = desc.tipo === "Porcentaje" 
-                    ? precioBase - (precioBase * desc.valor / 100)
-                    : precioBase - desc.valor;
+                precioBase = desc.tipo === "Porcentaje" ? precioBase - (precioBase * desc.valor / 100) : precioBase - desc.valor;
             }
             setPrecioFinal(Math.max(0, precioBase));
         }
 
-        // 2. REVISIÓN DE HISTORIAL (Se mantiene tu lógica original)
-        if (pacienteSeleccionado && pacienteSeleccionado.id && servicioSku) {
+        if (pacienteSeleccionado?.id && servicioSku) {
             try {
-                const qHistorial = query(
-                    collection(db, "operaciones"), 
-                    where("pacienteId", "==", pacienteSeleccionado.id), 
-                    where("servicioSku", "==", servicioSku)
-                );
-                const snap = await getDocs(qHistorial);
+                const q = query(collection(db, "operaciones"), where("pacienteId", "==", pacienteSeleccionado.id), where("servicioSku", "==", servicioSku));
+                const snap = await getDocs(q);
                 setHistorialCitas(snap.size);
-            } catch (e) { console.error("Error historial", e); }
-        } else {
-            setHistorialCitas(0);
-        }
+            } catch (e) { console.error(e); }
+        } else { setHistorialCitas(0); }
     };
     calcularDatosInteligentes();
-  }, [servicioSku, descuentoId, pacienteSeleccionado, catalogoServicios, descuentos]); // ✅ Agregamos dependencias
+  }, [servicioSku, descuentoId, descuentoSeleccionado, pacienteSeleccionado, catalogoServicios, descuentos]);
 
-
-  // --- 🛡️ FUNCIÓN BLINDADA V2: Firebase + Google ---
-const verificarDisponibilidadMultiples = async (
-    doctorId: string, 
-    fecha: string, 
-    horaInicio: string, 
-    cantidadBloques30min: number,
-    googleEventIdAExcluir?: string 
-) => {
+  // 🛡️ VERIFICACIÓN DISPONIBILIDAD
+  const verificarDisponibilidadMultiples = async (doctorId: string, fecha: string, horaInicio: string, cantidadBloques30min: number, googleEventIdAExcluir?: string) => {
     let horaCheck = horaInicio;
-    
     for (let i = 0; i < cantidadBloques30min; i++) {
         const llaveBloqueo = `${doctorId}|${horaCheck}`;
-
-        // 1. CHEQUEO GOOGLE: Buscamos si el bloqueo en este horario es de otra persona
-        // 'bloqueos' ahora es un array de objetos {key, googleEventId}
         const bloqueoEnGoogle = bloqueos.find((b: any) => b.key === llaveBloqueo);
+        if (bloqueoEnGoogle && bloqueoEnGoogle.googleEventId !== googleEventIdAExcluir) return false;
         
-        if (bloqueoEnGoogle) {
-            // Si hay un bloqueo pero NO es nuestra propia cita, entonces sí está ocupado
-            if (bloqueoEnGoogle.googleEventId !== googleEventIdAExcluir) {
-                console.warn(`⛔ Choque en Google detectado en ${horaCheck}`);
-                return false; 
-            }
-        }
-
-        // 2. CHEQUEO FIREBASE (Para asegurar que no choque con otras citas locales)
-        const q = query(
-            collection(db, "citas"),
-            where("doctorId", "==", doctorId),
-            where("fecha", "==", fecha),
-            where("hora", "==", horaCheck)
-        );
+        const q = query(collection(db, "citas"), where("doctorId", "==", doctorId), where("fecha", "==", fecha), where("hora", "==", horaCheck));
         const snapshot = await getDocs(q);
-        
-        if (!snapshot.empty) {
-            // Si el documento en Firebase tiene un googleEventId diferente al nuestro, es un choque
-            const hayChoqueReal = snapshot.docs.some(d => d.data().googleEventId !== googleEventIdAExcluir);
-            if (hayChoqueReal) {
-                console.warn(`⛔ Choque en Firebase detectado en ${horaCheck}`);
-                return false;
-            }
-        }
-
+        if (!snapshot.empty && snapshot.docs.some(d => d.data().googleEventId !== googleEventIdAExcluir)) return false;
         horaCheck = addMinutesToTime(horaCheck, 30); 
     }
     return true; 
-};
+  };
 
-    // >>> INICIO: BÚSQUEDA INTELIGENTE POR TOKENS <<<
+  // 🔍 BÚSQUEDA INTELIGENTE
   useEffect(() => {
     const buscarPacientes = async () => {
       if (busqueda.length < 3) { setResultados([]); return; }
-      
-      // Dividimos la búsqueda en palabras para usar el primer token
       const tokensBusqueda = busqueda.trim().toUpperCase().split(/\s+/);
-      const primerToken = tokensBusqueda[0];
-
-      const q = query(
-        collection(db, "pacientes"), 
-        where("searchKeywords", "array-contains", primerToken), // 🎯 Cambio: Ahora usa tokens
-        limit(20)
-      );
-      
+      const q = query(collection(db, "pacientes"), where("searchKeywords", "array-contains", tokensBusqueda[0]), limit(20));
       const snap = await getDocs(q);
       let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-      // Refinamiento local para múltiples palabras (Nombre + Apellido)
       if (tokensBusqueda.length > 1) {
-          docs = docs.filter((p: any) => 
-              tokensBusqueda.every(token => p.nombreCompleto.includes(token))
-          );
+          docs = docs.filter((p: any) => tokensBusqueda.every(token => p.nombreCompleto.includes(token)));
       }
       setResultados(docs);
     };
@@ -185,308 +133,215 @@ const verificarDisponibilidadMultiples = async (
     return () => clearTimeout(timer);
   }, [busqueda]);
 
-  if (!isOpen || !data) return null;
-
-  const serviciosOrdenados = [...(catalogoServicios || [])].sort((a, b) => a.nombre.localeCompare(b.nombre));
-  const servicioDetalle = serviciosOrdenados.find(s => s.sku === servicioSku);
-
-  const handleGuardar = async () => {
-    // 1. Validaciones de Identidad
-    let nombreFinal = "";
-    let idFinal = "EXTERNO"; 
-
-    if (modo === 'nuevo') {
-      if (!nombreNuevo) return alert("Escribe el nombre del paciente");
-      nombreFinal = nombreNuevo.toUpperCase();
-    } else {
-      if (!pacienteSeleccionado) return alert("Debes seleccionar un paciente de la lista");
-      nombreFinal = pacienteSeleccionado.nombreCompleto;
-      idFinal = pacienteSeleccionado.id; 
-    }
-
-    if (!servicioSku) return alert("⚠️ Selecciona un servicio.");
-    if (precioFinal === "" || Number(precioFinal) < 0) return alert("⚠️ Define un precio válido.");
+  const handleGuardar = async (formData: any) => {
+    if (!servicioSku) return toast.warning("Selecciona un servicio.");
+    if (modo === 'buscar' && !pacienteSeleccionado) return toast.warning("Selecciona un paciente.");
     
+    // --- 1. PREPARACIÓN DE VARIABLES (FASE 4 - CORREGIDA) ---
+    const servicioDetalle = catalogoServicios.find(s => s.sku === servicioSku);
+    const duracionMinutos = parseInt(servicioDetalle?.duracion || "30");
+    const bloquesNecesarios = Math.ceil(duracionMinutos / 30); 
+    const tituloCita = notaInterna ? `${servicioDetalle?.nombre} (${notaInterna})` : servicioDetalle?.nombre;
+
+    // Determinamos la identidad ANTES de entrar al try (Resuelve error ts2448)
+    let nombreFinal = modo === 'buscar' 
+        ? pacienteSeleccionado?.nombreCompleto 
+        : `${formData.nombres} ${formData.apellidoPaterno} ${formData.apellidoMaterno || ''}`.trim().toUpperCase();
+    
+    // El ID para limpieza es el del paciente seleccionado o el que ya tenía la cita
+    const idParaLimpieza = pacienteSeleccionado?.id || citaExistente?.pacienteId || null;
+
     setLoading(true);
 
     try {
-      const duracionMinutos = parseInt(servicioDetalle?.duracion || "30");
-      const bloquesNecesarios = Math.ceil(duracionMinutos / 30); 
-
-      // >>> --- INICIO CORRECCIÓN DE VARIABLES --- <<<
-      // 🛡️ VERIFICACIÓN Usando los campos EDITABLES (fechaSeleccionada / horaSeleccionada)
+      // 🛡️ VERIFICACIÓN DISPONIBILIDAD
       const hayEspacio = await verificarDisponibilidadMultiples(
-        data.doctor.id, 
-        fechaSeleccionada, 
-        horaSeleccionada, 
-        bloquesNecesarios,
-        citaExistente?.googleEventId
+          data!.doctor.id, 
+          fechaSeleccionada, 
+          horaSeleccionada, 
+          bloquesNecesarios, 
+          citaExistente?.googleEventId
       );
       
-      if (!hayEspacio) {
-          alert(`⛔ AGENDA OCUPADA.\n\nEl horario seleccionado ya no está disponible.`);
-          setLoading(false);
-          return;
-      }
+      if (!hayEspacio) { toast.error("El horario ya no está disponible."); setLoading(false); return; }
 
-      // >>> --- INICIO BLOQUE DE LIMPIEZA (EDICIÓN) --- <<<
+      // >>> INICIO: LÓGICA DE REAGENDADO Y LIMPIEZA (Punto 4 + Jorge Méndez) <<<
       if (citaExistente) {
-          // A. Borrar de Google Calendar la cita anterior
-          if (citaExistente.googleEventId && data.doctor.calendarId) {
+          const cambioDeDoctor = citaExistente.doctorId !== data!.doctor.id;
+
+          if (!cambioDeDoctor && citaExistente.googleEventId) {
+              await actualizarCitaGoogle({
+                  calendarId: data!.doctor.calendarId,
+                  eventId: citaExistente.googleEventId,
+                  fecha: fechaSeleccionada,
+                  hora: horaSeleccionada,
+                  duracionMinutos: duracionMinutos,
+                  pacienteNombre: nombreFinal,
+                  motivo: tituloCita
+              });
+          } else if (citaExistente.googleEventId && citaExistente.doctorCalendarId) {
               await cancelarCitaGoogle({
-                  calendarId: data.doctor.calendarId,
+                  calendarId: citaExistente.doctorCalendarId,
                   eventId: citaExistente.googleEventId
               });
           }
 
-          // B. Borrar bloques de cita viejos en Firebase
-          const qOldCitas = query(
-              collection(db, "citas"), 
-              where("googleEventId", "==", citaExistente.googleEventId)
-          );
+          // A. Limpieza de bloques de agenda
+          const qOldCitas = query(collection(db, "citas"), where("googleEventId", "==", citaExistente.googleEventId));
           const snapOldCitas = await getDocs(qOldCitas);
-          for (const d of snapOldCitas.docs) {
-              await deleteDoc(doc(db, "citas", d.id));
-          }
+          for (const d of snapOldCitas.docs) { await deleteDoc(doc(db, "citas", d.id)); }
 
-          // C. Borrar cargo en caja antiguo (para generar el nuevo con el precio actualizado)
-          const qOldOp = query(
-              collection(db, "operaciones"),
-              where("pacienteNombre", "==", citaExistente.paciente),
-              where("doctorId", "==", citaExistente.doctorId),
-              where("estatus", "==", "Pendiente de Pago")
-          );
-          const snapOldOp = await getDocs(qOldOp);
-          for (const d of snapOldOp.docs) {
-              await deleteDoc(doc(db, "operaciones", d.id));
+          // B. SELLO DE DUPLICIDAD FINANCIERA (Evita lo ocurrido con Jorge Méndez)
+          if (idParaLimpieza) {
+              const qOldOp = query(
+                  collection(db, "operaciones"),
+                  where("pacienteId", "==", idParaLimpieza),
+                  where("fechaCita", "==", citaExistente.fecha),
+                  where("estatus", "in", ["Pendiente de Pago", "Pagado (Cortesía)"])
+              );
+              const snapOldOp = await getDocs(qOldOp);
+              for (const d of snapOldOp.docs) { await deleteDoc(doc(db, "operaciones", d.id)); }
           }
       }
-      // >>> --- FIN BLOQUE DE LIMPIEZA --- <<<
+      // >>> FIN: REAGENDADO <<<
 
-      const tituloCita = notaInterna ? `${servicioDetalle?.nombre} (${notaInterna})` : servicioDetalle?.nombre;
+      // 2. REGISTRO DE PACIENTE (Si es nuevo)
+      let idFinal = pacienteSeleccionado?.id;
+      let telFinal = pacienteSeleccionado?.telefonoCelular;
 
-      // 1. Lógica para decidir el color (Implementación)
-// Asumimos que tu servicio tiene una propiedad 'categoria' o similar. 
-// Si no la tiene, puedes usar: servicioDetalle?.nombre.includes("LAB")
-const esLaboratorio = 
-    servicioDetalle?.nombre?.toUpperCase().includes("LAB") || 
-    servicioDetalle?.sku?.toUpperCase().startsWith("LAB"); 
+      if (modo === 'nuevo') {
+          let fotoUrl = null;
+          if (fotoFile) {
+              const snap = await uploadBytes(ref(storage, `pacientes/fotos/${Date.now()}_${fotoFile.name}`), fotoFile);
+              fotoUrl = await getDownloadURL(snap.ref);
+          }
+          const patientData = {
+              ...formData,
+              nombreCompleto: nombreFinal,
+              searchKeywords: generateSearchTags(nombreFinal),
+              fotoUrl,
+              telefonos: listaTelefonos.filter(t => t.trim() !== ""),
+              telefonoCelular: listaTelefonos[0] || "", // ✅ Dualidad de datos
+              convenioId: descuentoSeleccionado?.id || null,
+              fechaRegistro: serverTimestamp(),
+          };
+          const docPac = await addDoc(collection(db, "pacientes"), patientData);
+          idFinal = docPac.id;
+          telFinal = patientData.telefonoCelular;
+      }
 
-// 2. Pasamos el colorId a la función (Actualización de la llamada)
-
-      // Agendamos la NUEVA posición en Google
-      const resultadoGoogle = await agendarCitaGoogle({
-          doctorId: data.doctor.id,
-          doctorNombre: data.doctor.nombre,
-          calendarId: data.doctor.calendarId,
-          pacienteNombre: nombreFinal,
-          motivo: tituloCita, 
+      // 3. AGENDA (Google + Firebase con bloques reales)
+      const resGoogle = await agendarCitaGoogle({
+          calendarId: data!.doctor.calendarId,
+          doctorNombre: data!.doctor.nombre,
           fecha: fechaSeleccionada,
           hora: horaSeleccionada,
+          pacienteNombre: nombreFinal,
+          motivo: tituloCita,
           duracionMinutos: duracionMinutos,
-          esTodoElDia: esLaboratorio
+          esTodoElDia: servicioDetalle?.tipo === 'Laboratorio'
       });
-      
-      const googleId = resultadoGoogle.googleEventId || null;
 
-      // >>> INICIO: CREACIÓN DE CITA Y OPERACIÓN CON TRAZABILIDAD <<<
       let horaActual = horaSeleccionada;
       for (let i = 0; i < bloquesNecesarios; i++) {
           await addDoc(collection(db, "citas"), {
-            doctorId: data.doctor.id, // 🆔 ID Real del médico
-            doctorNombre: data.doctor.nombre,
-            paciente: nombreFinal,
-            pacienteId: idFinal !== "EXTERNO" ? idFinal : null, // 🆔 ID Real del paciente
-            telefonoCelular: modo === 'buscar' ? (pacienteSeleccionado?.telefonoCelular || null) : null,
+            doctorId: data!.doctor.id, doctorNombre: data!.doctor.nombre,
+            paciente: nombreFinal, pacienteId: idFinal,
+            telefonoCelular: telFinal,
             motivo: i === 0 ? tituloCita : "(Continuación)", 
-            fecha: fechaSeleccionada, // 📅 String ISO: "2026-01-03"
-            hora: horaActual,
-            creadoEn: serverTimestamp(),
-            googleEventId: googleId,
-            elaboradoPor: user?.email || "Usuario Desconocido",
-            confirmada: citaExistente?.confirmada || false,        
-            mensajeEnviado: citaExistente?.mensajeEnviado || false
+            fecha: fechaSeleccionada, hora: horaActual,
+            creadoEn: serverTimestamp(), googleEventId: resGoogle.googleEventId,
+            elaboradoPor: user?.email || "Admin"
           });
           horaActual = sumarMinutos(horaActual, 30);
       }
 
-      // Generamos el cargo en Caja sincronizado
+      // 4. OPERACIÓN FINANCIERA (Reporte Ingresos)
       await addDoc(collection(db, "operaciones"), {
-        pacienteId: idFinal, // 🆔 Vínculo maestro
-        pacienteNombre: nombreFinal, 
-        servicioSku: servicioDetalle?.sku,
-        servicioNombre: tituloCita, 
+        pacienteId: idFinal, pacienteNombre: nombreFinal,
+        servicioSku: servicioDetalle?.sku, servicioNombre: tituloCita,
         monto: Number(precioFinal), 
-        descuentoAplicado: descuentos.find(d => d.id === descuentoId)?.nombre || null, // ✅ Guarda el nombre del convenio usado
-        montoOriginal: Number(cleanPrice(servicioDetalle?.precio)),
+        montoOriginal: cleanPrice(servicioDetalle?.precio),
+        descuentoAplicado: descuentoSeleccionado?.nombre || null,
         estatus: Number(precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
-        fecha: serverTimestamp(),
-        fechaCita: fechaSeleccionada, // 📅 Crucial para FinanzasPage
-        fechaPago: Number(precioFinal) === 0 ? serverTimestamp() : null, // ✅ Crucial para CorteDia.tsx
-        metodoPago: Number(precioFinal) === 0 ? "Cortesía" : null,
-        requiereFactura: pacienteSeleccionado?.datosFiscales?.rfc ? true : false,
-        doctorId: data.doctor.id,
-        doctorNombre: data.doctor.nombre,
-        origen: citaExistente ? "Agenda (Editada)" : "Agenda"
+        fecha: serverTimestamp(), fechaCita: fechaSeleccionada,
+        doctorNombre: data!.doctor.nombre, origen: "Agenda"
       });
-// >>> FIN: BLOQUE DE TRAZABILIDAD <<<
 
-      if (data.waitingListId) { try { await deleteDoc(doc(db, "lista_espera", data.waitingListId)); } catch (e) {} }
-
+      if (data?.waitingListId) await deleteDoc(doc(db, "lista_espera", data.waitingListId));
       onClose(); 
-      toast.success(citaExistente ? "✅ Cita re-programada con éxito." : "✅ Cita agendada correctamente."); 
-
-    } catch (error) {
-      console.error(error);
-      toast.error("Error al procesar la cita.");
-    } finally {
-      setLoading(false);
+      toast.success(citaExistente ? "✅ Cita re-programada con éxito." : "✅ Cita agendada correctamente.");
+    } catch (e) { 
+        console.error(e); 
+        toast.error("Error al procesar."); 
+    } finally { 
+        setLoading(false); 
     }
   };
 
+  if (!isOpen || !data) return null;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-bold text-slate-800 mb-1">Nueva Cita</h2>
-        <div className="flex gap-2 mb-4 bg-slate-50 p-2 rounded-lg border border-slate-100">
-            <div className="flex-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase block">Fecha</label>
-                <input 
-                    type="date" 
-                    className="w-full bg-transparent text-sm font-bold text-slate-700 outline-none"
-                    value={fechaSeleccionada}
-                    onChange={(e) => setFechaSeleccionada(e.target.value)}
-                />
-            </div>
-            <div className="flex-1 border-l pl-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase block">Hora</label>
-                <input 
-                    type="time" 
-                    className="w-full bg-transparent text-sm font-bold text-slate-700 outline-none"
-                    value={horaSeleccionada}
-                    onChange={(e) => setHoraSeleccionada(e.target.value)}
-                />
-            </div>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-hidden flex flex-col">
+        <div className="p-6 border-b bg-slate-50 flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-slate-800">Agendar Nueva Cita</h2>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-3xl">×</button>
         </div>
 
-        {/* SELECTOR MODO */}
-        <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
-          <button onClick={() => setModo('buscar')} className={`flex-1 py-1 text-sm font-bold rounded-md transition-all ${modo === 'buscar' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>🔍 Buscar</button>
-          <button onClick={() => setModo('nuevo')} className={`flex-1 py-1 text-sm font-bold rounded-md transition-all ${modo === 'nuevo' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>✨ Nuevo</button>
-        </div>
-
-        <div className="space-y-4">
-          {/* BUSCADOR */}
-          {modo === 'buscar' && (
-            <div className="relative">
-              <input 
-                type="text" 
-                className="w-full border rounded p-2 uppercase"
-                placeholder="BUSCAR PACIENTE..."
-                value={busqueda}
-                onChange={(e) => { setBusqueda(e.target.value); setPacienteSeleccionado(null); }}
-              />
-              {resultados.length > 0 && !pacienteSeleccionado && (
-                <ul className="mt-1 border rounded bg-white shadow-lg max-h-40 overflow-y-auto absolute w-full max-w-xs z-10">
-                  {resultados.map(p => (
-                    <li key={p.id} className="p-2 hover:bg-blue-50 cursor-pointer text-sm border-b" 
-                    onClick={() => { 
-                    setPacienteSeleccionado(p); 
-                    setBusqueda(p.nombreCompleto); 
-                    setResultados([]); 
-                    // ✅ AUTO-LECTURA DE CONVENIO:
-                    if (p.convenioId) {
-                        setDescuentoId(p.convenioId);
-                        toast.info(`Convenio detectado: ${descuentos.find(d => d.id === p.convenioId)?.nombre || "Activo"}`);
-                    } else {
-                        setDescuentoId(""); // Limpia si el paciente no tiene convenio
-                    }
-    }}>
-                      <span className="font-bold block">{p.nombreCompleto}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+        <form onSubmit={handleSubmit(handleGuardar)} className="overflow-y-auto p-6 space-y-6 flex-1">
+            {/* DATOS DE CITA */}
+            <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <div><label className="text-xs font-bold text-blue-600 uppercase">Fecha</label>
+                <input type="date" className="w-full border rounded p-2" value={fechaSeleccionada} onChange={e => setFechaSeleccionada(e.target.value)} /></div>
+                <div><label className="text-xs font-bold text-blue-600 uppercase">Hora Inicio</label>
+                <input type="time" className="w-full border rounded p-2" value={horaSeleccionada} onChange={e => setHoraSeleccionada(e.target.value)} /></div>
             </div>
-          )}
 
-          {modo === 'nuevo' && (
-            <input type="text" className="w-full border rounded p-2 uppercase" placeholder="NOMBRE COMPLETO" value={nombreNuevo} onChange={(e) => setNombreNuevo(e.target.value)} />
-          )}
-          
-          {/* SELECTOR SERVICIO */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Cita / Servicio</label>
-            <select 
-                className="w-full border border-blue-300 bg-blue-50 rounded p-2 text-slate-700 font-medium"
-                value={servicioSku}
-                onChange={(e) => setServicioSku(e.target.value)}
-            >
-                <option value="">-- Selecciona --</option>
-                {serviciosOrdenados.map(s => (
-                    <option key={s.sku} value={s.sku}>
-                        {s.nombre} ({s.duracion} min)
-                    </option>
-                ))}
-            </select>
-          </div>
+            {/* SELECTOR MODO PACIENTE */}
+            <div className="flex bg-slate-100 p-1 rounded-lg">
+              <button type="button" onClick={() => setModo('buscar')} className={`flex-1 py-2 text-sm font-bold rounded-md transition ${modo === 'buscar' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>🔍 Buscar Existente</button>
+              <button type="button" onClick={() => setModo('nuevo')} className={`flex-1 py-2 text-sm font-bold rounded-md transition ${modo === 'nuevo' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>✨ Registrar Nuevo</button>
+            </div>
 
-          {/* PANEL DE CONTROL DE PAQUETES Y COBRO */}
-          {servicioDetalle && (
-             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm space-y-3 animate-fade-in">
-                
-                {pacienteSeleccionado && (
-                    <div className="flex justify-between items-center text-xs text-blue-600 bg-blue-100 p-2 rounded">
-                        <span>📊 Historial de este servicio:</span>
-                        <span className="font-bold">{historialCitas} veces anteriores</span>
+            {modo === 'buscar' ? (
+                <div className="relative">
+                    <input type="text" className="w-full border rounded p-3 uppercase" placeholder="Nombre del paciente..." value={busqueda} onChange={e => {setBusqueda(e.target.value); setPacienteSeleccionado(null);}} />
+                    {resultados.length > 0 && !pacienteSeleccionado && (
+                        <ul className="absolute z-10 w-full bg-white border rounded shadow-xl mt-1 max-h-40 overflow-y-auto">
+                            {resultados.map(p => <li key={p.id} className="p-3 hover:bg-blue-50 cursor-pointer border-b text-sm font-bold" onClick={() => {setPacienteSeleccionado(p); setBusqueda(p.nombreCompleto); setResultados([]); if(p.convenioId) setDescuentoId(p.convenioId);}}>{p.nombreCompleto}</li>)}
+                        </ul>
+                    )}
+                </div>
+            ) : (
+                <FormularioPacienteBase register={register} errors={errors} watch={watch} setValue={setValue} listaTelefonos={listaTelefonos} actualizarTelefono={actualizarTelefono} agregarTelefono={agregarTelefono} eliminarTelefono={eliminarTelefono} descuentos={descuentos} setDescuentoSeleccionado={setDescuentoSeleccionado} requiereFactura={requiereFactura} setRequiereFactura={setRequiereFactura} setFotoFile={setFotoFile} />
+            )}
+
+            {/* SECTOR SERVICIO Y COSTO */}
+            <div className="space-y-4 border-t pt-4">
+                <div><label className="text-xs font-bold text-slate-500 uppercase">Servicio o Paquete</label>
+                <select className="w-full border p-3 rounded-lg font-bold" value={servicioSku} onChange={e => setServicioSku(e.target.value)} required>
+                    <option value="">-- Seleccionar --</option>
+                    {catalogoServicios.map(s => <option key={s.sku} value={s.sku}>{s.nombre} ({s.duracion} min)</option>)}
+                </select></div>
+
+                {servicioSku && (
+                    <div className="bg-slate-50 p-4 rounded-lg border flex justify-between items-center">
+                        <div><p className="text-xs text-slate-500 uppercase font-bold">Total a cobrar hoy</p>
+                        <input type="number" className="text-2xl font-bold text-blue-700 bg-transparent outline-none w-32" value={precioFinal} onChange={e => setPrecioFinal(Number(e.target.value))} /></div>
+                        <div className="text-right text-xs text-slate-400 italic">
+                            {Math.ceil(parseInt(catalogoServicios.find(s=>s.sku===servicioSku).duracion)/30)} bloques de agenda
+                        </div>
                     </div>
                 )}
+            </div>
+        </form>
 
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Monto a Cobrar Hoy:</label>
-                    <div className="flex items-center gap-2">
-                        <span className="text-slate-400">$</span>
-                        <input 
-                            type="number" 
-                            className="w-full border rounded p-2 font-bold text-slate-800"
-                            value={precioFinal}
-                            onChange={e => setPrecioFinal(e.target.value === "" ? "" : Number(e.target.value))}
-                        />
-                    </div>
-                    <div className="flex gap-2 mt-1">
-                        <button onClick={() => setPrecioFinal(0)} className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200">
-                            🎁 Cortesía / Paquete ($0)
-                        </button>
-                        <button onClick={() => setPrecioFinal(servicioDetalle.precio)} className="text-[10px] bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300">
-                            🏷️ Precio Lista (${servicioDetalle.precio})
-                        </button>
-                    </div>
-                </div>
-
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Nota / Num. Sesión:</label>
-                    <input 
-                        type="text" 
-                        placeholder="Ej: Sesión 2 de 4" 
-                        className="w-full border rounded p-2 text-xs"
-                        value={notaInterna}
-                        onChange={e => setNotaInterna(e.target.value)}
-                    />
-                </div>
-
-                <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-slate-500 text-xs">
-                    <span>Duración: <strong>{servicioDetalle.duracion} min</strong></span>
-                    <span>Ocupa: <strong>{Math.ceil(parseInt(servicioDetalle.duracion)/30)} bloques</strong></span>
-                </div>
-             </div>
-          )}
-
-          <div className="flex gap-3 mt-6">
-            <button onClick={onClose} className="flex-1 px-4 py-2 border rounded hover:bg-slate-50">Cancelar</button>
-            <button onClick={handleGuardar} disabled={loading || !servicioSku} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
-              {loading ? "Agendando..." : "Confirmar Cita"}
+        <div className="p-6 border-t bg-slate-50 flex gap-4">
+            <button type="button" onClick={onClose} className="flex-1 py-3 border rounded-lg font-bold text-slate-600 hover:bg-slate-200">Cancelar</button>
+            <button type="submit" onClick={handleSubmit(handleGuardar)} disabled={loading || !servicioSku} className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50">
+                {loading ? "Procesando..." : "Confirmar Cita y Registro"}
             </button>
-          </div>
         </div>
       </div>
     </div>
