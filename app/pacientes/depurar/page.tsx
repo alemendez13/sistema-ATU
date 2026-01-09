@@ -5,6 +5,7 @@ import { collection, getDocs, doc, updateDoc, deleteDoc, query, where } from "@/
 import { db } from "@/lib/firebase";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { toast } from "sonner";
+import { superNormalize, generateSearchTags } from "@/lib/utils";
 
 export default function DepuracionPage() {
   const [analizando, setAnalizando] = useState(false);
@@ -69,6 +70,49 @@ export default function DepuracionPage() {
     } catch (e) { toast.error("Error en la fusión"); }
   };
 
+  // 🚀 SCRIPT DE MIGRACIÓN MASIVA (PASO 5)
+const [progreso, setProgreso] = useState(0);
+const [migrando, setMigrando] = useState(false);
+
+const ejecutarMigracionTags = async () => {
+    if (!confirm("⚠️ ¿Iniciar normalización de 11,000 registros? Esto corregirá la búsqueda de todos los pacientes actuales.")) return;
+    
+    setMigrando(true);
+    setProgreso(0);
+    
+    try {
+        const snap = await getDocs(collection(db, "pacientes"));
+        const total = snap.docs.length;
+        let procesados = 0;
+
+        // Procesamos uno por uno para respetar los límites del monitor-core
+        for (const documento of snap.docs) {
+            const data = documento.data();
+            const nombreActual = data.nombreCompleto || "";
+            
+            // Aplicamos la nueva "Súper Normalización" sin acentos
+            const nombreLimpio = superNormalize(nombreActual);
+            const nuevosTags = generateSearchTags(nombreLimpio);
+
+            await updateDoc(doc(db, "pacientes", documento.id), {
+                nombreCompleto: nombreLimpio,
+                searchKeywords: nuevosTags,
+                mantenimientoTags: "v2.0-limpio" // Bandera de control
+            });
+
+            procesados++;
+            setProgreso(Math.round((procesados / total) * 100));
+        }
+
+        toast.success("✅ Migración completada. Los 11,000 registros están ahora optimizados.");
+    } catch (e) {
+        console.error("Error en migración:", e);
+        toast.error("Error al actualizar registros legados.");
+    } finally {
+        setMigrando(false);
+    }
+};
+
   return (
     <ProtectedRoute>
       <div className="p-8 max-w-5xl mx-auto">
@@ -78,9 +122,15 @@ export default function DepuracionPage() {
             Evita fusionar familiares que comparten teléfono.
         </p>
 
-        <button onClick={ejecutarEscaneo} disabled={analizando} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50">
-          {analizando ? "Analizando base de datos..." : "🔍 Buscar posibles duplicados"}
-        </button>
+        <div className="flex gap-4 mb-8">
+            <button onClick={ejecutarEscaneo} disabled={analizando || migrando} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50">
+            {analizando ? "Analizando..." : "🔍 Buscar Duplicados"}
+            </button>
+
+            <button onClick={ejecutarMigracionTags} disabled={analizando || migrando} className="bg-slate-800 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-black disabled:opacity-50 flex items-center gap-2">
+            {migrando ? `⚙️ Procesando: ${progreso}%` : "🧹 Normalizar Acentos (Legado)"}
+            </button>
+        </div>
 
         <div className="mt-10 space-y-8">
           {grupos.map((grupo, idx) => (
