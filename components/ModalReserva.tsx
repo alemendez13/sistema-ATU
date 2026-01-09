@@ -5,7 +5,7 @@ import { db, storage } from "../lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { agendarCitaGoogle, cancelarCitaGoogle, actualizarCitaGoogle } from "../lib/actions"; 
 import { toast } from "sonner";
-import { addMinutesToTime, cleanPrice, generateSearchTags } from "../lib/utils";
+import { addMinutesToTime, cleanPrice, generateSearchTags, superNormalize } from "../lib/utils";
 import { useAuth } from "../hooks/useAuth";
 import { useForm } from "react-hook-form";
 
@@ -144,9 +144,11 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
     const tituloCita = notaInterna ? `${servicioDetalle?.nombre} (${notaInterna})` : servicioDetalle?.nombre;
 
     // Determinamos la identidad ANTES de entrar al try (Resuelve error ts2448)
+    const nombreParaNormalizar = `${formData.nombres} ${formData.apellidoPaterno} ${formData.apellidoMaterno || ''}`;
+
     let nombreFinal = modo === 'buscar' 
         ? pacienteSeleccionado?.nombreCompleto 
-        : `${formData.nombres} ${formData.apellidoPaterno} ${formData.apellidoMaterno || ''}`.trim().toUpperCase();
+        : superNormalize(nombreParaNormalizar);
     
     // El ID para limpieza es el del paciente seleccionado o el que ya tenía la cita
     const idParaLimpieza = pacienteSeleccionado?.id || citaExistente?.pacienteId || null;

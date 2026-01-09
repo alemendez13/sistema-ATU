@@ -35,6 +35,7 @@ export default function DirectoryClient({ mensajesPredefinidos }: { mensajesPred
   const [ultimoDoc, setUltimoDoc] = useState<any>(null);
   const [hayMas, setHayMas] = useState(true);
   const [buscando, setBuscando] = useState(false);
+  const [ultimoDocBusqueda, setUltimoDocBusqueda] = useState<any>(null);
 
   // 1. CARGA INICIAL (Solo 20 pacientes)
   const cargarPacientesIniciales = async () => {
@@ -66,28 +67,67 @@ export default function DirectoryClient({ mensajesPredefinidos }: { mensajesPred
 
   // 2. PAGINACIÓN
   const cargarMas = async () => {
-    if (!ultimoDoc) return;
+    // 1. Determinamos qué cursor usar según el modo actual
+    const cursorActual = buscando ? ultimoDocBusqueda : ultimoDoc;
+    
+    // GUARDIA: Si no hay cursor o estamos cargando, abortamos
+    if (!cursorActual || loading) return;
     
     try {
-      const q = query(
-        collection(db, "pacientes"), 
-        orderBy("fechaRegistro", "desc"),
-        startAfter(ultimoDoc),
-        limit(20)
-      );
+      let q;
+      
+      if (buscando) {
+          // LÓGICA DE BÚSQUEDA: Seguimos la secuencia de la búsqueda inteligente
+          const palabrasBusqueda = busqueda.trim().toUpperCase().split(/\s+/);
+          q = query(
+            collection(db, "pacientes"),
+            where("searchKeywords", "array-contains", palabrasBusqueda[0]),
+            orderBy("nombreCompleto", "asc"), // Requerido para consistencia en búsqueda
+            startAfter(cursorActual),
+            limit(20)
+          );
+      } else {
+          // LÓGICA GENERAL: La que ya tenías en VSC
+          q = query(
+            collection(db, "pacientes"), 
+            orderBy("fechaRegistro", "desc"), // Orden por lo más reciente
+            startAfter(cursorActual),
+            limit(20)
+          );
+      }
 
       const snapshot = await getDocs(q);
-      const nuevos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Paciente[];
-
-      setPacientes(prev => [...prev, ...nuevos]);
-      setUltimoDoc(snapshot.docs[snapshot.docs.length - 1]);
       
+      // Mapeamos los nuevos registros manteniendo la estructura fundamental
+      let nuevos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Paciente[];
+
+      // 2. REFINADO LOCAL: Si hay búsqueda de múltiples palabras, aplicamos el filtro
+      if (buscando && busqueda.trim().split(/\s+/).length > 1) {
+          const palabras = busqueda.trim().toUpperCase().split(/\s+/);
+          nuevos = nuevos.filter(p => 
+              palabras.every(pal => p.nombreCompleto.toUpperCase().includes(pal))
+          );
+      }
+
+      // 3. ACTUALIZACIÓN DE ESTADOS (Sin eliminar historial previo)
+      setPacientes(prev => [...prev, ...nuevos]);
+      
+      // Actualizamos el cursor correspondiente según el modo para la siguiente carga
+      const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+      if (buscando) {
+          setUltimoDocBusqueda(lastVisible);
+      } else {
+          setUltimoDoc(lastVisible);
+      }
+      
+      // Si trajo menos de 20, ya no hay más datos en el servidor
       if (snapshot.docs.length < 20) setHayMas(false);
 
     } catch (error) {
-      toast.error("Error cargando más pacientes");
+      console.error("Error en paginación:", error);
+      toast.error("Error al cargar más resultados");
     }
-  };
+};
 
   // 3. BUSCADOR EN SERVIDOR
 const realizarBusqueda = async (e: React.FormEvent) => {
@@ -100,23 +140,25 @@ const realizarBusqueda = async (e: React.FormEvent) => {
 
   setLoading(true);
   setBuscando(true);
-  setHayMas(false);
-  
+  setUltimoDocBusqueda(null); // Limpiamos rastro de búsquedas anteriores
+
   try {
       const palabrasBusqueda = busqueda.trim().toUpperCase().split(/\s+/);
       const primerTermino = palabrasBusqueda[0];
       
       const q = query(
           collection(db, "pacientes"),
-          // 👇 BUSQUEDA INTELIGENTE: Busca si el array contiene la palabra
           where("searchKeywords", "array-contains", primerTermino),
-          limit(30) 
+          orderBy("nombreCompleto", "asc"), // Requerido para paginación estable
+          limit(20) // Cambiamos 30 por 20 para ser consistentes con el diseño [cite: 347]
       );
 
       const snapshot = await getDocs(q);
+      
+      // ✅ MANTENEMOS ESTAS LÍNEAS (Mapeo de datos)
       let resultados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Paciente[];
 
-      // Si el usuario escribió más de una palabra, refinamos el resultado localmente
+      // ✅ MANTENEMOS ESTA LÓGICA (Refinado multi-palabra)
       if (palabrasBusqueda.length > 1) {
           resultados = resultados.filter(p => 
               palabrasBusqueda.every(palabra => 
@@ -126,6 +168,15 @@ const realizarBusqueda = async (e: React.FormEvent) => {
       }
 
       setPacientes(resultados);
+      
+      // 📑 NUEVA LÓGICA: Guardar cursor para "Cargar siguientes 20" [cite: 345, 346]
+      if (snapshot.docs.length > 0) {
+          setUltimoDocBusqueda(snapshot.docs[snapshot.docs.length - 1]);
+          setHayMas(snapshot.docs.length === 20);
+      } else {
+          setHayMas(false);
+      }
+
       if (resultados.length === 0) toast.info("No se encontraron coincidencias.");
 
   } catch (error) {

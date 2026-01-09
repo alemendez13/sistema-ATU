@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { verificarStock, descontarStockPEPS } from "../../lib/inventoryController";
 import { agendarCitaGoogle } from "../../lib/actions"; 
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { cleanPrice, calculateAge, generateSearchTags } from "../../lib/utils";
+import { cleanPrice, calculateAge, generateSearchTags, superNormalize } from "../../lib/utils";
 import { toast } from 'sonner';
 
 // COMPONENTES UI
@@ -144,7 +144,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
       }
 
       // 3. TRAZABILIDAD DE DATOS (Expediente)
-      const nombreConstruido = `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno || ''}`.trim().toUpperCase();
+    const nombreConstruido = superNormalize(`${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno || ''}`);
       const patientData = {
           ...data,
           nombreCompleto: nombreConstruido,
