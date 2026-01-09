@@ -2,7 +2,7 @@
 "use client";
 
 // ⚙️ CONFIGURACIÓN DE SENSIBILIDAD
-const READ_LIMIT = 100;       // Máximo de peticiones permitidas...
+const READ_LIMIT = 300;       // Máximo de peticiones permitidas...
 const TIME_WINDOW = 10000;    // ...en este periodo de tiempo (ms)
 const STORAGE_KEY = 'SANSCE_EMERGENCY_LOCK';
 

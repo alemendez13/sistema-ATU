@@ -147,10 +147,20 @@ export const parseWhatsAppTemplate = (template: string, data: {
  * 9. GENERADOR DE TAGS DE BÚSQUEDA
  * Convierte "Juan Perez Garcia" en ["JUAN", "PEREZ", "GARCIA"]
  */
+// NUEVA FUNCIÓN DE NORMALIZACIÓN PROFUNDA
+export const superNormalize = (text: string): string => {
+    return text
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remueve acentos y diacríticos
+        .trim()
+        .toUpperCase();
+};
+
+// ACTUALIZACIÓN DEL GENERADOR DE TAGS
 export const generateSearchTags = (nombre: string): string[] => {
     if (!nombre) return [];
-    // Limpiamos espacios extra y dividimos por palabras
-    const palabras = nombre.trim().toUpperCase().split(/\s+/);
-    // Retornamos un array sin duplicados
+    // Aplicamos superNormalize antes de generar el array de búsqueda
+    const nombreLimpio = superNormalize(nombre);
+    const palabras = nombreLimpio.split(/\s+/);
     return Array.from(new Set(palabras));
 };
