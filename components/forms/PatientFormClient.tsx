@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "@/lib/firebase-guard";
 import { db, storage } from "../../lib/firebase";
 import { useRouter } from "next/navigation";
 import { verificarStock, descontarStockPEPS } from "../../lib/inventoryController";

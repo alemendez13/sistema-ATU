@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, limit, getDocs, startAfter, where } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, startAfter, where } from "@/lib/firebase-guard";
 import { db } from "../../lib/firebase";
 import Link from "next/link";
 import WhatsAppButton from "../ui/WhatsAppButton";

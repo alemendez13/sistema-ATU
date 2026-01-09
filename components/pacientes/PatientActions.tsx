@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, deleteDoc, serverTimestamp } from "@/lib/firebase-guard";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import { db, storage } from "../../lib/firebase"; 
 import { useRouter } from "next/navigation";

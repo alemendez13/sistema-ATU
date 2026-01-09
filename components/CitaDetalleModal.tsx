@@ -1,7 +1,7 @@
 /* components/CitaDetalleModal.tsx */
 "use client";
 import { useState } from "react";
-import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch } from "@/lib/firebase-guard";
 import { db } from "../lib/firebase";
 import { toast } from "sonner";
 import WhatsAppButton from "./ui/WhatsAppButton";

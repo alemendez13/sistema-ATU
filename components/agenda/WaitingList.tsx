@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 // Importamos 'limit' para proteger la cuota
-import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, limit } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, limit } from "@/lib/firebase-guard";
 import { db } from "../../lib/firebase";
 import { toast } from "sonner";
 import Button from "../ui/Button";

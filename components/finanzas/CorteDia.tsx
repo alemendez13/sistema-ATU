@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy } from "@/lib/firebase-guard";
 import { db } from "../../lib/firebase";
 
 export default function CorteDia() {

@@ -1,7 +1,7 @@
 /* components/AgendaBoard.tsx */
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"; 
+import { collection, query, where, onSnapshot, doc, updateDoc } from "@/lib/firebase-guard"; 
 import { db } from "../lib/firebase";
 import ModalReserva from "./ModalReserva";
 import CitaDetalleModal from "./CitaDetalleModal"; 

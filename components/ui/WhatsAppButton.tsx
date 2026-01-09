@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { formatearCelular } from "../../lib/whatsappTemplates";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "@/lib/firebase-guard";
 import { db } from "../../lib/firebase";
 import { toast } from "sonner";
 

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { collection, addDoc, query, orderBy, onSnapshot, where, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, query, orderBy, onSnapshot, where, serverTimestamp } from "@/lib/firebase-guard";
 import { db } from "../../lib/firebase";
 
 interface Gasto {

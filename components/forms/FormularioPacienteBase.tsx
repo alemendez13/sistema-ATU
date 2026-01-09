@@ -2,7 +2,7 @@
 import React from "react";
 import SmartAvatarUploader from "../ui/SmartAvatarUploader";
 import { calculateAge } from "../../lib/utils";
-import { collection, query, where, getDocs, limit } from "firebase/firestore";
+import { collection, query, where, getDocs, limit } from "@/lib/firebase-guard";
 import { db } from "../../lib/firebase";
 import Link from "next/link";
 

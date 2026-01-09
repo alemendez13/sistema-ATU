@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, deleteDoc, doc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, deleteDoc, doc } from "@/lib/firebase-guard";
 import { db, storage } from "../lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { agendarCitaGoogle, cancelarCitaGoogle, actualizarCitaGoogle } from "../lib/actions"; 
