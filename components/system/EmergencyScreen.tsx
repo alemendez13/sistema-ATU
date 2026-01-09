@@ -9,7 +9,7 @@ export default function EmergencyScreen() {
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === "admin123" || password === "SANSCE2025") {
+    if (password === "F4b1S-JoY1T0" || password === "SANSCE2025") {
       monitor.unlockSystem();
     } else {
       setError(true);
