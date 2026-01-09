@@ -1,7 +1,7 @@
 /* app/reportes/hoja-frontal/page.tsx */
 "use client";
 import { useState } from "react";
-import { collection, query, where, getDocs, limit } from "firebase/firestore";
+import { collection, query, where, getDocs, limit } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import DownloadHojaFrontalButton from "../../../components/pdf/DownloadHojaFrontalButton";

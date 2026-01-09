@@ -1,7 +1,7 @@
 // app/finanzas/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, doc, updateDoc, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, updateDoc, orderBy } from "@/lib/firebase-guard";
 import { db } from "@/lib/firebase"; 
 import CorteDia from "@/components/finanzas/CorteDia";
 import ProtectedRoute from "@/components/ProtectedRoute";

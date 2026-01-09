@@ -1,7 +1,7 @@
 /* app/reportes/ingresos-sansce/page.tsx */
 "use client";
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, orderBy, doc, getDoc } from "firebase/firestore"; 
+import { collection, query, where, getDocs, orderBy, doc, getDoc } from "@/lib/firebase-guard"; 
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Pencil, Trash2, Plus, ExternalLink, FileText, AppWindow, Loader2, X } from 'lucide-react';
 import { db } from '@/lib/firebase'; // Uso de Alias @/
-import { collection, onSnapshot, query, orderBy, doc, deleteDoc, setDoc, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, deleteDoc, setDoc, addDoc } from "@/lib/firebase-guard";
 import { toast } from 'sonner';
 import { useAuth } from "@/hooks/useAuth";
 

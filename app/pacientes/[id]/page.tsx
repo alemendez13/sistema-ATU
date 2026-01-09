@@ -2,7 +2,7 @@
 "use client"; // 👈 ESTO ES LA CLAVE: Le dice a Next.js que esto corre en el navegador
 
 import { useState, useEffect } from "react";
-import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, orderBy } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
 // Ajusta esta importación si tus tipos están en otro lado, según tu estructura es correcto:
 import { Paciente, Operacion } from "../../../types"; 

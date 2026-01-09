@@ -1,7 +1,7 @@
 // ARCHIVO: app/reportes/conciliacion-lab/ConciliacionClient.tsx
 "use client";
 import { useState } from "react";
-import { collection, query, where, getDocs, orderBy, limit, startAfter } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, limit, startAfter } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase"; 
 import Link from "next/link";
 import { toast } from "sonner";

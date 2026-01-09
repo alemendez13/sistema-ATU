@@ -1,7 +1,7 @@
 // ARCHIVO: app/reportes/cambio-turno/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, serverTimestamp, Timestamp } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase"; 
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import { toast } from "sonner";

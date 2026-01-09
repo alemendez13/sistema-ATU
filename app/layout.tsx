@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from 'sonner';
 import Navbar from "../components/ui/Navbar";
 import Sidebar from "../components/ui/Sidebar";
+import ResourceMonitorProvider from "../providers/ResourceMonitorProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -11,6 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es">
       <body className={`${inter.className} bg-slate-50 text-slate-900`}>
+        <ResourceMonitorProvider>
         <Navbar />
         <Sidebar /> {/* 👈 Inyectamos la barra lateral */}
         
@@ -20,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </main>
         
         <Toaster position="top-center" richColors />
+        </ResourceMonitorProvider>
       </body>
     </html>
   );

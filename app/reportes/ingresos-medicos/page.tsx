@@ -1,7 +1,7 @@
 /* app/reportes/ingresos-medico/page.tsx */
 "use client";
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, orderBy, getDoc, doc } from "firebase/firestore"; 
+import { collection, query, where, getDocs, orderBy, getDoc, doc } from "@/lib/firebase-guard"; 
 import { db } from "../../../lib/firebase";
 import { getMedicosAction, enviarCorteMedicoAction } from "../../../lib/actions";
 import ProtectedRoute from "../../../components/ProtectedRoute";

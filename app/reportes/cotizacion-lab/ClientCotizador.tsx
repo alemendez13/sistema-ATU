@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { PDFDownloadLink } from "@react-pdf/renderer"; 
 import CotizacionLabPDF from "../../../components/documents/CotizacionLabPDF";
 import Link from "next/link";
-import { collection, query, where, getDocs, limit } from "firebase/firestore";
+import { collection, query, where, getDocs, limit } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
 import { cleanPrice } from "../../../lib/utils"; // ⬅️ Importa tu nueva utilidad
 

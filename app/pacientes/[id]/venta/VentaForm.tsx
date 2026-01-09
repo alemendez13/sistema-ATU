@@ -1,7 +1,7 @@
 // app/pacientes/[id]/venta/VentaForm.tsx
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from "@/lib/firebase-guard";
 import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";

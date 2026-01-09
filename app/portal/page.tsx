@@ -1,7 +1,7 @@
 // ARCHIVO: app/portal/page.tsx
 "use client";
 import { useState } from "react";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy } from "@/lib/firebase-guard";
 import { db } from "../../lib/firebase";
 import { toast } from "sonner";
 // 👇 AQUÍ ESTÁ LA CORRECCIÓN DE LA RUTA
