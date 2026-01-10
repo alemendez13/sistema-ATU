@@ -136,7 +136,13 @@ export async function enviarCorteMedicoAction(datos: {
     medicoNombre: string;
     medicoEmail: string;
     periodo: string;
-    resumen: { cobrado: number; comision: number; pagar: number };
+    resumen: { 
+        cobrado: number; 
+        comision: number; 
+        pagar: number;
+        tpvMP?: number;   // 🎯 Opcional para retrocompatibilidad
+        tpvBAN?: number;  // 🎯 Opcional
+    };
     movimientos: any[];
 }) {
     if (!datos.medicoEmail || !datos.medicoEmail.includes('@')) {
@@ -173,19 +179,25 @@ export async function enviarCorteMedicoAction(datos: {
         // Ajusta esta URL a tu dominio real cuando hagas deploy
         const enlaceValidacion = `https://sistema-atu.netlify.app/validar-corte/${tokenValidacion}`;
         const htmlContent = `
-            <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-                <div style="background-color: #2563eb; padding: 20px; text-align: center; color: white;">
-                    <h2 style="margin:0;">Corte de Caja: ${datos.periodo}</h2>
-                    <p>Hola, Dr(a). ${datos.medicoNombre}</p>
-                </div>
-                
-                <div style="padding: 20px;">
-                    <p>Adjuntamos el desglose de movimientos del periodo solicitado.</p>
-                    <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                        <p style="margin: 5px 0;"><strong>Total Cobrado:</strong> $${datos.resumen.cobrado}</p>
-                        <p style="margin: 5px 0;"><strong>Retención Clínica:</strong> -$${datos.resumen.comision}</p>
-                        <h3 style="margin: 10px 0; color: #2563eb;">A Depositar: $${datos.resumen.pagar}</h3>
+        <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+            <div style="background-color: #2563eb; padding: 20px; text-align: center; color: white;">
+                <h2 style="margin:0;">Corte de Caja: ${datos.periodo}</h2>
+                <p>Hola, Dr(a). ${datos.medicoNombre}</p>
+            </div>
+            
+            <div style="padding: 20px;">
+                <p>Adjuntamos el desglose de movimientos del periodo solicitado.</p>
+                <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <p style="margin: 5px 0;"><strong>Total Cobrado:</strong> $${datos.resumen.cobrado.toLocaleString()}</p>
+                    
+                    <div style="margin: 10px 0; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 13px;">
+                        <p style="margin: 2px 0; color: #0284c7;"><strong>En TPV Mercado Pago:</strong> $${(datos.resumen.tpvMP || 0).toLocaleString()}</p>
+                        <p style="margin: 2px 0; color: #059669;"><strong>En TPV Banamex:</strong> $${(datos.resumen.tpvBAN || 0).toLocaleString()}</p>
                     </div>
+
+                    <p style="margin: 5px 0;"><strong>Retención Clínica:</strong> -$${datos.resumen.comision.toLocaleString()}</p>
+                    <h3 style="margin: 10px 0; color: #2563eb;">Total a Liquidar: $${datos.resumen.pagar.toLocaleString()}</h3>
+                </div>
                     <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
                         <thead style="background-color: #f1f5f9;">
                             <tr>
