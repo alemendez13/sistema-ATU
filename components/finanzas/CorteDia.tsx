@@ -64,6 +64,8 @@ export default function CorteDia() {
   // 2. Mantenimiento de variables originales para el reporte
   const totalVendido    = sumarMonto(ingresos);
   const efectivoEntrada = sumarMonto(ingresos.filter(i => i.metodoPago === 'Efectivo'));
+  const tpvMP           = sumarMonto(ingresos.filter(i => i.metodoPago === 'Tarjeta (TPV MP)'));
+  const tpvBAN          = sumarMonto(ingresos.filter(i => i.metodoPago === 'Tarjeta (TPV BAN)'));
   const dineroBanco     = totalVendido - efectivoEntrada;
   const totalGastos     = sumarMonto(gastos);
   const balanceCaja     = efectivoEntrada - totalGastos;
@@ -81,6 +83,19 @@ export default function CorteDia() {
             <span>💳 Banco: ${dineroBanco.toFixed(2)}</span>
             <span>💵 Efec: ${efectivoEntrada.toFixed(2)}</span>
         </div>
+
+        {/* 📊 MINI-DESGLOSE TÉCNICO DE TERMINALES */}
+        <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-y-1 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+            <div className="flex justify-between pr-2 border-r border-slate-100">
+                <span className="text-sky-600">MP:</span>
+                <span className="text-slate-700">${tpvMP.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between pl-2">
+                <span className="text-emerald-700">BAN:</span>
+                <span className="text-slate-700">${tpvBAN.toFixed(2)}</span>
+            </div>
+        </div>
+
       </div>
 
       {/* Tarjeta 2: Salidas (Gastos) */}
