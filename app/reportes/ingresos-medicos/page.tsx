@@ -7,6 +7,8 @@ import { getMedicosAction, enviarCorteMedicoAction } from "../../../lib/actions"
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
 import { toast } from "sonner";
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { LiquidacionMedicoPDF } from '../../../components/documents/LiquidacionMedicoPDF';
 
 export default function ReporteIngresosMedicos() {
   const [medicos, setMedicos] = useState<any[]>([]);
@@ -24,7 +26,13 @@ export default function ReporteIngresosMedicos() {
   const [movimientos, setMovimientos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [enviando, setEnviando] = useState(false);
-  const [resumen, setResumen] = useState({ cobrado: 0, comisionSansce: 0, aPagarMedico: 0 });
+  const [resumen, setResumen] = useState({ 
+    cobrado: 0, 
+    comisionSansce: 0, 
+    aPagarMedico: 0,
+    tpvMP: 0,  // 🎯 Añadir esto
+    tpvBAN: 0  // 🎯 Añadir esto
+});
 
   // 1. Cargar médicos
   useEffect(() => {
@@ -41,7 +49,7 @@ export default function ReporteIngresosMedicos() {
     
     setLoading(true);
     setMovimientos([]);
-    setResumen({ cobrado: 0, comisionSansce: 0, aPagarMedico: 0 });
+    setResumen({ cobrado: 0, comisionSansce: 0, aPagarMedico: 0, tpvMP: 0, tpvBAN: 0 });
 
     try {
       const medicoSelected = medicos.find(m => m.id === medicoId);
@@ -101,15 +109,25 @@ export default function ReporteIngresosMedicos() {
       // 🟢 3. CÁLCULO MATEMÁTICO BLINDADO
       // Realizamos la suma una vez que tenemos todos los datos finales
       const totalCobradoReal = resultadosFiltrados.reduce((acc, curr) => acc + curr.monto, 0);
-      const comision = totalCobradoReal * porcentaje;
-      const aPagar = totalCobradoReal - comision;
+      // 🧠 Cálculo de desgloses específicos por terminal
+      const totalMP = resultadosFiltrados
+          .filter(r => r.formaPago === 'Tarjeta (TPV MP)')
+          .reduce((acc, curr) => acc + curr.monto, 0);
+
+      const totalBAN = resultadosFiltrados
+          .filter(r => r.formaPago === 'Tarjeta (TPV BAN)')
+          .reduce((acc, curr) => acc + curr.monto, 0);
+            const comision = totalCobradoReal * porcentaje;
+            const aPagar = totalCobradoReal - comision;
 
       // 🟢 4. ACTUALIZACIÓN DE INTERFAZ
       setMovimientos(resultadosFiltrados);
       setResumen({
-        cobrado: totalCobradoReal,
-        comisionSansce: comision,
-        aPagarMedico: aPagar
+          cobrado: totalCobradoReal,
+          comisionSansce: comision,
+          aPagarMedico: aPagar,
+          tpvMP: totalMP,
+          tpvBAN: totalBAN
       });
 
       if (resultadosFiltrados.length === 0) {
@@ -136,15 +154,17 @@ export default function ReporteIngresosMedicos() {
     setEnviando(true);
     try {
         const resultado = await enviarCorteMedicoAction({
-            medicoNombre: medico.nombre,
-            medicoEmail: medico.email,
-            periodo: `${fechaInicio} al ${fechaFin}`,
-            resumen: { 
-                cobrado: resumen.cobrado, 
-                comision: resumen.comisionSansce, 
-                pagar: resumen.aPagarMedico 
-            },
-            movimientos: movimientos
+          medicoNombre: medico.nombre,
+          medicoEmail: medico.email,
+          periodo: `${fechaInicio} al ${fechaFin}`,
+          resumen: { 
+              cobrado: resumen.cobrado, 
+              comision: resumen.comisionSansce, 
+              pagar: resumen.aPagarMedico,
+              tpvMP: resumen.tpvMP,   // 🎯 Enviar desglose al correo
+              tpvBAN: resumen.tpvBAN  // 🎯 Enviar desglose al correo
+          },
+          movimientos: movimientos
         });
 
         if (resultado.success) {
@@ -225,10 +245,34 @@ export default function ReporteIngresosMedicos() {
                       <p className="text-xs font-bold text-indigo-500 uppercase">A Pagar al Médico</p>
                       <p className="text-4xl font-extrabold text-indigo-700 mt-2">${resumen.aPagarMedico.toLocaleString()}</p>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="bg-sky-50 border border-sky-100 p-3 rounded-lg flex justify-between items-center">
+                          <span className="text-[10px] font-black text-sky-600 uppercase">Total TPV MP</span>
+                          <span className="text-lg font-bold text-sky-700">${resumen.tpvMP.toLocaleString()}</span>
+                      </div>
+                      <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-lg flex justify-between items-center">
+                          <span className="text-[10px] font-black text-emerald-600 uppercase">Total TPV BAN</span>
+                          <span className="text-lg font-bold text-emerald-700">${resumen.tpvBAN.toLocaleString()}</span>
+                      </div>
+                  </div>
+
               </div>
 
               {/* BOTÓN DE ENVÍO DE CORREO */}
-              <div className="flex justify-end mb-4">
+              <div className="flex justify-end gap-3 mb-4">
+                  <PDFDownloadLink
+                      document={<LiquidacionMedicoPDF datos={{
+                          medicoNombre: medicos.find(m => m.id === medicoId)?.nombre,
+                          periodo: `${fechaInicio} al ${fechaFin}`,
+                          resumen: resumen,
+                          movimientos: movimientos
+                      }} />}
+                      fileName={`Liquidacion_${medicoId}_${fechaInicio}.pdf`}
+                      className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-6 rounded-lg shadow flex items-center gap-2"
+                  >
+                      {({ loading }) => (loading ? "Generando PDF..." : "📄 Descargar PDF")}
+                  </PDFDownloadLink>
                  <button 
                     onClick={handleEnviarCorreo}
                     disabled={enviando}
