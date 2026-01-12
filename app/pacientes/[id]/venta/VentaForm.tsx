@@ -23,6 +23,8 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const { user } = useAuth() as any;
+  const [tieneRFC, setTieneRFC] = useState(false);
+  const [requiereFactura, setRequiereFactura] = useState(false);
   
   // Estados del Formulario
   const [servicioSku, setServicioSku] = useState("");
@@ -134,6 +136,10 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
               const pSnap = await getDoc(doc(db, "pacientes", pacienteId));
               if (pSnap.exists()) {
                   const pData = pSnap.data();
+                  // ✅ DETECTAR RFC Y SUGERIR FACTURA
+                  const rfcEnExpediente = !!(pData.datosFiscales?.rfc || pData.rfc);
+                  setTieneRFC(rfcEnExpediente);
+                  setRequiereFactura(rfcEnExpediente);
                   // Si el paciente tiene un convenio guardado...
                   if (pData.convenioId) {
                       setDescuentoId(pData.convenioId);
@@ -166,12 +172,10 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
     try {
       const pDoc = await getDoc(doc(db, "pacientes", pacienteId));
       let pNombre = "Desconocido";
-      let requiereFactura = false;
 
       if (pDoc.exists()) {
           const dataPac = pDoc.data();
           pNombre = dataPac.nombreCompleto;
-          if (dataPac.datosFiscales?.rfc) requiereFactura = true;
       }
 
       const medicoElegido = medicos.find(m => m.id === medicoId);
@@ -414,6 +418,29 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
                 </div>
             </div>
           )}
+
+          {/* ✅ BLOQUE DE DOBLE CHECK PARA FACTURA */}
+          <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                      type="checkbox" 
+                      checked={requiereFactura} 
+                      onChange={(e) => setRequiereFactura(e.target.checked)}
+                      className="w-5 h-5 rounded border-slate-300 text-blue-600"
+                  />
+                  <span className="text-sm font-bold text-slate-700 uppercase">¿Generar Factura?</span>
+              </label>
+
+              {tieneRFC ? (
+                  <span className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded font-black border border-green-200 uppercase">
+                      RFC Registrado
+                  </span>
+              ) : (
+                  <span className="text-[10px] bg-amber-100 text-amber-600 px-2 py-1 rounded font-black border border-amber-200 uppercase">
+                      Sin Datos Fiscales
+                  </span>
+              )}
+          </div>
 
           <div className="flex gap-4 pt-4">
             <button type="button" onClick={() => router.back()} className="flex-1 py-3 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>

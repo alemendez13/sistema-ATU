@@ -167,12 +167,17 @@ export default function FinanzasPage() {
                                   <tr key={op.id} className={`${bgClass} hover:bg-slate-100 transition-colors`}>
                                       <td className="p-4 font-bold text-slate-800">{op.pacienteNombre}</td>
                                       <td className="p-4">
-                                          <span className="bg-white text-blue-700 px-2 py-1 rounded text-[10px] font-bold border border-blue-100">
-                                              {op.servicioNombre}
-                                          </span>
-                                      </td>
-                                      <td className="p-4 text-xs font-bold text-slate-600 uppercase">
-                                          {op.doctorNombre || "N/A"}
+                                          <div className="flex flex-col gap-1">
+                                              <span className="bg-white text-blue-700 px-2 py-1 rounded text-[10px] font-bold border border-blue-100 w-fit">
+                                                  {op.servicioNombre}
+                                              </span>
+                                              {/* ✅ AGREGADO: Aviso visual para el cajero */}
+                                              {op.requiereFactura && (
+                                                  <span className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1">
+                                                      📄 Requiere Factura
+                                                  </span>
+                                              )}
+                                          </div>
                                       </td>
                                       <td className="p-4 font-mono text-base font-bold text-slate-900">
                                           {formatCurrency(op.monto)}

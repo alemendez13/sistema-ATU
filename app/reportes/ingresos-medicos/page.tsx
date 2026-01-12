@@ -72,39 +72,21 @@ export default function ReporteIngresosMedicos() {
       // 🧠 MEMORIA TEMPORAL (Caché de Pacientes para búsqueda de RFC)
       const cachePacientes: Record<string, any> = {};
 
-      // 🟢 2. PROCESAMIENTO DE FILAS Y ENRIQUECIMIENTO
-      const promesas = snapshot.docs.map(async (docOp) => {
+      // 🟢 2. PROCESAMIENTO VELOZ (Sustituye todo el bloque anterior)
+      const resultadosFiltrados = snapshot.docs.map((docOp) => {
         const data = docOp.data();
-        let pideFactura = "No";
         
-        if (data.pacienteId && data.pacienteId !== "EXTERNO") {
-            try {
-                if (!cachePacientes[data.pacienteId]) {
-                    const pacRef = doc(db, "pacientes", data.pacienteId);
-                    cachePacientes[data.pacienteId] = getDoc(pacRef).then(snap => snap.exists() ? snap.data() : null);
-                }
-                const pData = await cachePacientes[data.pacienteId];
-                if (pData?.datosFiscales?.rfc && pData.datosFiscales.rfc.length > 10) {
-                    pideFactura = "Sí";
-                }
-            } catch (e) { console.warn("Error verificando factura", e); }
-        }
-
-        // Devolvemos el objeto procesado (El monto se suma después para evitar errores)
         return {
             id: docOp.id,
-            fecha: data.fechaCita || "S/F", // 🎯 Usamos la fecha de la cita para el reporte
+            fecha: data.fechaCita || "S/F",
             paciente: data.pacienteNombre,
             concepto: data.servicioNombre,
             formaPago: data.metodoPago || (Number(data.monto) === 0 ? "Cortesía" : "No especificado"),
-            factura: pideFactura,
+            // Usamos "as any" para evitar el error de TypeScript que viste antes
+            factura: (data as any).requiereFactura ? "Sí" : "No",
             monto: Number(data.monto) || 0
         };
       });
-
-      // Esperamos a que terminen todas las búsquedas de RFC
-      const resultadosPrevios = await Promise.all(promesas);
-      const resultadosFiltrados = resultadosPrevios.filter(r => r !== null);
 
       // 🟢 3. CÁLCULO MATEMÁTICO BLINDADO
       // Realizamos la suma una vez que tenemos todos los datos finales
