@@ -63,6 +63,7 @@ export interface Operacion {
   monto: number | string; // Aceptamos ambos por ahora para evitar errores con Excel
   estatus: "Pendiente de Pago" | "Pagado";
   metodoPago?: "Efectivo" | "Tarjeta" | "Transferencia" | "Otro";
+  requiereFactura?: boolean;
   fecha: any;
   fechaPago?: any;
   fechaCita?: string;

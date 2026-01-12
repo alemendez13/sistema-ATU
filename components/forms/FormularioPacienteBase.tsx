@@ -50,6 +50,26 @@ export default function FormularioPacienteBase({
   const [duplicado, setDuplicado] = React.useState<{ id: string, nombre: string } | null>(null);
   const [ultimaBusqueda, setUltimaBusqueda] = React.useState<Record<string, string>>({});
 
+    const nombreWatch = watch("nombres");
+  const apellidoPWatch = watch("apellidoPaterno");
+  const curpWatch = watch("curp");
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+        if (nombreWatch && apellidoPWatch) {
+            validarDuplicado("nombreCompleto", `${nombreWatch} ${apellidoPWatch}`.toUpperCase());
+        }
+    }, 800); // Espera 800ms de silencio para buscar
+    return () => clearTimeout(timer);
+  }, [nombreWatch, apellidoPWatch]);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+        if (curpWatch) validarDuplicado("curp", curpWatch.toUpperCase());
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [curpWatch]);
+
   const validarDuplicado = async (campo: string, valor: string) => {
     const valorLimpio = valor.trim().toUpperCase();
     
@@ -98,7 +118,6 @@ export default function FormularioPacienteBase({
                 <input 
                     className={inputStyle} 
                     {...register("nombres", { required: true })} 
-                    onBlur={(e) => validarDuplicado("nombres", e.target.value)}
                 />
             </div>
             <div>
@@ -106,7 +125,6 @@ export default function FormularioPacienteBase({
                 <input 
                     className={inputStyle} 
                     {...register("apellidoPaterno", { required: true })} 
-                    onBlur={(e) => validarDuplicado("apellidoPaterno", e.target.value)}
                 />
             </div>
             <div><label className={labelStyle}>Apellido Materno</label><input className={inputStyle} {...register("apellidoMaterno")} /></div>
@@ -166,7 +184,6 @@ export default function FormularioPacienteBase({
                 <input 
                     className={inputStyle} 
                     {...register("curp")} 
-                    onBlur={(e) => validarDuplicado("curp", e.target.value)}
                     placeholder="18 CARACTERES" 
                 />
           </div>

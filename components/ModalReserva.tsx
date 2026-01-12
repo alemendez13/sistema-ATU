@@ -261,6 +261,7 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
       // 4. OPERACIÓN FINANCIERA (Reporte Ingresos)
       await addDoc(collection(db, "operaciones"), {
         pacienteId: idFinal, pacienteNombre: nombreFinal,
+        requiereFactura: requiereFactura,
         servicioSku: servicioDetalle?.sku, servicioNombre: tituloCita,
         monto: Number(precioFinal), 
         montoOriginal: cleanPrice(servicioDetalle?.precio),
@@ -311,7 +312,8 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
                     <input type="text" className="w-full border rounded p-3 uppercase" placeholder="Nombre del paciente..." value={busqueda} onChange={e => {setBusqueda(e.target.value); setPacienteSeleccionado(null);}} />
                     {resultados.length > 0 && !pacienteSeleccionado && (
                         <ul className="absolute z-10 w-full bg-white border rounded shadow-xl mt-1 max-h-40 overflow-y-auto">
-                            {resultados.map(p => <li key={p.id} className="p-3 hover:bg-blue-50 cursor-pointer border-b text-sm font-bold" onClick={() => {setPacienteSeleccionado(p); setBusqueda(p.nombreCompleto); setResultados([]); if(p.convenioId) setDescuentoId(p.convenioId);}}>{p.nombreCompleto}</li>)}
+                            {resultados.map(p => <li key={p.id} className="p-3 hover:bg-blue-50 cursor-pointer border-b text-sm font-bold" onClick={() => {setPacienteSeleccionado(p); setBusqueda(p.nombreCompleto); setResultados([]); if(p.convenioId) setDescuentoId(p.convenioId);const tieneRFC = !!(p.datosFiscales?.rfc || p.rfc);
+                            setRequiereFactura(tieneRFC);}}>{p.nombreCompleto}</li>)}
                         </ul>
                     )}
                 </div>

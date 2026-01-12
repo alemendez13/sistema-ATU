@@ -191,6 +191,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
       await addDoc(collection(db, "operaciones"), {
         pacienteId: docRef.id,
         pacienteNombre: nombreConstruido,
+        requiereFactura: requiereFactura,
         servicioSku: servicioSeleccionado.sku,
         servicioNombre: servicioSeleccionado.nombre,
         monto: montoFinal, 
