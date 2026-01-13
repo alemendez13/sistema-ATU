@@ -133,7 +133,7 @@ const onSubmit = async (data: any) => {
   setIsSubmitting(true);
 
   try {
-    // 1. VERIFICAR INVENTARIO (Si aplica)
+    // 1. VERIFICAR INVENTARIO (Regla Original VSC)
     if (servicioSeleccionado.tipo === "Producto") {
       const check = await verificarStock(servicioSeleccionado.sku, 1);
       if (!check.suficiente) { 
@@ -141,36 +141,33 @@ const onSubmit = async (data: any) => {
         setIsSubmitting(false); 
         return; 
       }
-      await descontarStockPEPS(servicioSeleccionado.sku, servicioSeleccionado.nombre, 1);
     }
 
-    // 2. SUBIR FOTO (Si hay)
+    // 2. PROCESAR FOTO (Regla Original VSC)
     let fotoUrl = null;
     if (fotoFile) {
         const snap = await uploadBytes(ref(storage, `pacientes/fotos/${Date.now()}_${fotoFile.name}`), fotoFile);
         fotoUrl = await getDownloadURL(snap.ref);
     }
 
-    // 3. TRANSACCIÓN MAESTRA: GENERAR FOLIO Y GUARDAR EXPEDIENTE
+    // 3. TRANSACCIÓN MAESTRA (Folio + Registro de Paciente en un solo paso)
     const counterRef = doc(db, "metadata", "pacientes_control");
     const nombreConstruido = superNormalize(`${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno || ''}`);
     
-    // Usamos runTransaction importado de firebase-guard
     const result = await runTransaction(db, async (transaction: Transaction) => {
       const counterDoc = await transaction.get(counterRef);
       if (!counterDoc.exists()) throw new Error("Contador no inicializado en Firebase");
 
       const nuevoNumero = (counterDoc.data().ultimoFolio || 0) + 1;
-      const añoActual = new Date().getFullYear();
-      const folioExpediente = `SANSCE-${añoActual}-${nuevoNumero.toString().padStart(4, '0')}`;
+      const folioExpediente = `SANSCE-${new Date().getFullYear()}-${nuevoNumero.toString().padStart(4, '0')}`;
 
-      // Actualizamos el contador global
+      // A. Actualizamos el contador
       transaction.update(counterRef, { ultimoFolio: nuevoNumero });
 
-      // Preparamos el expediente
+      // B. Preparamos el expediente (Incluyendo 'tutor' para paridad con web)
       const patientData = {
         ...data,
-        folioExpediente, // <--- ASIGNACIÓN DE FOLIO ÚNICO
+        folioExpediente,
         nombreCompleto: nombreConstruido,
         searchKeywords: generateSearchTags(nombreConstruido),
         edad: age || 0,
@@ -179,16 +176,24 @@ const onSubmit = async (data: any) => {
         telefonoCelular: listaTelefonos[0] || "", 
         convenioId: descuentoSeleccionado?.id || null,
         fechaRegistro: serverTimestamp(),
-        origen: "mostrador_clinica"
+        origen: "mostrador_clinica",
+        tutor: data.tutor || null
       };
 
+      // C. Guardamos al paciente DENTRO de la transacción (Seguridad Máxima)
       const newPacRef = doc(collection(db, "pacientes"));
       transaction.set(newPacRef, patientData);
 
       return { id: newPacRef.id, folio: folioExpediente };
     });
 
-    // 4. AGENDA (Google + Firebase) - Usamos el ID generado en la transacción
+    // 4. DESCONTAR STOCK (Mejora: Ahora con Folio para Trazabilidad)
+    if (servicioSeleccionado.tipo === "Producto") {
+      // @ts-ignore
+      await descontarStockPEPS(servicioSeleccionado.sku, servicioSeleccionado.nombre, 1, result.folio);
+    }
+
+    // 5. AGENDA (Google + Firebase) - RECUPERADO: 'esTodoElDia'
     if (esServicioMedico && selectedMedicoId) {
         const medicoObj = medicos.find(m => m.id === selectedMedicoId);
         const resGoogle = await agendarCitaGoogle({
@@ -199,14 +204,14 @@ const onSubmit = async (data: any) => {
             pacienteNombre: nombreConstruido,
             motivo: (esLaboratorio ? "🔬 LAB: " : "🩺 ") + servicioSeleccionado.nombre,
             duracionMinutos: parseInt(servicioSeleccionado?.duracion || "30"),
-            esTodoElDia: esLaboratorio && !data.horaCita
+            esTodoElDia: esLaboratorio && !data.horaCita // <-- RESTAURADO
         });
 
         await addDoc(collection(db, "citas"), {
             doctorId: medicoObj.id,
             doctorNombre: medicoObj.nombre,
             paciente: nombreConstruido,
-            pacienteId: result.id, // ID de la transacción
+            pacienteId: result.id, 
             fecha: data.fechaCita,
             hora: data.horaCita,
             creadoEn: new Date(),
@@ -215,19 +220,20 @@ const onSubmit = async (data: any) => {
         });
     }
 
-    // 5. OPERACIÓN FINANCIERA (Reporte Ingresos)
+    // 6. OPERACIÓN FINANCIERA - RECUPERADO: 'esCita' y 'descuentoAplicado'
     await addDoc(collection(db, "operaciones"), {
       pacienteId: result.id,
       pacienteNombre: nombreConstruido,
-      requiereFactura: requiereFactura,
+      folioPaciente: result.folio, // Mejora de trazabilidad
+      requiereFactura,
       servicioSku: servicioSeleccionado.sku,
       servicioNombre: servicioSeleccionado.nombre,
       monto: montoFinal, 
       montoOriginal: cleanPrice(servicioSeleccionado.precio),
-      descuentoAplicado: descuentoSeleccionado?.nombre || null,
+      descuentoAplicado: descuentoSeleccionado?.nombre || null, // <-- RESTAURADO
       fecha: serverTimestamp(),
       estatus: montoFinal === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago", 
-      esCita: esServicioMedico,
+      esCita: esServicioMedico, // <-- RESTAURADO
       doctorNombre: medicos.find(m => m.id === selectedMedicoId)?.nombre || null
     });
     
@@ -235,7 +241,7 @@ const onSubmit = async (data: any) => {
     router.push('/pacientes'); 
 
   } catch (e: any) { 
-    console.error(e);
+    console.error(e); // <-- RESTAURADO (Para diagnóstico VSC)
     toast.error("Error en registro: " + e.message); 
   } finally { 
     setIsSubmitting(false); 
