@@ -26,36 +26,33 @@ export default function FinanzasPage() {
   }, [verCarteraVencida, user]); // ✅ Añadimos 'user' aquí 
 
   const cargarPendientes = async () => {
-    setLoading(true);
-    try {
-      const hoyISO = new Date().toLocaleDateString('en-CA'); // "YYYY-MM-DD" local
+  setLoading(true);
+  try {
+    const hoyISO = new Date().toLocaleDateString('en-CA'); // Formato "YYYY-MM-DD"
 
-      const q = query(
-        collection(db, "operaciones"),
-        where("estatus", "==", "Pendiente de Pago"),
-        where("fechaCita", verCarteraVencida ? "<" : "==", hoyISO), 
-        orderBy("fechaCita", "desc"), 
-        orderBy("doctorNombre", "asc") 
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const docs = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Operacion[];
+    const q = query(
+      collection(db, "operaciones"),
+      where("estatus", "==", "Pendiente de Pago"),
+      // Mantenemos tu diseño: Filtramos por la fecha de la CITA
+      where("fechaCita", verCarteraVencida ? "<" : "==", hoyISO), 
+      orderBy("fechaCita", "desc"),
+      orderBy("doctorNombre", "asc")
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const docs = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as Operacion[];
 
-      setPendientes(docs);
-    } catch (error: any) {
-      // Si el error es por permisos denegados al salir, no lo mostramos como error fatal
-      if (error.code !== 'permission-denied') {
-        console.error("Error cargando finanzas:", error);
-        toast.error("Error al filtrar la cobranza.");
-      }
-    }
-      finally {
-      setLoading(false);
-    }
-  };
+    setPendientes(docs);
+  } catch (error: any) {
+    console.error("Error en finanzas:", error);
+    toast.error("Error al cargar la cobranza.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleCobrar = async (id: string, metodo: string, op: Operacion) => {
     if(!confirm(`¿Confirmas recibir el pago en ${metodo}?`)) return;
@@ -149,8 +146,8 @@ export default function FinanzasPage() {
                                 <th className="p-4">Servicio</th>
                                 <th className="p-4">Responsable</th>
                                 <th className="p-4">Monto</th>
-                                <th className="p-4">Fecha Solicitud</th>
-                                <th className="p-4">Fecha Cita</th>
+                                <th className="p-4 text-center">Registro</th>
+                                <th className="p-4 text-center">Fecha Cita</th>
                                 <th className="p-4 text-right">Acción (Cobrar)</th>
                             </tr>
                         </thead>
@@ -179,18 +176,31 @@ export default function FinanzasPage() {
                                               )}
                                           </div>
                                       </td>
+                                      <td className="p-4 font-medium text-slate-700">
+                                          {op.doctorNombre || "No asignado"}
+                                      </td>
                                       <td className="p-4 font-mono text-base font-bold text-slate-900">
                                           {formatCurrency(op.monto)}
                                       </td>
                                       
-                                      {/* 👇 CELDA 5: FECHA SOLICITUD (Registro) */}
-                                      <td className="p-4 text-[10px] text-slate-400 font-mono">
+                                      {/* Registro (Trazabilidad) */}
+                                      <td className="p-4 text-[10px] text-slate-400 font-mono text-center">
                                         {formatDate(op.fecha)}
                                       </td>
-                                      {/* 👇 CELDA 6: FECHA CITA (Para el filtro) */}
-                                      <td className="p-4 text-[11px] text-blue-600 font-black font-mono">
-                                        {op.fechaCita || "S/F"}
+
+                                      {/* Fecha de la Cita (Control de Cobro) */}
+                                      <td className="p-4 text-center">
+                                        {op.fechaCita ? (
+                                          <span className="text-[11px] text-blue-600 font-black font-mono bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                                            {op.fechaCita}
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] text-red-500 font-bold animate-pulse">
+                                            ⚠️ SIN FECHA CITA
+                                          </span>
+                                        )}
                                       </td>
+                                      
                                       {/* 👇 CELDA 7: ACCIONES DE COBRO */}
 
                                       <td className="p-4">
