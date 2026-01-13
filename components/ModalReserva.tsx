@@ -217,15 +217,30 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
               const snap = await uploadBytes(ref(storage, `pacientes/fotos/${Date.now()}_${fotoFile.name}`), fotoFile);
               fotoUrl = await getDownloadURL(snap.ref);
           }
+          const { 
+            razonSocial, rfc, regimenFiscal, usoCFDI, cpFiscal, emailFacturacion, tipoPersona,
+            ...datosRestantes 
+          } = formData;
+
           const patientData = {
-              ...formData,
+              ...datosRestantes,
               nombreCompleto: nombreFinal,
               searchKeywords: generateSearchTags(nombreFinal),
               fotoUrl,
               telefonos: listaTelefonos.filter(t => t.trim() !== ""),
-              telefonoCelular: listaTelefonos[0] || "", // ✅ Dualidad de datos
+              telefonoCelular: listaTelefonos[0] || "",
               convenioId: descuentoSeleccionado?.id || null,
               fechaRegistro: serverTimestamp(),
+              // Inyección de lógica fiscal corregida
+              datosFiscales: requiereFactura ? {
+                  tipoPersona: tipoPersona || "Fisica",
+                  razonSocial: razonSocial?.toUpperCase(),
+                  rfc: rfc?.toUpperCase(),
+                  regimenFiscal: regimenFiscal,
+                  usoCFDI: usoCFDI,
+                  cpFiscal: cpFiscal,
+                  emailFacturacion: emailFacturacion,
+              } : null
           };
           const docPac = await addDoc(collection(db, "pacientes"), patientData);
           idFinal = docPac.id;

@@ -165,8 +165,13 @@ const onSubmit = async (data: any) => {
       transaction.update(counterRef, { ultimoFolio: nuevoNumero });
 
       // B. Preparamos el expediente (Incluyendo 'tutor' para paridad con web)
+      const { 
+        razonSocial, rfc, regimenFiscal, usoCFDI, cpFiscal, emailFacturacion, tipoPersona,
+        ...datosLimpios 
+      } = data;
+
       const patientData = {
-        ...data,
+        ...datosLimpios,
         folioExpediente,
         nombreCompleto: nombreConstruido,
         searchKeywords: generateSearchTags(nombreConstruido),
@@ -177,7 +182,17 @@ const onSubmit = async (data: any) => {
         convenioId: descuentoSeleccionado?.id || null,
         fechaRegistro: serverTimestamp(),
         origen: "mostrador_clinica",
-        tutor: data.tutor || null
+        tutor: data.tutor || null,
+        // Agrupación correcta de datos fiscales
+        datosFiscales: requiereFactura ? {
+            tipoPersona: tipoPersona || "Fisica",
+            razonSocial: razonSocial?.toUpperCase(),
+            rfc: rfc?.toUpperCase(),
+            regimenFiscal: regimenFiscal,
+            usoCFDI: usoCFDI,
+            cpFiscal: cpFiscal,
+            emailFacturacion: emailFacturacion,
+        } : null
       };
 
       // C. Guardamos al paciente DENTRO de la transacción (Seguridad Máxima)
