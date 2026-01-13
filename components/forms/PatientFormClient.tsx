@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { collection, addDoc, serverTimestamp } from "@/lib/firebase-guard";
+import { collection, addDoc, serverTimestamp, doc, runTransaction } from "@/lib/firebase-guard";
+import { Transaction } from "firebase/firestore";
 import { db, storage } from "../../lib/firebase";
 import { useRouter } from "next/navigation";
 import { verificarStock, descontarStockPEPS } from "../../lib/inventoryController";
@@ -122,92 +123,124 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
   const actualizarTelefono = (i: number, v: string) => { const n = [...listaTelefonos]; n[i] = v; setListaTelefonos(n); };
   const eliminarTelefono = (i: number) => { if (listaTelefonos.length > 1) setListaTelefonos(listaTelefonos.filter((_, idx) => idx !== i)); };
 
-  const onSubmit = async (data: any) => {
-    if (!servicioSeleccionado) return toast.warning("Selecciona un servicio.");
-    if (esServicioMedico && !selectedMedicoId) return toast.warning("Selecciona un Profesional.");
-    if (esServicioMedico && !esLaboratorio && (!data.fechaCita || !data.horaCita)) return toast.error("Faltan datos de la cita.");
+  // components/forms/PatientFormClient.tsx
 
-    setIsSubmitting(true);
-    try {
-      // 1. INVENTARIO
-      if (servicioSeleccionado.tipo === "Producto") {
-        const check = await verificarStock(servicioSeleccionado.sku, 1);
-        if (!check.suficiente) { toast.error("Stock insuficiente."); setIsSubmitting(false); return; }
-        await descontarStockPEPS(servicioSeleccionado.sku, servicioSeleccionado.nombre, 1);
+const onSubmit = async (data: any) => {
+  if (!servicioSeleccionado) return toast.warning("Selecciona un servicio.");
+  if (esServicioMedico && !selectedMedicoId) return toast.warning("Selecciona un Profesional.");
+  if (esServicioMedico && !esLaboratorio && (!data.fechaCita || !data.horaCita)) return toast.error("Faltan datos de la cita.");
+
+  setIsSubmitting(true);
+
+  try {
+    // 1. VERIFICAR INVENTARIO (Si aplica)
+    if (servicioSeleccionado.tipo === "Producto") {
+      const check = await verificarStock(servicioSeleccionado.sku, 1);
+      if (!check.suficiente) { 
+        toast.error("Stock insuficiente."); 
+        setIsSubmitting(false); 
+        return; 
       }
+      await descontarStockPEPS(servicioSeleccionado.sku, servicioSeleccionado.nombre, 1);
+    }
 
-      // 2. FOTOS
-      let fotoUrl = null;
-      if (fotoFile) {
-          const snap = await uploadBytes(ref(storage, `pacientes/fotos/${Date.now()}_${fotoFile.name}`), fotoFile);
-          fotoUrl = await getDownloadURL(snap.ref);
-      }
+    // 2. SUBIR FOTO (Si hay)
+    let fotoUrl = null;
+    if (fotoFile) {
+        const snap = await uploadBytes(ref(storage, `pacientes/fotos/${Date.now()}_${fotoFile.name}`), fotoFile);
+        fotoUrl = await getDownloadURL(snap.ref);
+    }
 
-      // 3. TRAZABILIDAD DE DATOS (Expediente)
+    // 3. TRANSACCIÓN MAESTRA: GENERAR FOLIO Y GUARDAR EXPEDIENTE
+    const counterRef = doc(db, "metadata", "pacientes_control");
     const nombreConstruido = superNormalize(`${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno || ''}`);
+    
+    // Usamos runTransaction importado de firebase-guard
+    const result = await runTransaction(db, async (transaction: Transaction) => {
+      const counterDoc = await transaction.get(counterRef);
+      if (!counterDoc.exists()) throw new Error("Contador no inicializado en Firebase");
+
+      const nuevoNumero = (counterDoc.data().ultimoFolio || 0) + 1;
+      const añoActual = new Date().getFullYear();
+      const folioExpediente = `SANSCE-${añoActual}-${nuevoNumero.toString().padStart(4, '0')}`;
+
+      // Actualizamos el contador global
+      transaction.update(counterRef, { ultimoFolio: nuevoNumero });
+
+      // Preparamos el expediente
       const patientData = {
-          ...data,
-          nombreCompleto: nombreConstruido,
-          searchKeywords: generateSearchTags(nombreConstruido),
-          edad: age || 0,
-          fotoUrl,
-          // ✅ Trazabilidad Dual de Teléfonos
-          telefonos: listaTelefonos.filter(t => t.trim() !== ""),
-          telefonoCelular: listaTelefonos[0] || "", 
-          convenioId: descuentoSeleccionado?.id || null,
-          fechaRegistro: serverTimestamp(),
+        ...data,
+        folioExpediente, // <--- ASIGNACIÓN DE FOLIO ÚNICO
+        nombreCompleto: nombreConstruido,
+        searchKeywords: generateSearchTags(nombreConstruido),
+        edad: age || 0,
+        fotoUrl,
+        telefonos: listaTelefonos.filter(t => t.trim() !== ""),
+        telefonoCelular: listaTelefonos[0] || "", 
+        convenioId: descuentoSeleccionado?.id || null,
+        fechaRegistro: serverTimestamp(),
+        origen: "mostrador_clinica"
       };
-      
-      const docRef = await addDoc(collection(db, "pacientes"), patientData);
 
-      // 4. AGENDA (Google + Firebase)
-      if (esServicioMedico && selectedMedicoId) {
-          const medicoObj = medicos.find(m => m.id === selectedMedicoId);
-          const resGoogle = await agendarCitaGoogle({
-              calendarId: medicoObj.calendarId,
-              doctorNombre: medicoObj.nombre,
-              fecha: data.fechaCita,
-              hora: data.horaCita || "00:00",
-              pacienteNombre: nombreConstruido,
-              motivo: (esLaboratorio ? "🔬 LAB: " : "🩺 ") + servicioSeleccionado.nombre,
-              duracionMinutos: parseInt(servicioSeleccionado?.duracion || "30"),
-              esTodoElDia: esLaboratorio && !data.horaCita
-          });
+      const newPacRef = doc(collection(db, "pacientes"));
+      transaction.set(newPacRef, patientData);
 
-          await addDoc(collection(db, "citas"), {
-              doctorId: medicoObj.id,
-              doctorNombre: medicoObj.nombre,
-              paciente: nombreConstruido,
-              pacienteId: docRef.id,
-              fecha: data.fechaCita,
-              hora: data.horaCita,
-              creadoEn: new Date(),
-              googleEventId: resGoogle.googleEventId || null,
-              confirmada: true 
-          });
-      }
+      return { id: newPacRef.id, folio: folioExpediente };
+    });
 
-      // 5. OPERACIÓN FINANCIERA (Reporte Ingresos)
-      await addDoc(collection(db, "operaciones"), {
-        pacienteId: docRef.id,
-        pacienteNombre: nombreConstruido,
-        requiereFactura: requiereFactura,
-        servicioSku: servicioSeleccionado.sku,
-        servicioNombre: servicioSeleccionado.nombre,
-        monto: montoFinal, 
-        montoOriginal: cleanPrice(servicioSeleccionado.precio),
-        descuentoAplicado: descuentoSeleccionado?.nombre || null,
-        fecha: serverTimestamp(),
-        estatus: montoFinal === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago", 
-        esCita: esServicioMedico,
-        doctorNombre: medicos.find(m => m.id === selectedMedicoId)?.nombre || null
-      });
-      
-      toast.success("✅ Registro completo.");
-      router.push('/pacientes'); 
-    } catch (e: any) { toast.error("Error: " + e.message); } 
-    finally { setIsSubmitting(false); }
-  };
+    // 4. AGENDA (Google + Firebase) - Usamos el ID generado en la transacción
+    if (esServicioMedico && selectedMedicoId) {
+        const medicoObj = medicos.find(m => m.id === selectedMedicoId);
+        const resGoogle = await agendarCitaGoogle({
+            calendarId: medicoObj.calendarId,
+            doctorNombre: medicoObj.nombre,
+            fecha: data.fechaCita,
+            hora: data.horaCita || "00:00",
+            pacienteNombre: nombreConstruido,
+            motivo: (esLaboratorio ? "🔬 LAB: " : "🩺 ") + servicioSeleccionado.nombre,
+            duracionMinutos: parseInt(servicioSeleccionado?.duracion || "30"),
+            esTodoElDia: esLaboratorio && !data.horaCita
+        });
+
+        await addDoc(collection(db, "citas"), {
+            doctorId: medicoObj.id,
+            doctorNombre: medicoObj.nombre,
+            paciente: nombreConstruido,
+            pacienteId: result.id, // ID de la transacción
+            fecha: data.fechaCita,
+            hora: data.horaCita,
+            creadoEn: new Date(),
+            googleEventId: resGoogle.googleEventId || null,
+            confirmada: true 
+        });
+    }
+
+    // 5. OPERACIÓN FINANCIERA (Reporte Ingresos)
+    await addDoc(collection(db, "operaciones"), {
+      pacienteId: result.id,
+      pacienteNombre: nombreConstruido,
+      requiereFactura: requiereFactura,
+      servicioSku: servicioSeleccionado.sku,
+      servicioNombre: servicioSeleccionado.nombre,
+      monto: montoFinal, 
+      montoOriginal: cleanPrice(servicioSeleccionado.precio),
+      descuentoAplicado: descuentoSeleccionado?.nombre || null,
+      fecha: serverTimestamp(),
+      estatus: montoFinal === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago", 
+      esCita: esServicioMedico,
+      doctorNombre: medicos.find(m => m.id === selectedMedicoId)?.nombre || null
+    });
+    
+    toast.success(`✅ Registro completo. Folio: ${result.folio}`);
+    router.push('/pacientes'); 
+
+  } catch (e: any) { 
+    console.error(e);
+    toast.error("Error en registro: " + e.message); 
+  } finally { 
+    setIsSubmitting(false); 
+  }
+};
 
   const inputStyle = "w-full rounded-md border-slate-300 shadow-sm py-2 px-3 text-sm border";
   const labelStyle = "block text-xs font-bold text-slate-600 mb-1 uppercase";

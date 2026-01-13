@@ -13,6 +13,7 @@ import { toast } from "sonner";
 interface Paciente {
   id: string;
   nombreCompleto: string;
+  folioExpediente?: string;
   telefonoCelular: string;
   celular?: string; // Soporte legacy
   email: string;
@@ -303,8 +304,8 @@ function PacienteCard({ paciente, opcionesMensajes }: { paciente: Paciente, opci
 
       <div className="pt-3 border-t border-slate-50 space-y-3">
          <div className="flex justify-between items-center">
-            <span className="text-[10px] text-slate-300 font-mono tracking-tighter">
-               ID: {paciente.id.slice(0,6)}...
+            <span className="text-[10px] text-blue-600 font-bold font-mono tracking-tight bg-blue-50 px-2 py-0.5 rounded">
+              FOLIO: {paciente.folioExpediente || "S/F"}
             </span>
             <Link href={`/pacientes/${paciente.id}`} className="text-blue-600 text-xs font-bold hover:underline">
               Abrir Expediente →
