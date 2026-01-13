@@ -28,6 +28,7 @@ function calcularEdad(fechaNacimiento?: string) {
 function serializarPaciente(data: any): Paciente {
   return {
     ...data,
+    folioExpediente: data.folioExpediente || null,
     fechaNacimiento: typeof data.fechaNacimiento === 'string' ? data.fechaNacimiento : data.fechaNacimiento?.toDate?.().toISOString() || null,
     fechaRegistro: data.fechaRegistro?.toDate?.().toISOString() || null,
     datosFiscales: data.datosFiscales || null
@@ -178,7 +179,14 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
                 <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-900 mb-1">{datos.nombreCompleto}</h1>
-                        <p className="text-slate-400 text-sm">ID Interno: {datos.id}</p>
+                        <div className="flex items-center gap-3 mt-1">
+                            <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-1 rounded-md tracking-wider">
+                                FOLIO: {datos.folioExpediente || "S/F"}
+                            </span>
+                            <p className="text-slate-400 text-[10px] font-mono uppercase tracking-tighter">
+                                ID Técnico: {datos.id}
+                            </p>
+                        </div>
                     </div>
                     <div className="flex gap-2 text-sm">
                          <span className="bg-slate-100 px-3 py-1 rounded-full text-slate-600 font-medium">Edad: {edadReal} años</span>
