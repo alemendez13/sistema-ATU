@@ -249,6 +249,8 @@ const onSubmit = async (data: any) => {
       fecha: serverTimestamp(),
       estatus: montoFinal === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago", 
       esCita: esServicioMedico, // <-- RESTAURADO
+      fechaCita: data.fechaCita || null, 
+      horaCita: data.horaCita || null,
       doctorNombre: medicos.find(m => m.id === selectedMedicoId)?.nombre || null
     });
     
