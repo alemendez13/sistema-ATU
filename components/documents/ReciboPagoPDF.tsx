@@ -113,7 +113,7 @@ export default function ReciboPagoPDF({ folio, fecha, paciente, servicio, monto,
             <Text style={styles.companySub}>Salud y Nutrición Especializada</Text>
           </View>
           <View>
-            <Text style={{ fontSize: 10, color: 'gray' }}>Folio: {folio.slice(0,8).toUpperCase()}</Text>
+            <Text style={{ fontSize: 10, color: 'gray' }}>Folio: {folio}</Text>
             <Text style={{ fontSize: 10, color: 'gray' }}>{fecha}</Text>
           </View>
         </View>
