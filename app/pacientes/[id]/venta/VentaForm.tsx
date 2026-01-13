@@ -158,6 +158,8 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
   const handleVenta = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!servicioSku) return;
+
+    // Reglas de validación operativa
     if (esLaboratorio && !medicoId) {
         toast.error("⚠️ Es obligatorio asignar un responsable para el seguimiento de laboratorio.");
         return;
@@ -170,20 +172,24 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
     setLoading(true);
 
     try {
+      // 1. Obtención de datos del paciente para trazabilidad
       const pDoc = await getDoc(doc(db, "pacientes", pacienteId));
       let pNombre = "Desconocido";
+      let pSedeId = ""; // Inicializamos variable para capturar la sede 
 
       if (pDoc.exists()) {
           const dataPac = pDoc.data();
           pNombre = dataPac.nombreCompleto;
+          // Extraemos la sede necesaria para el inventario satélite 
+          pSedeId = dataPac.sedeId || ""; 
       }
 
       const medicoElegido = medicos.find(m => m.id === medicoId);
 
-      // Si no hay hora y es laboratorio, se marca como evento de todo el día
+      // Si no hay hora y es laboratorio, se marca como evento de todo el día en Google Calendar 
       const esTodoElDia = esLaboratorio && !horaCita;
 
-      // 3. Crear OPERACIÓN con Descuentos
+      // 2. Crear OPERACIÓN con Descuentos (Normalización Financiera) [cite: 14]
       // >>> INICIO: NORMALIZACIÓN DE OPERACIÓN FINANCIERA <<<
       const docRef = await addDoc(collection(db, "operaciones"), {
         pacienteId,
@@ -203,36 +209,40 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
         
         folioInterno: generateFolio("FIN-FR-09", ""), 
         fecha: serverTimestamp(),
-        // 🎯 Corrección: Si es 0, se marca como pagado para no ensuciar Cartera Vencida
+        // Si el precio es 0, se marca como pagado para no generar deuda histórica [cite: 14]
         estatus: Number(precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
         
         esCita: esServicio,
         doctorId: medicoId || null,
         doctorNombre: medicoElegido?.nombre || null,
-        fechaCita: fechaCita, // 📅 Asegurado como String "YYYY-MM-DD"
+        fechaCita: fechaCita, // Asegurado como String ISO para filtros [cite: 14]
         horaCita: horaCita || null
       });
-// >>> FIN: NORMALIZACIÓN <<<
+      // >>> FIN: NORMALIZACIÓN <<<
 
-      // 2. VINCULACIÓN DE FOLIO (Paso Final de Unificación)
-      // Usamos el ID real que Firebase acaba de darnos (docRef.id)
+      // 3. VINCULACIÓN DE FOLIO (Unificación de registro y archivo financiero) [cite: 14]
       await setDoc(doc(db, "operaciones", docRef.id), { 
         folioInterno: generateFolio("FIN-FR-09", docRef.id) 
       }, { merge: true });
 
-      // Descontar Stock si aplica
-      // Permitimos descuento si es Producto O si es un Laboratorio que tiene insumos registrados
+      // 4. Gestión de Inventario PEPS (Primeras Entradas, Primeras Salidas) 
+      // Se activa para productos físicos o laboratorios con insumos vinculados
       if (servicioSeleccionado && (servicioSeleccionado.tipo === "Producto" || servicioSeleccionado.tipo === "Laboratorio")) {
         try {
-            await descontarStockPEPS(servicioSeleccionado.sku, servicioSeleccionado.nombre, 1);
+            // CORRECCIÓN TÉCNICA: Se envía pSedeId extraído del documento del paciente
+            await descontarStockPEPS(
+                servicioSeleccionado.sku, 
+                servicioSeleccionado.nombre, 
+                1, 
+                pSedeId
+            );
         } catch (err) { 
-            // Si el error es "SinStock", significa que este lab no lleva control de inventario, 
-            // así que podemos ignorar el error o registrarlo.
+            // Control de inventarios satélite: algunos laboratorios no llevan control estricto [cite: 8]
             console.warn("No se descontó stock para este ítem:", err); 
         }
       }
 
-      // Agendar Google si aplica
+      // 5. Agendar en base de datos local y Google Calendar si es servicio 
       if (esServicio && medicoElegido) {
         await addDoc(collection(db, "citas"), {
             doctorId: medicoId,
@@ -263,8 +273,8 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
       router.push("/finanzas"); 
 
     } catch (error) {
-      console.error(error);
-      toast.error("Error al procesar");
+      console.error("Error en handleVenta:", error);
+      toast.error("Error al procesar la transacción");
     } finally {
       setLoading(false);
     }
