@@ -287,7 +287,7 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
                                             <div className="flex justify-center">
                                                 <DownloadReciboButton 
                                                     datos={{
-                                                        folio: (pago.id || "000").slice(0,8).toUpperCase(),
+                                                        folio: datos.folioExpediente || (pago.id || "000").slice(0,8).toUpperCase(),
                                                         fecha: pago.fecha?.seconds ? new Date(pago.fecha.seconds * 1000).toLocaleDateString() : new Date().toLocaleDateString(),
                                                         paciente: datos.nombreCompleto,
                                                         servicio: pago.servicioNombre,
