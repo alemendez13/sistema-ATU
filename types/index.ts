@@ -2,6 +2,7 @@
 export interface Paciente {
   id?: string;
   nombreCompleto: string;
+  folioExpediente?: string | null;
   fechaNacimiento: string;
   edad: number;
   genero: string;
