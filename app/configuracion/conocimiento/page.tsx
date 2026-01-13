@@ -1,11 +1,23 @@
 // app/configuracion/conocimiento/page.tsx
 "use client";
-import React, { useState, useEffect } from 'react';
-import { Pencil, Trash2, Plus, ExternalLink, FileText, AppWindow, Loader2, X } from 'lucide-react';
-import { db } from '@/lib/firebase'; // Uso de Alias @/
-import { collection, onSnapshot, query, orderBy, doc, deleteDoc, setDoc, addDoc } from "@/lib/firebase-guard";
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Trash2, Plus, ExternalLink, FileText, AppWindow, 
+  Loader2, X, ChevronDown, ChevronRight, BookOpen 
+} from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { 
+  collection, onSnapshot, query, orderBy, doc, 
+  deleteDoc, addDoc, writeBatch 
+} from "@/lib/firebase-guard";
 import { toast } from 'sonner';
 import { useAuth } from "@/hooks/useAuth";
+
+// --- ORDEN DE PRESENTACIÓN REQUERIDO (Punto 1 y 2) ---
+const GROUPS_ORDER = [
+  "MG", "PMR", "GEC", "COM", "AUD", "MEJ", "RIE", "MKT", 
+  "ATU", "CLI", "EDU", "GEM", "FIN", "RHU", "IYM"
+];
 
 // --- SUSTITUCIÓN: LISTADO COMPLETO GEC-FR-02 (136 DOCUMENTOS) ---
 const initialDocs = [
@@ -197,52 +209,79 @@ const initialDocs = [
   { codigo: "GEM-FR-07", nombre: "Entrega de materiales", edicion: "Ed. 0", modulo: "Módulo 6", estado: "Documento" },
 ];
 
-export default function ListadoConocimiento() {
+export default function CerebroConocimientoISO() {
   const { user } = useAuth(); 
   const [docs, setDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Estado para controlar qué grupos están expandidos
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
   const [newDoc, setNewDoc] = useState({
-    codigo: '',
-    nombre: '',
-    edicion: 'Ed. 0',
-    modulo: 'Módulo 1',
-    estado: 'Documento'
+    codigo: '', nombre: '', edicion: 'Ed. 0', modulo: 'Módulo 1', estado: 'Documento'
   });
 
+  // --- LÓGICA DE AGRUPACIÓN Y CLASIFICACIÓN (Punto 1 y 2) ---
+  const groupedDocs = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    GROUPS_ORDER.forEach(g => groups[g] = []);
+
+    docs.forEach(d => {
+      let prefix = d.codigo.split('-')[0].toUpperCase();
+      // Mapeo especial: GER (Gestión de Riesgos) -> RIE (Riesgos)
+      if (prefix === "GER") prefix = "RIE";
+      
+      if (groups[prefix]) {
+        groups[prefix].push(d);
+      } else {
+        if (!groups["OTROS"]) groups["OTROS"] = [];
+        groups["OTROS"].push(d);
+      }
+    });
+    return groups;
+  }, [docs]);
+
   useEffect(() => {
-    if (!user) return; // Guardia de seguridad
+    if (!user) return;
 
     const q = query(collection(db, "conocimiento"), orderBy("codigo", "asc"));
     
-    // onSnapshot recibe (query, callback_exito, callback_error)
-    const unsubscribe = onSnapshot(q, 
-      async (snapshot) => {
-        if (snapshot.empty) {
-          // Si no hay datos, sembramos los initialDocs [cite: 158]
-          for (const docInit of initialDocs) {
-            await addDoc(collection(db, "conocimiento"), docInit);
-          }
-        } else {
-          const docsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-          setDocs(docsData);
-        }
-        setLoading(false);
-      }, 
-      (error) => {
-        // Manejo de errores de permisos al cerrar sesión 
-        if (error.code !== 'permission-denied') {
-          console.error("Error en Firestore:", error);
-        }
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      if (snapshot.empty) {
+        // --- OPTIMIZACIÓN DE ESCRITURA (Punto 3) ---
+        // Usamos Batch para enviar los 136 registros en una sola transacción
+        const batch = writeBatch(db);
+        initialDocs.forEach((docInit) => {
+          const newDocRef = doc(collection(db, "conocimiento"));
+          batch.set(newDocRef, docInit);
+        });
+        await batch.commit();
+        toast.success("Cerebro normativo inicializado con éxito.");
+      } else {
+        const docsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setDocs(docsData);
       }
-    );
+      setLoading(false);
+    });
 
-    return () => unsubscribe(); // Limpieza del listener
-  }, [user]); // Se ejecuta cada vez que el usuario cambia
+    return () => unsubscribe();
+  }, [user]);
 
-  // --- FUNCIÓN: GUARDAR NUEVO DOCUMENTO ---
+  const toggleGroup = (group: string) => {
+    setExpandedGroups(prev => ({ ...prev, [group]: !prev[group] }));
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("¿Eliminar este documento maestro?")) {
+      try {
+        await deleteDoc(doc(db, "conocimiento", id));
+        toast.success("Registro eliminado.");
+      } catch (e) { toast.error("Error al eliminar."); }
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -256,19 +295,9 @@ export default function ListadoConocimiento() {
       setNewDoc({ codigo: '', nombre: '', edicion: 'Ed. 0', modulo: 'Módulo 1', estado: 'Documento' });
     } catch (error) {
       toast.error("Error al guardar en Firebase.");
+      console.error(error);
     } finally {
       setIsSaving(false);
-    }
-  };
-  
-  const handleDelete = async (id: string) => {
-    if (confirm("¿Estás seguro de eliminar este registro del cerebro?")) {
-      try {
-        await deleteDoc(doc(db, "conocimiento", id));
-        toast.success("Documento eliminado correctamente.");
-      } catch (e) {
-        toast.error("Error al eliminar.");
-      }
     }
   };
 
@@ -279,59 +308,80 @@ export default function ListadoConocimiento() {
   );
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen relative">
+    <div className="p-8 bg-gray-50 min-h-screen">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-light text-gray-800">Cerebro de Conocimiento</h1>
-          <p className="text-gray-500 mt-2 text-sm italic">Gestión de Procesos y Versiones SANSCE</p>
+          <h1 className="text-3xl font-light text-gray-800 flex items-center gap-3">
+            <BookOpen className="text-[#78c9cf]" /> Cerebro de Conocimiento
+          </h1>
+          <p className="text-gray-500 mt-2 text-sm italic">Control Documental Basado en ISO 7101:2023</p>
         </div>
-        {/* MODIFICACIÓN: BOTÓN AHORA ABRE MODAL */}
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="bg-[#78c9cf] hover:bg-[#65b1b7] text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-lg active:scale-95"
+          className="bg-[#78c9cf] text-white px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg hover:scale-105 transition-all"
         >
-          <Plus size={20} /> NUEVO PROCESO / APP
+          <Plus size={20} /> NUEVO DOCUMENTO / APP
         </button>
       </div>
 
-      {/* TABLA DE CONTENIDO (Se mantiene lógica de mapeo previa) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200 text-gray-400">
-            <tr>
-              <th className="p-4 uppercase text-[10px] font-bold">Código</th>
-              <th className="p-4 uppercase text-[10px] font-bold">Nombre</th>
-              <th className="p-4 text-center uppercase text-[10px] font-bold">Ed.</th>
-              <th className="p-4 text-center uppercase text-[10px] font-bold">Módulo</th>
-              <th className="p-4 uppercase text-[10px] font-bold">Estado</th>
-              <th className="p-4 text-right uppercase text-[10px] font-bold">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {docs.map((doc: any) => (
-              <tr key={doc.id} className="hover:bg-blue-50/30 transition-colors group">
-                <td className="p-4 font-mono font-bold text-[#78c9cf]">{doc.codigo}</td>
-                <td className="p-4 text-gray-600 font-medium">{doc.nombre}</td>
-                <td className="p-4 text-center text-gray-400">{doc.edicion}</td>
-                <td className="p-4 text-center">
-                   <span className="px-2 py-1 bg-slate-100 rounded text-[9px] text-slate-500 font-black">{doc.modulo}</span>
-                </td>
-                <td className="p-4">
-                  <div className="flex items-center gap-2 text-[11px]">
-                    {doc.estado === "Integrado" && <span className="text-green-600 flex items-center gap-1"><AppWindow size={14}/> APP NATIVA</span>}
-                    {doc.estado === "App Externa" && <span className="text-blue-500 flex items-center gap-1"><ExternalLink size={14}/> EXTERNO</span>}
-                    {doc.estado === "Documento" && <span className="text-orange-400 flex items-center gap-1"><FileText size={14}/> ADMIN</span>}
+      <div className="space-y-4">
+        {GROUPS_ORDER.map(groupKey => {
+          const groupDocs = groupedDocs[groupKey];
+          if (groupDocs.length === 0) return null;
+          const isExpanded = expandedGroups[groupKey];
+
+          return (
+            <div key={groupKey} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* HEADER DEL GRUPO */}
+              <button 
+                onClick={() => toggleGroup(groupKey)}
+                className="w-full p-4 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors border-b border-gray-50"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-cyan-50 text-[#78c9cf] flex items-center justify-center font-black text-xs">
+                    {groupKey}
                   </div>
-                </td>
-                <td className="p-4 text-right">
-                   <button onClick={() => handleDelete(doc.id)} className="text-red-200 hover:text-red-500 transition-colors">
-                     <Trash2 size={18} />
-                   </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <span className="font-bold text-gray-700 uppercase tracking-widest text-xs">
+                    Capítulo: {groupKey}
+                  </span>
+                  <span className="bg-gray-100 text-gray-400 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                    {groupDocs.length} DOCS
+                  </span>
+                </div>
+                {isExpanded ? <ChevronDown className="text-gray-300" /> : <ChevronRight className="text-gray-300" />}
+              </button>
+
+              {/* LISTADO DEL GRUPO */}
+              {isExpanded && (
+                <div className="overflow-x-auto animate-in slide-in-from-top-2 duration-200">
+                  <table className="w-full text-left text-xs">
+                    <tbody className="divide-y divide-gray-50">
+                      {groupDocs.map((doc: any) => (
+                        <tr key={doc.id} className="hover:bg-blue-50/20 transition-colors group">
+                          <td className="p-4 font-mono font-bold text-[#78c9cf] w-32">{doc.codigo}</td>
+                          <td className="p-4 text-gray-600 font-medium">{doc.nombre}</td>
+                          <td className="p-4 text-center text-gray-400 w-16">{doc.edicion}</td>
+                          <td className="p-4 w-40">
+                            <div className="flex items-center gap-2">
+                              {doc.estado === "Integrado" && <span className="text-green-600 flex items-center gap-1 font-bold"><AppWindow size={14}/> APP NATIVA</span>}
+                              {doc.estado === "App Externa" && <span className="text-blue-500 flex items-center gap-1 font-bold"><ExternalLink size={14}/> EXTERNO</span>}
+                              {doc.estado === "Documento" && <span className="text-orange-400 flex items-center gap-1 font-bold"><FileText size={14}/> ADMIN</span>}
+                            </div>
+                          </td>
+                          <td className="p-4 text-right w-16">
+                             <button onClick={() => handleDelete(doc.id)} className="text-red-100 group-hover:text-red-400 transition-colors">
+                               <Trash2 size={16} />
+                             </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* --- MODAL DE REGISTRO (INTEGRACIÓN SPRINT) --- */}
