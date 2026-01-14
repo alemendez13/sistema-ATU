@@ -61,11 +61,43 @@ export default function CorteDia() {
         return acc + (isNaN(valorFinal) ? 0 : valorFinal);
     }, 0);
 
+    const sumarPorMetodo = (arr: any[], metodoDeseado: string) => 
+    arr.reduce((acc, curr) => {
+        // 1. Si la operación tiene desglose (Pago Mixto)
+        if (curr.desglosePagos && Array.isArray(curr.desglosePagos)) {
+            const parcial = curr.desglosePagos
+                .filter((p: any) => p.metodo === metodoDeseado)
+                .reduce((a: number, c: any) => a + c.monto, 0);
+            return acc + parcial;
+        }
+        // 2. Si es un pago tradicional (Efectivo, Tarjeta, etc.)
+        return acc + (curr.metodoPago === metodoDeseado ? (curr.montoPagado || 0) : 0);
+    }, 0);
+
   // 2. Mantenimiento de variables originales para el reporte
   const totalVendido    = sumarMonto(ingresos);
-  const efectivoEntrada = sumarMonto(ingresos.filter(i => i.metodoPago === 'Efectivo'));
-  const tpvMP           = sumarMonto(ingresos.filter(i => i.metodoPago === 'Tarjeta (TPV MP)'));
-  const tpvBAN          = sumarMonto(ingresos.filter(i => i.metodoPago === 'Tarjeta (TPV BAN)'));
+  const efectivoEntrada = sumarPorMetodo(ingresos, 'Efectivo');
+  // Usamos .includes() para capturar 'TPV MP', 'TPV Cred MP', 'TPV DebMP', etc.
+  const tpvMP = ingresos.reduce((acc, curr) => {
+      if (curr.desglosePagos) {
+          // Suma las partes de MP dentro de un pago mixto
+          return acc + curr.desglosePagos
+              .filter((p: any) => p.metodo.includes('MP'))
+              .reduce((a: number, c: any) => a + c.monto, 0);
+      }
+      // Suma pagos directos
+      return acc + (curr.metodoPago?.includes('MP') ? (curr.montoPagado || 0) : 0);
+  }, 0);
+
+  const tpvBAN = ingresos.reduce((acc, curr) => {
+      if (curr.desglosePagos) {
+          // Suma las partes de BANAMEX dentro de un pago mixto
+          return acc + curr.desglosePagos
+              .filter((p: any) => p.metodo.includes('BAN'))
+              .reduce((a: number, c: any) => a + c.monto, 0);
+      }
+      return acc + (curr.metodoPago?.includes('BAN') ? (curr.montoPagado || 0) : 0);
+  }, 0);
   const dineroBanco     = totalVendido - efectivoEntrada;
   const totalGastos     = sumarMonto(gastos);
   const balanceCaja     = efectivoEntrada - totalGastos;
