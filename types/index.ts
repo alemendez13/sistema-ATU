@@ -63,7 +63,8 @@ export interface Operacion {
   servicioNombre: string;
   monto: number | string; // Aceptamos ambos por ahora para evitar errores con Excel
   estatus: "Pendiente de Pago" | "Pagado";
-  metodoPago?: "Efectivo" | "Tarjeta" | "Transferencia" | "Otro";
+  metodoPago?: string; // Se mantiene como referencia principal (ej. "Mixto")
+  desglosePagos?: { metodo: string; monto: number }[]; // <-- AGREGADO: Nueva lista de montos
   requiereFactura?: boolean;
   fecha: any;
   fechaPago?: any;
