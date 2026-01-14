@@ -18,6 +18,8 @@ export default function FinanzasPage() {
   const { user } = useAuth() as any; 
   const [verCarteraVencida, setVerCarteraVencida] = useState(false);
   const [opParaTarjeta, setOpParaTarjeta] = useState<Operacion | null>(null);
+  const [opParaPagoMixto, setOpParaPagoMixto] = useState<Operacion | null>(null);
+  const [montosMixtos, setMontosMixtos] = useState({ efectivo: 0, mp: 0, ban: 0, transf: 0 });
 
   // Reacciona al cambio de botones
   useEffect(() => {
@@ -67,7 +69,14 @@ export default function FinanzasPage() {
           metodoPago: metodo,
           fechaPago: new Date(),
           elaboradoPor: user?.email || "Usuario Desconocido", 
-          montoPagado: montoNumerico // ✅ Aquí reemplazas la línea anterior
+          montoPagado: montoNumerico,
+          // AGREGADO: Si es pago mixto, guardamos el desglose detallado
+          desglosePagos: metodo === 'Mixto' ? [
+            { metodo: 'Efectivo', monto: montosMixtos.efectivo },
+            { metodo: 'Tarjeta (TPV MP)', monto: montosMixtos.mp },
+            { metodo: 'Tarjeta (TPV BAN)', monto: montosMixtos.ban },
+            { metodo: 'Transferencia', monto: montosMixtos.transf }
+          ].filter(p => p.monto > 0) : null
       };
 
       await updateDoc(doc(db, "operaciones", id), datosCobro);
@@ -200,7 +209,7 @@ export default function FinanzasPage() {
                                           </span>
                                         )}
                                       </td>
-                                      
+
                                       {/* 👇 CELDA 7: ACCIONES DE COBRO */}
 
                                       <td className="p-4">
@@ -210,6 +219,7 @@ export default function FinanzasPage() {
                                               <div className="flex flex-wrap gap-1 justify-end">
                                                   <button onClick={() => handleCobrar(op.id!, 'Efectivo', op)} className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-green-200 transition">EFECTIVO</button>
                                                   <button onClick={() => setOpParaTarjeta(op)} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200 transition">TARJETA</button>
+                                                  <button onClick={() => { setOpParaPagoMixto(op); setMontosMixtos({efectivo:0, mp:0, ban:0, transf:0}); }} className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-amber-200 transition">🔀 MIXTO</button>
                                                   <button onClick={() => handleCobrar(op.id!, 'Transferencia', op)} className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-purple-200 transition">TRANSF</button>
                                                   <button onClick={() => handleCobrar(op.id!, 'Vale', op)} className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-orange-200 transition">🎟️ VALE</button>
                                                   <button onClick={() => {
@@ -261,16 +271,30 @@ export default function FinanzasPage() {
 
         {/* --- NUEVAS OPCIONES SOLICITADAS --- */}
         <button 
-          onClick={() => { handleCobrar(opParaTarjeta.id!, 'Tarjeta (TPV MP)', opParaTarjeta); setOpParaTarjeta(null); }}
-          className="w-full py-3 bg-slate-50 hover:bg-sky-50 text-sky-600 rounded-xl font-bold text-xs border border-slate-100 transition-all flex justify-between px-4 items-center"
+          onClick={() => { handleCobrar(opParaTarjeta.id!, 'TPV Cred BAN', opParaTarjeta); setOpParaTarjeta(null); }}
+          className="w-full py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs border border-emerald-200 transition-all flex justify-between px-4 items-center"
         >
-          🧲 TPV MP <span>→</span>
+          📟 TPV Cred BAN <span>→</span>
         </button>
         <button 
-          onClick={() => { handleCobrar(opParaTarjeta.id!, 'Tarjeta (TPV BAN)', opParaTarjeta); setOpParaTarjeta(null); }}
-          className="w-full py-3 bg-slate-50 hover:bg-emerald-50 text-emerald-700 rounded-xl font-bold text-xs border border-slate-100 transition-all flex justify-between px-4 items-center"
+          onClick={() => { handleCobrar(opParaTarjeta.id!, 'TPV Deb BAN', opParaTarjeta); setOpParaTarjeta(null); }}
+          className="w-full py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs border border-emerald-200 transition-all flex justify-between px-4 items-center"
         >
-          📟 TPV BAN <span>→</span>
+          📟 TPV Deb BAN <span>→</span>
+        </button>
+
+        {/* MERCADO PAGO */}
+        <button 
+          onClick={() => { handleCobrar(opParaTarjeta.id!, 'TPV Cred MP', opParaTarjeta); setOpParaTarjeta(null); }}
+          className="w-full py-3 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded-xl font-bold text-xs border border-sky-200 transition-all flex justify-between px-4 items-center"
+        >
+          🧲 TPV Cred MP <span>→</span>
+        </button>
+        <button 
+          onClick={() => { handleCobrar(opParaTarjeta.id!, 'TPV Deb MP', opParaTarjeta); setOpParaTarjeta(null); }}
+          className="w-full py-3 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded-xl font-bold text-xs border border-sky-200 transition-all flex justify-between px-4 items-center"
+        >
+          🧲 TPV Deb MP <span>→</span>
         </button>
 
         <button 

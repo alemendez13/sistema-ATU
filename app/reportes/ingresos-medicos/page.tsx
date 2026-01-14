@@ -42,6 +42,20 @@ export default function ReporteIngresosMedicos() {
     });
   }, []);
 
+
+  const sumarPorMetodo = (arr: any[], metodoDeseado: string) => 
+    arr.reduce((acc, curr) => {
+        // 1. Si la operación tiene desglose (Pago Mixto)
+        if (curr.desglosePagos && Array.isArray(curr.desglosePagos)) {
+            const parcial = curr.desglosePagos
+                .filter((p: any) => p.metodo === metodoDeseado)
+                .reduce((a: number, c: any) => a + c.monto, 0);
+            return acc + parcial;
+        }
+        // 2. Si es un pago tradicional
+        return acc + (curr.formaPago === metodoDeseado ? (curr.monto || 0) : 0);
+    }, 0);
+
   // 2. Generar Reporte (Versión "Experiencia 5 Estrellas" ⭐)
   // 2. Generar Reporte (Versión Corregida 2026 - Trazabilidad Total)
   const generarCorte = async () => {
@@ -83,6 +97,7 @@ export default function ReporteIngresosMedicos() {
             concepto: data.servicioNombre,
             formaPago: data.metodoPago || (Number(data.monto) === 0 ? "Cortesía" : "No especificado"),
             // Usamos "as any" para evitar el error de TypeScript que viste antes
+            desglosePagos: data.desglosePagos || null,
             factura: (data as any).requiereFactura ? "Sí" : "No",
             monto: Number(data.monto) || 0
         };
@@ -91,14 +106,10 @@ export default function ReporteIngresosMedicos() {
       // 🟢 3. CÁLCULO MATEMÁTICO BLINDADO
       // Realizamos la suma una vez que tenemos todos los datos finales
       const totalCobradoReal = resultadosFiltrados.reduce((acc, curr) => acc + curr.monto, 0);
-      // 🧠 Cálculo de desgloses específicos por terminal
-      const totalMP = resultadosFiltrados
-          .filter(r => r.formaPago === 'Tarjeta (TPV MP)')
-          .reduce((acc, curr) => acc + curr.monto, 0);
-
-      const totalBAN = resultadosFiltrados
-          .filter(r => r.formaPago === 'Tarjeta (TPV BAN)')
-          .reduce((acc, curr) => acc + curr.monto, 0);
+      
+            // ✅ CÁLCULO MEJORADO: Ahora busca montos dentro de pagos mixtos
+            const totalMP = sumarPorMetodo(resultadosFiltrados, 'Tarjeta (TPV MP)');
+            const totalBAN = sumarPorMetodo(resultadosFiltrados, 'Tarjeta (TPV BAN)');
             const comision = totalCobradoReal * porcentaje;
             const aPagar = totalCobradoReal - comision;
 

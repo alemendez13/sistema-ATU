@@ -7,6 +7,7 @@ import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency, cleanPrice, formatDate } from "../../../lib/utils";
+import { addDoc, serverTimestamp } from "@/lib/firebase-guard"; // Asegúrate de tener addDoc
 
 export default function ReporteIngresosPage() {
   // Estado para la fecha (por defecto HOY)
@@ -14,97 +15,121 @@ export default function ReporteIngresosPage() {
   const [ingresos, setIngresos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [totales, setTotales] = useState({ efectivo: 0, tarjeta: 0, transferencia: 0, total: 0 });
+  const ejecutarCierreCaja = async () => {
+    if(!confirm("¿Deseas realizar el Cierre de Caja? Los totales se guardarán de forma permanente.")) return;
+    
+      try {
+          await addDoc(collection(db, "cortes_caja"), {
+              fechaCorte: fechaSeleccionada,
+              creadoEn: serverTimestamp(),
+              totales: totales,
+              detalleTerminales: {
+                  tpvCredBAN: sumarPorMetodo(ingresos, 'TPV Cred BAN'),
+                  tpvDebBAN: sumarPorMetodo(ingresos, 'TPV Deb BAN'),
+                  tpvCredMP: sumarPorMetodo(ingresos, 'TPV Cred MP'),
+                  tpvDebMP: sumarPorMetodo(ingresos, 'TPV DebMP'),
+              },
+              cerradoPor: "Admin SANSCE" // Aquí podrías usar el email del usuario logueado
+          });
+          toast.success("✅ Caja cerrada y guardada con éxito.");
+      } catch (error) {
+          toast.error("Error al procesar el cierre.");
+      }
+  };
+
+  // 1. Definición de la función de suma técnica para pagos mixtos
+  const sumarPorMetodo = (arr: any[], metodoDeseado: string) => 
+    arr.reduce((acc, curr) => {
+        // Caso A: Si la operación es un Pago Mixto
+        if (curr.desglosePagos && Array.isArray(curr.desglosePagos)) {
+            const parcial = curr.desglosePagos
+                .filter((p: any) => p.metodo === metodoDeseado)
+                .reduce((a: number, c: any) => a + c.monto, 0);
+            return acc + parcial;
+        }
+        // Caso B: Si es un pago tradicional
+        const metodoOperacion = curr.metodoPago || "";
+        // Soporte para Tarjetas (agrupa MP y BAN en el total de tarjeta)
+        if (metodoDeseado === "Tarjeta") {
+            return acc + (metodoOperacion.includes("Tarjeta") || metodoOperacion.includes("TPV") ? (curr.monto || 0) : 0);
+        }
+        return acc + (metodoOperacion === metodoDeseado ? (curr.monto || 0) : 0);
+    }, 0);
 
   // Función para cargar datos (MEJORADA)
+  /* app/reportes/ingresos-sansce/page.tsx - Versión Corregida */
+
+// ... (imports y sumarPorMetodo se mantienen igual)
+
   const cargarReporte = async () => {
     setLoading(true);
-    setIngresos([]);
-    setTotales({ efectivo: 0, tarjeta: 0, transferencia: 0, total: 0 });
-
     try {
-      const start = new Date(`${fechaSeleccionada}T00:00:00`);
-      const end = new Date(`${fechaSeleccionada}T23:59:59`);
-
+      // 1. Consulta principal
       const q = query(
         collection(db, "operaciones"),
-        where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]), // 🎯 Incluye cortesías
-        where("fechaCita", "==", fechaSeleccionada), // 🎯 Busca por el string exacto YYYY-MM-DD
+        where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]),
+        where("fechaCita", "==", fechaSeleccionada),
         orderBy("fecha", "desc")
       );
 
       const snapshot = await getDocs(q);
       
-      let sumaTotal = 0;
-      let sumaEfectivo = 0;
-      let sumaTarjeta = 0;
-      let sumaTransf = 0;
+      // 2. Mapeo y Enriquecimiento
+      const datosCompletos = await Promise.all(snapshot.docs.map(async (docSnap) => {
+        const data = docSnap.data();
+        const montoLimpio = cleanPrice(data.monto);
 
-      // Mapeamos los datos básicos primero
-      const datosBasicos = snapshot.docs.map(doc => {
-  const data = doc.data();
-  return { id: doc.id, ...data, monto: cleanPrice(data.monto) };
-});
-
-      // --- ENRIQUECIMIENTO DE DATOS (NUEVO) ---
-      // Buscamos información extra que no está en la operación (Factura y Médico)
-      const datosCompletos = await Promise.all(datosBasicos.map(async (op: any) => {
-        // 1. Sumatorias
-        sumaTotal += op.monto;
-        const metodo = op.metodoPago || "Otro";
-        if (metodo === "Efectivo") sumaEfectivo += op.monto;
-        if (metodo.includes("Tarjeta") || metodo.includes("TPV")) sumaTarjeta += op.monto;
-        if (metodo === "Transferencia") sumaTransf += op.monto;
-
-        // 2. Lógica para extraer NOMBRE DEL PS (Médico)
+        // Lógica de Nombre del PS
         let nombrePS = "SANSCE (General)";
-        if (op.servicioNombre) {
-            if (op.servicioNombre.includes("Consulta con")) {
-                nombrePS = op.servicioNombre.replace("Consulta con", "").trim();
-            } else if (op.servicioSku === "CONSULTA") {
-                nombrePS = "Consulta General";
-            }
+        if (data.servicioNombre?.includes("Consulta con")) {
+            nombrePS = data.servicioNombre.replace("Consulta con", "").trim();
+        } else if (data.servicioSku === "CONSULTA") {
+            nombrePS = "Consulta General";
         }
 
-        // 3. Lógica para saber si REQUIERE FACTURA
-        // Consultamos el expediente del paciente para ver si tiene datos fiscales
+        // Lógica de Factura (Consulta asíncrona)
         let requiereFactura = "No";
-        if (op.pacienteId) {
+        if (data.pacienteId) {
             try {
-                const pacienteRef = doc(db, "pacientes", op.pacienteId);
+                const pacienteRef = doc(db, "pacientes", data.pacienteId);
                 const pacienteSnap = await getDoc(pacienteRef);
-                if (pacienteSnap.exists()) {
-                    const pData = pacienteSnap.data();
-                    // Si tiene RFC y Razón Social, asumimos que SÍ factura
-                    if (pData.datosFiscales?.rfc && pData.datosFiscales?.rfc.length > 3) {
-                        requiereFactura = "Sí";
-                    }
+                if (pacienteSnap.exists() && pacienteSnap.data().datosFiscales?.rfc?.length > 3) {
+                    requiereFactura = "Sí";
                 }
-            } catch (err) {
-                console.log("No se pudo verificar factura para", op.pacienteNombre);
-            }
+            } catch (err) { console.error("Error factura:", err); }
         }
 
         return {
-          ...op,
-          nombrePS,       // <--- NUEVO CAMPO
-          requiereFactura, // <--- NUEVO CAMPO
-          concepto: op.servicioNombre || "Atención", // <--- NUEVO CAMPO (Concepto)
-          hora: formatDate(op.fecha).split(' ')[0] // Extrae solo la parte de tiempo si es necesario o usa op.fecha
+          id: docSnap.id,
+          ...data,
+          monto: montoLimpio,
+          nombrePS,
+          requiereFactura,
+          concepto: data.servicioNombre || "Atención",
+          hora: data.fecha ? (formatDate(data.fecha).split(' ')[1] || "00:00") : "--:--"
         };
       }));
 
-      setIngresos(datosCompletos);
-      setTotales({ efectivo: sumaEfectivo, tarjeta: sumaTarjeta, transferencia: sumaTransf, total: sumaTotal });
+      // 3. CÁLCULO DE TOTALES (Única fuente de verdad)
+      const efecFinal  = sumarPorMetodo(datosCompletos, 'Efectivo');
+      const tarjFinal  = sumarPorMetodo(datosCompletos, 'Tarjeta');
+      const transFinal = sumarPorMetodo(datosCompletos, 'Transferencia');
+      const totalFinal = datosCompletos.reduce((acc, curr) => acc + curr.monto, 0);
 
-      if (datosCompletos.length === 0) toast.info("No hubo ingresos registrados en esta fecha.");
+      // Seteo de estados
+      setIngresos(datosCompletos);
+      setTotales({ 
+          efectivo: efecFinal, 
+          tarjeta: tarjFinal, 
+          transferencia: transFinal, 
+          total: totalFinal 
+      });
+
+      if (datosCompletos.length === 0) toast.info("No hubo ingresos registrados.");
 
     } catch (error: any) {
-      console.error("Error cargando reporte:", error);
-      if (error.message && error.message.includes("Quota")) {
-        toast.error("Límite de lectura excedido por hoy. Intenta mañana.");
-      } else {
-        toast.error("Error al generar el reporte.");
-      }
+      console.error("Error:", error);
+      toast.error("Error al generar el reporte.");
     } finally {
       setLoading(false);
     }
@@ -171,6 +196,13 @@ export default function ReporteIngresosPage() {
               <p className="text-lg font-bold text-slate-700">${totales.transferencia.toLocaleString()}</p>
             </div>
           </div>
+
+          <button 
+              onClick={ejecutarCierreCaja}
+              className="mb-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl flex justify-center items-center gap-2"
+          >
+              🔒 Realizar Cierre de Caja (Finalizar Jornada)
+          </button>
 
           {/* Tabla de Detalle */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
