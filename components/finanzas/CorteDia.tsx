@@ -91,7 +91,7 @@ export default function CorteDia() {
 
   const tpvBAN = ingresos.reduce((acc, curr) => {
       if (curr.desglosePagos) {
-          // Suma las partes de BANAMEX dentro de un pago mixto
+          // Suma las partes de BANORTE dentro de un pago mixto
           return acc + curr.desglosePagos
               .filter((p: any) => p.metodo.includes('BAN'))
               .reduce((a: number, c: any) => a + c.monto, 0);

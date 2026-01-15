@@ -60,7 +60,7 @@ export const LiquidacionMedicoPDF = ({ datos }: { datos: any }) => (
           <Text style={{ fontWeight: 'bold' }}>{formatCurrency(datos.resumen.tpvMP || 0)}</Text>
         </View>
         <View style={[styles.cardTpv, { borderLeft: 3, borderLeftColor: '#059669' }]}>
-          <Text style={[styles.label, { color: '#059669' }]}>TPV Banamex</Text>
+          <Text style={[styles.label, { color: '#059669' }]}>TPV Banorte</Text>
           <Text style={{ fontWeight: 'bold' }}>{formatCurrency(datos.resumen.tpvBAN || 0)}</Text>
         </View>
       </View>
