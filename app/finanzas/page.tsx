@@ -57,38 +57,61 @@ export default function FinanzasPage() {
 };
 
   const handleCobrar = async (id: string, metodo: string, op: Operacion) => {
-    if(!confirm(`¿Confirmas recibir el pago en ${metodo}?`)) return;
+    // 1. REGLA DE NEGOCIO: Definimos el monto real a cobrar (Cortesía = $0.00)
+    // Extraído de tu lógica original en VSC
+    const montoBase = Number(cleanPrice(op.monto));
+    const montoAFacturar = metodo === 'Cortesía' ? 0 : montoBase; 
+
+    // 2. VALIDACIÓN MATEMÁTICA (Exclusiva para Pago Mixto)
+    if (metodo === 'Mixto') {
+        const sumaIngresada = Object.values(montosMixtos).reduce((a, b) => a + b, 0);
+        // Usamos una tolerancia de $0.01 para evitar errores de punto flotante
+        if (Math.abs(sumaIngresada - montoAFacturar) > 0.01) {
+            toast.error(`La suma ($${sumaIngresada}) no coincide con el total ($${montoAFacturar})`);
+            return;
+        }
+    }
+
+    // 3. CONFIRMACIÓN MEJORADA (Usa formatCurrency de utils.ts) [cite: 12]
+    if (!confirm(`¿Confirmas recibir el pago de ${formatCurrency(montoAFacturar)} en ${metodo}?`)) return;
+    
     setProcesandoId(id);
     try {
-      // 1. 👇 DEFINIMOS LA VARIABLE PRIMERO (Calculamos el monto)
-      const montoNumerico = metodo === 'Cortesía' ? 0 : Number(cleanPrice(op.monto));
+        const datosCobro: any = {
+            estatus: "Pagado",
+            metodoPago: metodo,
+            fechaPago: new Date(),
+            elaboradoPor: user?.email || "Usuario Desconocido", 
+            montoPagado: montoAFacturar, // Aseguramos el 0 si es cortesía
+        };
 
-      // 2. 👇 USAMOS LA VARIABLE EN EL OBJETO
-      const datosCobro = {
-          estatus: "Pagado",
-          metodoPago: metodo,
-          fechaPago: new Date(),
-          elaboradoPor: user?.email || "Usuario Desconocido", 
-          montoPagado: montoNumerico,
-          // AGREGADO: Si es pago mixto, guardamos el desglose detallado
-          desglosePagos: metodo === 'Mixto' ? [
-            { metodo: 'Efectivo', monto: montosMixtos.efectivo },
-            { metodo: 'Tarjeta (TPV MP)', monto: montosMixtos.mp },
-            { metodo: 'Tarjeta (TPV BAN)', monto: montosMixtos.ban },
-            { metodo: 'Transferencia', monto: montosMixtos.transf }
-          ].filter(p => p.monto > 0) : null
-      };
+        // 4. ESTRUCTURA DE DESGLOSE (Sincronizada con Fase 1)
+        if (metodo === 'Mixto') {
+            datosCobro.desglosePagos = [
+                { metodo: 'Efectivo', monto: montosMixtos.efectivo },
+                { metodo: 'Tarjeta (TPV MP)', monto: montosMixtos.mp },
+                { metodo: 'Tarjeta (TPV BAN)', monto: montosMixtos.ban },
+                { metodo: 'Transferencia', monto: montosMixtos.transf }
+            ].filter(p => p.monto > 0); 
+        }
 
-      await updateDoc(doc(db, "operaciones", id), datosCobro);
-      cargarPendientes();
-      toast.success(`Pago en ${metodo} registrado correctamente`);
+        // 5. PERSISTENCIA EN FIRESTORE 
+        await updateDoc(doc(db, "operaciones", id), datosCobro);
+        
+        // 6. LIMPIEZA DE ESTADOS DE INTERFAZ (Vital para evitar bugs visuales)
+        setOpParaPagoMixto(null);
+        setOpParaTarjeta(null); // Cerramos también el modal de tarjetas por si acaso
+        setMontosMixtos({ efectivo: 0, mp: 0, ban: 0, transf: 0 });
+        
+        cargarPendientes();
+        toast.success(`Pago ${metodo} registrado con éxito.`);
     } catch (error) {
-      console.error("Error al cobrar:", error);
-      toast.error("No se pudo registrar el pago");
+        console.error("Error al cobrar:", error);
+        toast.error("No se pudo registrar el pago");
     } finally {
-      setProcesandoId(null);
+        setProcesandoId(null);
     }
-  };
+};
 
   let ultimoDoctor = "";
   let colorAlternado = false;
@@ -308,6 +331,115 @@ export default function FinanzasPage() {
   </div>
 )}
 
+{/* 🔀 MODAL DE PAGO MIXTO (FASE 2) */}
+{opParaPagoMixto && (
+  <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+      {/* Encabezado del Modal */}
+      <div className="bg-amber-500 p-6 text-white">
+        <h3 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2">
+            🔀 Pago Mixto SANSCE
+        </h3>
+        <p className="text-amber-100 text-[10px] font-bold opacity-90 uppercase tracking-widest">
+            Distribución de cobro por folio
+        </p>
+      </div>
+
+      <div className="p-6 space-y-4">
+        {/* Resumen de la Deuda */}
+        <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+          <span className="text-xs font-bold text-slate-500 uppercase">Total a Cubrir:</span>
+          <span className="text-xl font-black text-slate-800">
+            {formatCurrency(opParaPagoMixto.monto)}
+          </span>
+        </div>
+
+        {/* Campos de Entrada de Montos */}
+        <div className="space-y-3">
+          {[
+            { id: 'efectivo', label: '💵 Efectivo', key: 'efectivo' },
+            { id: 'mp', label: '🧲 TPV Mercado Pago', key: 'mp' },
+            { id: 'ban', label: '📟 TPV Banorte', key: 'ban' },
+            { id: 'transf', label: '🏦 Transferencia', key: 'transf' }
+          ].map((input) => (
+            <div key={input.id} className="relative">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">
+                {input.label}
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 font-bold">$</span>
+                <input 
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 pl-8 font-mono font-bold focus:border-amber-400 focus:bg-white outline-none transition-all"
+                  value={montosMixtos[input.key as keyof typeof montosMixtos] || ''}
+                  onChange={(e) => setMontosMixtos({
+                    ...montosMixtos, 
+                    [input.key]: Number(e.target.value) 
+                  })}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Validador Matemático en Tiempo Real */}
+        {(() => {
+          const suma = Object.values(montosMixtos).reduce((a, b) => a + b, 0);
+          const totalDeuda = Number(cleanPrice(opParaPagoMixto.monto));
+          const diferencia = totalDeuda - suma;
+          const esExacto = Math.abs(diferencia) < 0.01;
+
+          return (
+            <div className={`p-4 rounded-2xl border-2 transition-all ${
+              esExacto ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-100'
+            }`}>
+              <div className="flex justify-between text-[10px] font-black uppercase mb-1">
+                <span className={esExacto ? 'text-green-600' : 'text-red-400'}>Suma Actual:</span>
+                <span className={esExacto ? 'text-green-700' : 'text-red-600'}>
+                    {formatCurrency(suma)}
+                </span>
+              </div>
+              {!esExacto && (
+                <p className="text-[10px] font-bold text-red-500 italic">
+                  {diferencia > 0 
+                    ? `Faltan ${formatCurrency(diferencia)}` 
+                    : `Exceso de ${formatCurrency(Math.abs(diferencia))}`}
+                </p>
+              )}
+              {esExacto && (
+                <p className="text-[10px] font-bold text-green-600 uppercase flex items-center gap-1">
+                  ✅ Monto coincidente
+                </p>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Botones de Acción */}
+        <div className="flex gap-2 pt-2">
+          <button 
+            onClick={() => {
+                setOpParaPagoMixto(null);
+                setMontosMixtos({ efectivo: 0, mp: 0, ban: 0, transf: 0 });
+            }}
+            className="flex-1 py-3 text-slate-400 font-bold text-xs uppercase hover:bg-slate-50 rounded-xl transition-all"
+          >
+            Cancelar
+          </button>
+          <button 
+            onClick={() => handleCobrar(opParaPagoMixto.id!, 'Mixto', opParaPagoMixto)}
+            className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs uppercase rounded-xl shadow-lg shadow-amber-200 transition-all disabled:opacity-30 disabled:grayscale"
+            disabled={Math.abs(Object.values(montosMixtos).reduce((a, b) => a + b, 0) - Number(cleanPrice(opParaPagoMixto.monto))) > 0.01}
+          >
+            Confirmar Cobro
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </ProtectedRoute> 
   );
 }
