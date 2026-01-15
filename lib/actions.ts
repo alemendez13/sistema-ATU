@@ -192,7 +192,7 @@ export async function enviarCorteMedicoAction(datos: {
                     
                     <div style="margin: 10px 0; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 13px;">
                         <p style="margin: 2px 0; color: #0284c7;"><strong>En TPV Mercado Pago:</strong> $${(datos.resumen.tpvMP || 0).toLocaleString()}</p>
-                        <p style="margin: 2px 0; color: #059669;"><strong>En TPV Banamex:</strong> $${(datos.resumen.tpvBAN || 0).toLocaleString()}</p>
+                        <p style="margin: 2px 0; color: #059669;"><strong>En TPV Banorte:</strong> $${(datos.resumen.tpvBAN || 0).toLocaleString()}</p>
                     </div>
 
                     <p style="margin: 5px 0;"><strong>Retención Clínica:</strong> -$${datos.resumen.comision.toLocaleString()}</p>
