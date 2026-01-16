@@ -77,6 +77,7 @@ export default function CorteDia() {
   // 2. Mantenimiento de variables originales para el reporte
   const totalVendido    = sumarMonto(ingresos);
   const efectivoEntrada = sumarPorMetodo(ingresos, 'Efectivo');
+  const efectivoPS = sumarPorMetodo(ingresos, 'Efectivo PS');
   // Usamos .includes() para capturar 'TPV MP', 'TPV Cred MP', 'TPV DebMP', etc.
   const tpvMP = ingresos.reduce((acc, curr) => {
       if (curr.desglosePagos) {
@@ -98,7 +99,7 @@ export default function CorteDia() {
       }
       return acc + (curr.metodoPago?.includes('BAN') ? (curr.montoPagado || 0) : 0);
   }, 0);
-  const dineroBanco     = totalVendido - efectivoEntrada;
+  const dineroBanco = totalVendido - efectivoEntrada - efectivoPS;
   const totalGastos     = sumarMonto(gastos);
   const balanceCaja     = efectivoEntrada - totalGastos;
 
@@ -111,9 +112,15 @@ export default function CorteDia() {
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <p className="text-xs font-bold text-slate-400 uppercase">Ventas Totales</p>
         <p className="text-2xl font-bold text-slate-800">${totalVendido.toFixed(2)}</p>
-        <div className="mt-2 text-xs text-slate-500 flex justify-between">
-            <span>💳 Banco: ${dineroBanco.toFixed(2)}</span>
-            <span>💵 Efec: ${efectivoEntrada.toFixed(2)}</span>
+        {/* Desglose visual actualizado */}
+        <div className="mt-2 text-[10px] text-slate-500 flex flex-col gap-1">
+            <div className="flex justify-between"><span>💳 Banco:</span> <span>${dineroBanco.toFixed(2)}</span></div>
+            <div className="flex justify-between"><span>💵 Caja Recep:</span> <span>${efectivoEntrada.toFixed(2)}</span></div>
+            {/* ✅ Mostramos explícitamente cuánto tienen los médicos */}
+            <div className="flex justify-between text-indigo-600 font-bold">
+                <span>👨‍⚕️ Efectivo PS:</span> 
+                <span>${efectivoPS.toFixed(2)}</span>
+            </div>
         </div>
 
         {/* 📊 MINI-DESGLOSE TÉCNICO DE TERMINALES */}
