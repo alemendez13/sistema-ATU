@@ -225,20 +225,28 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
         folioInterno: generateFolio("FIN-FR-09", docRef.id) 
       }, { merge: true });
 
-      // 4. Gestión de Inventario PEPS (Primeras Entradas, Primeras Salidas) 
-      // Se activa para productos físicos o laboratorios con insumos vinculados
-      if (servicioSeleccionado && (servicioSeleccionado.tipo === "Producto" || servicioSeleccionado.tipo === "Laboratorio")) {
+      // 4. Gestión de Inventario PEPS (Primeras Entradas, Primeras Salidas)
+      // MEJORA VALIDADA v2: Nombres de variables únicos para evitar conflicto con línea 190.
+      
+      // Usamos nombres distintos (itemEs...) para no chocar con las variables de estado
+      const itemEsProducto = servicioSeleccionado?.tipo === "Producto";
+      const itemEsLaboratorio = servicioSeleccionado?.tipo === "Laboratorio";
+      
+      // Regla Maestra: Solo descontamos si el Excel NO dice explícitamente "No"
+      const necesitaStock = servicioSeleccionado?.requiereStock !== false; 
+
+      // Condición Unificada: (Es Producto O Es Lab) Y (Requiere Stock)
+      if (servicioSeleccionado && (itemEsProducto || itemEsLaboratorio) && necesitaStock) {
         try {
-            // CORRECCIÓN TÉCNICA: Se envía pSedeId extraído del documento del paciente
             await descontarStockPEPS(
                 servicioSeleccionado.sku, 
                 servicioSeleccionado.nombre, 
                 1, 
-                pSedeId
+                pSedeId 
             );
         } catch (err) { 
-            // Control de inventarios satélite: algunos laboratorios no llevan control estricto [cite: 8]
             console.warn("No se descontó stock para este ítem:", err); 
+            toast.warning("Nota: Venta registrada, pero sin descuento de inventario.");
         }
       }
 

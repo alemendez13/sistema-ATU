@@ -82,7 +82,8 @@ export interface ProductoCatalogo {
   tipo: "Producto" | "Servicio" | "Equipo";
   duracion?: string;
   observaciones?: string; 
-  area?: string;          
+  area?: string;    
+  requiereStock?: boolean;      
 }
 
 // ... (resto del código anterior)
