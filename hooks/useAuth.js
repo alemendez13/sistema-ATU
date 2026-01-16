@@ -2,8 +2,6 @@
 import { useState, useEffect } from "react";
 import { onIdTokenChanged } from "firebase/auth"; // 👈 CAMBIO CLAVE
 import { auth } from "../lib/firebase";
-import nookies from "nookies"; // Asegúrate de tener instalado 'nookies' (npm install nookies)
-// Si no usas nookies, usaremos js-cookie o document.cookie nativo como abajo:
 
 export function useAuth() {
   const [user, setUser] = useState(null);
