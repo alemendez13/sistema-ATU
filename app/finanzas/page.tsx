@@ -241,6 +241,7 @@ export default function FinanzasPage() {
                                           ) : (
                                               <div className="flex flex-wrap gap-1 justify-end">
                                                   <button onClick={() => handleCobrar(op.id!, 'Efectivo', op)} className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-green-200 transition">EFECTIVO</button>
+                                                  <button onClick={() => handleCobrar(op.id!, 'Efectivo PS', op)} className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-indigo-200 transition border border-indigo-200"title="Cobrado directamente por el Profesional">EFECTIVO PS</button>
                                                   <button onClick={() => setOpParaTarjeta(op)} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200 transition">TARJETA</button>
                                                   <button onClick={() => { setOpParaPagoMixto(op); setMontosMixtos({efectivo:0, mp:0, ban:0, transf:0}); }} className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-amber-200 transition">🔀 MIXTO</button>
                                                   <button onClick={() => handleCobrar(op.id!, 'Transferencia', op)} className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-purple-200 transition">TRANSF</button>
