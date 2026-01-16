@@ -41,22 +41,22 @@ export default function Navbar() {
   { name: "Reportes", href: "/finanzas" }, // Caja y Reportes
 ];
 
-  // Función de Cerrar Sesión (NUEVA)
+  // Función de Cerrar Sesión MEJORADA
   const handleLogout = async () => {
     try {
-      // 1. Borramos la cookie "gafete" inmediatamente
+      // 1. Borramos la cookie explícitamente con las mismas opciones que se creó
       document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
+      
+      // 2. Limpieza de seguridad local (Opcional pero recomendado)
+      window.localStorage.clear(); 
 
-      // 2. Redirigimos visualmente antes de cerrar sesión en Firebase
-      // Esto desmonta los componentes que tienen listeners activos
-      router.push("/login");
+      // 3. Desconexión de Firebase
+      await signOut(auth);
 
-      // 3. Cerramos la sesión en Firebase tras un breve delay
-      setTimeout(async () => {
-        await signOut(auth);
-        toast.success("Sesión cerrada correctamente");
-      }, 100);
-
+      // 4. Redirección forzada
+      window.location.href = "/login"; // Usamos window.location en vez de router.push para forzar recarga limpia
+      
+      toast.success("Sesión cerrada correctamente");
     } catch (error) {
       console.error("Error al salir:", error);
       toast.error("Error al cerrar sesión");
