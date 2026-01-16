@@ -133,30 +133,33 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
     return () => clearTimeout(timer);
   }, [busqueda]);
 
+ // ... imports (se mantienen igual)
+
+// BUSTITUYE SOLO LA FUNCIÓN handleGuardar COMPLETA POR ESTA VERSIÓN:
+
   const handleGuardar = async (formData: any) => {
     if (!servicioSku) return toast.warning("Selecciona un servicio.");
     if (modo === 'buscar' && !pacienteSeleccionado) return toast.warning("Selecciona un paciente.");
     
-    // --- 1. PREPARACIÓN DE VARIABLES (FASE 4 - CORREGIDA) ---
+    // --- 1. PREPARACIÓN DE VARIABLES ---
     const servicioDetalle = catalogoServicios.find(s => s.sku === servicioSku);
     const duracionMinutos = parseInt(servicioDetalle?.duracion || "30");
     const bloquesNecesarios = Math.ceil(duracionMinutos / 30); 
     const tituloCita = notaInterna ? `${servicioDetalle?.nombre} (${notaInterna})` : servicioDetalle?.nombre;
 
-    // Determinamos la identidad ANTES de entrar al try (Resuelve error ts2448)
+    // Normalización de identidad
     const nombreParaNormalizar = `${formData.nombres} ${formData.apellidoPaterno} ${formData.apellidoMaterno || ''}`;
-
     let nombreFinal = modo === 'buscar' 
         ? pacienteSeleccionado?.nombreCompleto 
         : superNormalize(nombreParaNormalizar);
     
-    // El ID para limpieza es el del paciente seleccionado o el que ya tenía la cita
     const idParaLimpieza = pacienteSeleccionado?.id || citaExistente?.pacienteId || null;
 
     setLoading(true);
 
     try {
       // 🛡️ VERIFICACIÓN DISPONIBILIDAD
+      // Pasamos el googleEventId actual para que el sistema sepa que "nosotros mismos" no somos un bloqueo
       const hayEspacio = await verificarDisponibilidadMultiples(
           data!.doctor.id, 
           fechaSeleccionada, 
@@ -167,11 +170,36 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
       
       if (!hayEspacio) { toast.error("El horario ya no está disponible."); setLoading(false); return; }
 
-      // >>> INICIO: LÓGICA DE REAGENDADO Y LIMPIEZA (Punto 4 + Jorge Méndez) <<<
-      if (citaExistente) {
-          const cambioDeDoctor = citaExistente.doctorId !== data!.doctor.id;
+      // -----------------------------------------------------------------------
+      // 🧠 LÓGICA CORE: GESTIÓN DE ID DE GOOGLE (Corrección Fase 8)
+      // -----------------------------------------------------------------------
+      let googleEventIdFinal = ""; // Aquí guardaremos el ID definitivo (sea viejo o nuevo)
+      const cambioDeDoctor = citaExistente ? citaExistente.doctorId !== data!.doctor.id : false;
 
+      // >>> CASO A: EDICIÓN DE CITA EXISTENTE <<<
+      if (citaExistente) {
+          
+          // 1. Limpieza de Firebase (Borramos los bloques visuales viejos para regenerarlos luego)
+          const qOldCitas = query(collection(db, "citas"), where("googleEventId", "==", citaExistente.googleEventId));
+          const snapOldCitas = await getDocs(qOldCitas);
+          for (const d of snapOldCitas.docs) { await deleteDoc(doc(db, "citas", d.id)); }
+
+          // 2. Limpieza Financiera (Solo si no está pagado, para evitar duplicidad de deuda)
+          if (idParaLimpieza) {
+              const qOldOp = query(
+                  collection(db, "operaciones"),
+                  where("pacienteId", "==", idParaLimpieza),
+                  where("fechaCita", "==", citaExistente.fecha), // Buscamos por la fecha ORIGINAL
+                  where("estatus", "in", ["Pendiente de Pago", "Pagado (Cortesía)"])
+              );
+              const snapOldOp = await getDocs(qOldOp);
+              for (const d of snapOldOp.docs) { await deleteDoc(doc(db, "operaciones", d.id)); }
+          }
+
+          // 3. Gestión con Google Calendar
           if (!cambioDeDoctor && citaExistente.googleEventId) {
+              // ESCENARIO 1: Mismo Doctor -> ACTUALIZAMOS (PATCH)
+              // No borramos ni creamos nuevo. Mantenemos el ID original. Trazabilidad intacta.
               await actualizarCitaGoogle({
                   calendarId: data!.doctor.calendarId,
                   eventId: citaExistente.googleEventId,
@@ -181,33 +209,50 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
                   pacienteNombre: nombreFinal,
                   motivo: tituloCita
               });
+              googleEventIdFinal = citaExistente.googleEventId; // ✅ Reusamos el ID
+          
           } else if (citaExistente.googleEventId && citaExistente.doctorCalendarId) {
+              // ESCENARIO 2: Cambio de Doctor -> BORRAR VIEJO + CREAR NUEVO
+              // Borramos del calendario del doctor anterior
               await cancelarCitaGoogle({
                   calendarId: citaExistente.doctorCalendarId,
                   eventId: citaExistente.googleEventId
               });
+              
+              // Creamos en el calendario del nuevo doctor
+              const resGoogle = await agendarCitaGoogle({
+                  calendarId: data!.doctor.calendarId,
+                  doctorNombre: data!.doctor.nombre,
+                  fecha: fechaSeleccionada,
+                  hora: horaSeleccionada,
+                  pacienteNombre: nombreFinal,
+                  motivo: tituloCita,
+                  duracionMinutos: duracionMinutos,
+                  esTodoElDia: servicioDetalle?.tipo === 'Laboratorio'
+              });
+              googleEventIdFinal = resGoogle.googleEventId || ""; 
           }
 
-          // A. Limpieza de bloques de agenda
-          const qOldCitas = query(collection(db, "citas"), where("googleEventId", "==", citaExistente.googleEventId));
-          const snapOldCitas = await getDocs(qOldCitas);
-          for (const d of snapOldCitas.docs) { await deleteDoc(doc(db, "citas", d.id)); }
-
-          // B. SELLO DE DUPLICIDAD FINANCIERA (Evita lo ocurrido con Jorge Méndez)
-          if (idParaLimpieza) {
-              const qOldOp = query(
-                  collection(db, "operaciones"),
-                  where("pacienteId", "==", idParaLimpieza),
-                  where("fechaCita", "==", citaExistente.fecha),
-                  where("estatus", "in", ["Pendiente de Pago", "Pagado (Cortesía)"])
-              );
-              const snapOldOp = await getDocs(qOldOp);
-              for (const d of snapOldOp.docs) { await deleteDoc(doc(db, "operaciones", d.id)); }
-          }
+      } else {
+          // >>> CASO B: CITA TOTALMENTE NUEVA <<<
+          const resGoogle = await agendarCitaGoogle({
+              calendarId: data!.doctor.calendarId,
+              doctorNombre: data!.doctor.nombre,
+              fecha: fechaSeleccionada,
+              hora: horaSeleccionada,
+              pacienteNombre: nombreFinal,
+              motivo: tituloCita,
+              duracionMinutos: duracionMinutos,
+              esTodoElDia: servicioDetalle?.tipo === 'Laboratorio'
+          });
+          googleEventIdFinal = resGoogle.googleEventId || "";
       }
-      // >>> FIN: REAGENDADO <<<
 
-      // 2. REGISTRO DE PACIENTE (Si es nuevo)
+      // -----------------------------------------------------------------------
+      // FIN LÓGICA CORE
+      // -----------------------------------------------------------------------
+
+      // 2. REGISTRO DE PACIENTE (Si es nuevo) - Lógica Original mantenida
       let idFinal = pacienteSeleccionado?.id;
       let telFinal = pacienteSeleccionado?.telefonoCelular;
 
@@ -231,7 +276,6 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
               telefonoCelular: listaTelefonos[0] || "",
               convenioId: descuentoSeleccionado?.id || null,
               fechaRegistro: serverTimestamp(),
-              // Inyección de lógica fiscal corregida
               datosFiscales: requiereFactura ? {
                   tipoPersona: tipoPersona || "Fisica",
                   razonSocial: razonSocial?.toUpperCase(),
@@ -247,18 +291,8 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
           telFinal = patientData.telefonoCelular;
       }
 
-      // 3. AGENDA (Google + Firebase con bloques reales)
-      const resGoogle = await agendarCitaGoogle({
-          calendarId: data!.doctor.calendarId,
-          doctorNombre: data!.doctor.nombre,
-          fecha: fechaSeleccionada,
-          hora: horaSeleccionada,
-          pacienteNombre: nombreFinal,
-          motivo: tituloCita,
-          duracionMinutos: duracionMinutos,
-          esTodoElDia: servicioDetalle?.tipo === 'Laboratorio'
-      });
-
+      // 3. GENERACIÓN DE BLOQUES EN FIREBASE (Agenda Visual)
+      // Usamos googleEventIdFinal que calculamos arriba
       let horaActual = horaSeleccionada;
       for (let i = 0; i < bloquesNecesarios; i++) {
           await addDoc(collection(db, "citas"), {
@@ -267,13 +301,16 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
             telefonoCelular: telFinal,
             motivo: i === 0 ? tituloCita : "(Continuación)", 
             fecha: fechaSeleccionada, hora: horaActual,
-            creadoEn: serverTimestamp(), googleEventId: resGoogle.googleEventId,
+            creadoEn: serverTimestamp(), 
+            googleEventId: googleEventIdFinal, // 👈 AQUÍ ESTÁ LA CLAVE DE LA CORRECCIÓN
             elaboradoPor: user?.email || "Admin"
           });
           horaActual = sumarMinutos(horaActual, 30);
       }
 
       // 4. OPERACIÓN FINANCIERA (Reporte Ingresos)
+      // Solo creamos la deuda si no es una edición de "Solo cambio de hora" donde ya existía un pago,
+      // pero como arriba borramos las deudas pendientes, aquí regeneramos la deuda actualizada.
       await addDoc(collection(db, "operaciones"), {
         pacienteId: idFinal, pacienteNombre: nombreFinal,
         requiereFactura: requiereFactura,
