@@ -53,6 +53,7 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
   const [busqueda, setBusqueda] = useState("");
   const [resultados, setResultados] = useState<any[]>([]);
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<any>(null);
+  const [bloqueoDuplicado, setBloqueoDuplicado] = useState(false);
   
   // Props para FormularioPacienteBase
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm();
@@ -71,6 +72,7 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
     if (isOpen) {
         setServicioSku(""); setPrecioFinal(""); setNotaInterna(""); setHistorialCitas(0);
         setFechaSeleccionada(data?.fecha || ""); setHoraSeleccionada(data?.hora || "");
+        setBloqueoDuplicado(false);
         if (data?.prefilledName) { setModo('nuevo'); setValue("nombres", data.prefilledName.toUpperCase()); }
     }
   }, [isOpen, data, setValue]);
@@ -132,10 +134,6 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
     const timer = setTimeout(buscarPacientes, 300);
     return () => clearTimeout(timer);
   }, [busqueda]);
-
- // ... imports (se mantienen igual)
-
-// BUSTITUYE SOLO LA FUNCIÓN handleGuardar COMPLETA POR ESTA VERSIÓN:
 
   const handleGuardar = async (formData: any) => {
     if (!servicioSku) return toast.warning("Selecciona un servicio.");
@@ -247,10 +245,6 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
           });
           googleEventIdFinal = resGoogle.googleEventId || "";
       }
-
-      // -----------------------------------------------------------------------
-      // FIN LÓGICA CORE
-      // -----------------------------------------------------------------------
 
       // 2. REGISTRO DE PACIENTE (Si es nuevo) - Lógica Original mantenida
       let idFinal = pacienteSeleccionado?.id;
@@ -370,7 +364,22 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
                     )}
                 </div>
             ) : (
-                <FormularioPacienteBase register={register} errors={errors} watch={watch} setValue={setValue} listaTelefonos={listaTelefonos} actualizarTelefono={actualizarTelefono} agregarTelefono={agregarTelefono} eliminarTelefono={eliminarTelefono} descuentos={descuentos} setDescuentoSeleccionado={setDescuentoSeleccionado} requiereFactura={requiereFactura} setRequiereFactura={setRequiereFactura} setFotoFile={setFotoFile} />
+                <FormularioPacienteBase 
+                  register={register} 
+                  errors={errors} 
+                  watch={watch} 
+                  setValue={setValue} 
+                  listaTelefonos={listaTelefonos} 
+                  actualizarTelefono={actualizarTelefono} 
+                  agregarTelefono={agregarTelefono} 
+                  eliminarTelefono={eliminarTelefono} 
+                  descuentos={descuentos} 
+                  setDescuentoSeleccionado={setDescuentoSeleccionado} 
+                  requiereFactura={requiereFactura} 
+                  setRequiereFactura={setRequiereFactura} 
+                  setFotoFile={setFotoFile}
+                  setBloqueoDuplicado={setBloqueoDuplicado} 
+                />
             )}
 
             {/* SECTOR SERVICIO Y COSTO */}
@@ -395,8 +404,14 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
 
         <div className="p-6 border-t bg-slate-50 flex gap-4">
             <button type="button" onClick={onClose} className="flex-1 py-3 border rounded-lg font-bold text-slate-600 hover:bg-slate-200">Cancelar</button>
-            <button type="submit" onClick={handleSubmit(handleGuardar)} disabled={loading || !servicioSku} className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50">
-                {loading ? "Procesando..." : "Confirmar Cita y Registro"}
+            {/* ✅ CORRECCIÓN EN BOTÓN: Bloqueamos si hay duplicado */}
+            <button 
+              type="submit" 
+              onClick={handleSubmit(handleGuardar)} 
+              disabled={loading || !servicioSku || (modo === 'nuevo' && bloqueoDuplicado)} 
+              className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+                {bloqueoDuplicado ? "⛔ Duplicado" : (loading ? "Procesando..." : "Confirmar Cita y Registro")}
             </button>
         </div>
       </div>

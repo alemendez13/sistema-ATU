@@ -31,15 +31,17 @@ interface FormProps {
   setFotoFile: (f: File | null) => void;
   currentFotoUrl?: string;
   isEditing?: boolean;
-  datosActuales?: any; // ✅ Se añade para evitar el error ts(2304)
+  datosActuales?: any; 
+  setBloqueoDuplicado: (bloqueado: boolean) => void;
 }
 
 export default function FormularioPacienteBase({
   register, errors, watch, setValue, listaTelefonos, actualizarTelefono, 
   agregarTelefono, eliminarTelefono, descuentos, setDescuentoSeleccionado,
   requiereFactura, setRequiereFactura, setFotoFile, currentFotoUrl,
-  isEditing,      // ✅ Se añade aquí para que la función la reconozca
-  datosActuales   // ✅ Se añade aquí para que la función la reconozca
+  setBloqueoDuplicado,
+  isEditing,      
+  datosActuales   
 }: FormProps) {
 
   const inputStyle = "w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 text-sm border uppercase";
@@ -50,57 +52,95 @@ export default function FormularioPacienteBase({
   const [duplicado, setDuplicado] = React.useState<{ id: string, nombre: string } | null>(null);
   const [ultimaBusqueda, setUltimaBusqueda] = React.useState<Record<string, string>>({});
 
-    const nombreWatch = watch("nombres");
+  const nombreWatch = watch("nombres");
   const apellidoPWatch = watch("apellidoPaterno");
+  const apellidoMWatch = watch("apellidoMaterno"); 
+  const fechaNacWatch = watch("fechaNacimiento");  
   const curpWatch = watch("curp");
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
-        if (nombreWatch && apellidoPWatch) {
-            validarDuplicado("nombreCompleto", `${nombreWatch} ${apellidoPWatch}`.toUpperCase());
+        if (nombreWatch && apellidoPWatch && fechaNacWatch) {
+            const nombreCompleto = `${nombreWatch} ${apellidoPWatch} ${apellidoMWatch || ''}`.trim().toUpperCase();
+            validarDuplicado("identidad", { nombre: nombreCompleto, fecha: fechaNacWatch });
         }
-    }, 800); // Espera 800ms de silencio para buscar
+    }, 800);
     return () => clearTimeout(timer);
-  }, [nombreWatch, apellidoPWatch]);
+  }, [nombreWatch, apellidoPWatch, apellidoMWatch, fechaNacWatch]);
 
+  // EFECTO 2: Validación Legal (CURP)
   React.useEffect(() => {
     const timer = setTimeout(() => {
-        if (curpWatch) validarDuplicado("curp", curpWatch.toUpperCase());
+        if (curpWatch && curpWatch.length > 10) { // Validación mínima de longitud
+            validarDuplicado("curp", curpWatch.toUpperCase());
+        }
     }, 800);
     return () => clearTimeout(timer);
   }, [curpWatch]);
 
-  const validarDuplicado = async (campo: string, valor: string) => {
-    const valorLimpio = valor.trim().toUpperCase();
-    
-    // 🛡️ REGLA 1: Evitar búsquedas repetidas
-    if (!valorLimpio || valorLimpio.length < 3 || ultimaBusqueda[campo] === valorLimpio) return;
-    
-    // 🛡️ REGLA 2: No buscar si el valor es igual al original (Ahorra lecturas en edición)
-    if (isEditing && datosActuales?.[campo]?.toUpperCase() === valorLimpio) return;
+  // 🛡️ FUNCIÓN MAESTRA DE VALIDACIÓN (HÍBRIDA)
+  const validarDuplicado = async (criterio: "identidad" | "curp", valor: any) => {
+    // Generamos una "firma" única para el cache (si es objeto lo convertimos a string)
+    const firmaValor = typeof valor === 'object' ? JSON.stringify(valor) : valor;
+
+    // 🛡️ REGLA 1 (RECUPERADA): Si ya buscamos esto hace un momento, no gastar lectura
+    if (ultimaBusqueda[criterio] === firmaValor) return;
+
+    // 🛡️ REGLA 2 (RECUPERADA): Pre-validación en Edición
+    // Si estamos editando y los datos son iguales a los originales, no molestar a Firebase
+    if (isEditing && datosActuales) {
+        if (criterio === "curp" && datosActuales.curp === valor) return;
+        if (criterio === "identidad" && 
+            datosActuales.nombreCompleto === valor.nombre && 
+            datosActuales.fechaNacimiento === valor.fecha) return;
+    }
 
     try {
-        const q = query(
-            collection(db, "pacientes"), 
-            where(campo, "==", valorLimpio), 
-            limit(1)
-        );
+        let q;
+        
+        // Lógica de Búsqueda (Fase 3: Unicidad Compuesta)
+        if (criterio === "identidad") {
+             q = query(
+                collection(db, "pacientes"),
+                where("nombreCompleto", "==", valor.nombre),
+                where("fechaNacimiento", "==", valor.fecha), // Validación estricta
+                limit(1)
+            );
+        } else {
+             q = query(
+                collection(db, "pacientes"), 
+                where("curp", "==", valor), 
+                limit(1)
+            );
+        }
+
         const snap = await getDocs(q);
         
-        setUltimaBusqueda(prev => ({ ...prev, [campo]: valorLimpio }));
+        // Actualizamos caché para no repetir
+        setUltimaBusqueda(prev => ({ ...prev, [criterio]: firmaValor }));
 
         if (!snap.empty) {
             const docPac = snap.docs[0];
-            // 🛡️ REGLA 3: No marcar como duplicado si es el mismo paciente que editamos
+            
+            // 🛡️ REGLA 3: Verificar que no sea el mismo registro que editamos
             if (isEditing && docPac.id === datosActuales?.id) {
                 setDuplicado(null);
+                setBloqueoDuplicado(false);
             } else {
+                // ⛔ BLOQUEO ACTIVO
                 setDuplicado({ id: docPac.id, nombre: docPac.data().nombreCompleto });
+                setBloqueoDuplicado(true); 
             }
         } else {
+            // Limpieza si no hay duplicados
             setDuplicado(null);
+            setBloqueoDuplicado(false);
         }
-    } catch (e) { console.error("Error validando duplicado", e); }
+    } catch (e) { 
+        console.error("Error validando duplicado", e); 
+        // En caso de error de red, por seguridad no bloqueamos, pero logueamos
+        setBloqueoDuplicado(false); 
+    }
   };
 
   return (
@@ -130,24 +170,19 @@ export default function FormularioPacienteBase({
             <div><label className={labelStyle}>Apellido Materno</label><input className={inputStyle} {...register("apellidoMaterno")} /></div>
             {/* ⚠️ BANNER DE DETECCIÓN DE DUPLICADOS (Caso Alejandro Isla) */}
                 {duplicado && (
-                    <div className="col-span-full mt-4 bg-orange-50 border-2 border-orange-200 p-4 rounded-lg flex items-center gap-4 animate-pulse">
-                        <span className="text-2xl">⚠️</span>
-                        <div className="flex-1">
-                            <p className="text-orange-800 font-bold text-sm">
-                                POSIBLE EXPEDIENTE DUPLICADO DETECTADO
-                            </p>
-                            <p className="text-orange-700 text-xs">
-                                Ya existe un registro para <strong>{duplicado.nombre}</strong>.
-                            </p>
-                        </div>
-                        <Link 
-                            href={`/pacientes/${duplicado.id}`}
-                            className="bg-orange-600 text-white px-4 py-2 rounded-md text-xs font-bold hover:bg-orange-700 transition"
-                        >
-                            IR AL EXPEDIENTE EXISTENTE
-                        </Link>
-                    </div>
-                )}
+            <div className="col-span-full mt-4 bg-red-50 border-2 border-red-200 p-4 rounded-lg flex items-center gap-4 animate-pulse">
+                <span className="text-2xl">⛔</span>
+                <div className="flex-1">
+                    <p className="text-red-800 font-bold text-sm">
+                        DUPLICADO EXACTO DETECTADO (BLOQUEO FASE 3)
+                    </p>
+                    <p className="text-red-700 text-xs">
+                        El paciente <strong>{duplicado.nombre}</strong> ya existe con estos datos. No se permite duplicar.
+                    </p>
+                </div>
+                {/* Opcional: Link al expediente existente */}
+            </div>
+        )}
             <div><label className={labelStyle}>Fecha Nacimiento</label><input type="date" className={inputStyle} {...register("fechaNacimiento", { required: true })} /></div>
             <div><label className={labelStyle}>Género</label><select className={inputStyle} {...register("genero", { required: true })}><option value="">--</option>{GENEROS.map(g => <option key={g} value={g}>{g}</option>)}</select></div>
             <div><label className={labelStyle}>Email Personal</label><input type="email" className={inputStyle} {...register("email", { required: true })} /></div>

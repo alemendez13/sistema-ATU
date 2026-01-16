@@ -36,6 +36,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
   const [age, setAge] = useState<number | null>(null);
   const [esLaboratorio, setEsLaboratorio] = useState(false);
   const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB límite Plan Spark
+  const [bloqueoDuplicado, setBloqueoDuplicado] = useState(false);
 
   // --- ESTADOS DE SELECCIÓN (CASCADA) ---
   const [selectedArea, setSelectedArea] = useState("");
@@ -330,10 +331,16 @@ const onSubmit = async (data: any) => {
             descuentos={descuentos} setDescuentoSeleccionado={setDescuentoSeleccionado}
             requiereFactura={requiereFactura} setRequiereFactura={setRequiereFactura}
             setFotoFile={setFotoFile}
+            setBloqueoDuplicado={setBloqueoDuplicado}
         />
 
-        <Button type="submit" isLoading={isSubmitting} className="w-full text-lg py-4">
-          💾 Guardar Expediente y Generar Cobro
+        <Button 
+            type="submit" 
+            isLoading={isSubmitting} 
+            disabled={bloqueoDuplicado} // <--- AQUÍ LA MAGIA
+            className={`w-full text-lg py-4 ${bloqueoDuplicado ? 'opacity-50 cursor-not-allowed bg-slate-400' : ''}`}
+        >
+          {bloqueoDuplicado ? "⛔ DUPLICADO DETECTADO - NO SE PUEDE GUARDAR" : "💾 Guardar Expediente y Generar Cobro"}
         </Button>
       </form>
     </div>
