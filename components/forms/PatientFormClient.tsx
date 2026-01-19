@@ -236,20 +236,28 @@ const onSubmit = async (data: any) => {
         });
     }
 
-    // 6. OPERACIÓN FINANCIERA - RECUPERADO: 'esCita' y 'descuentoAplicado'
+    // 6. OPERACIÓN FINANCIERA - BLINDADA PARA CORTE DEL DÍA
+    const esPagadoAlMomento = montoFinal === 0; // Detecta si es Cortesía o $0
+
     await addDoc(collection(db, "operaciones"), {
       pacienteId: result.id,
       pacienteNombre: nombreConstruido,
-      folioPaciente: result.folio, // Mejora de trazabilidad
+      folioPaciente: result.folio,
       requiereFactura,
       servicioSku: servicioSeleccionado.sku,
       servicioNombre: servicioSeleccionado.nombre,
       monto: montoFinal, 
       montoOriginal: cleanPrice(servicioSeleccionado.precio),
-      descuentoAplicado: descuentoSeleccionado?.nombre || null, // <-- RESTAURADO
-      fecha: serverTimestamp(),
-      estatus: montoFinal === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago", 
-      esCita: esServicioMedico, // <-- RESTAURADO
+      descuentoAplicado: descuentoSeleccionado?.nombre || null,
+      fecha: serverTimestamp(), // Fecha de creación del registro
+      
+      // 👇 CAMBIO CLAVE: Asignamos fechaPago si se paga hoy. Si no, queda null.
+      estatus: esPagadoAlMomento ? "Pagado (Cortesía)" : "Pendiente de Pago", 
+      fechaPago: esPagadoAlMomento ? serverTimestamp() : null, 
+      metodoPago: esPagadoAlMomento ? "Cortesía" : null,
+      // 👆 FIN CAMBIO CLAVE
+
+      esCita: esServicioMedico,
       fechaCita: data.fechaCita || null, 
       horaCita: data.horaCita || null,
       doctorNombre: medicos.find(m => m.id === selectedMedicoId)?.nombre || null
