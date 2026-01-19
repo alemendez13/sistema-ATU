@@ -2,11 +2,20 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, onSnapshot, orderBy } from "@/lib/firebase-guard";
 import { db } from "../../lib/firebase";
+import { useAuth } from "../../hooks/useAuth";
 
 export default function CorteDia() {
   const [ingresos, setIngresos] = useState<any[]>([]);
   const [gastos, setGastos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // 1. Obtenemos el usuario y le decimos a TypeScript que sea flexible (as any)
+  const { user } = useAuth() as any; 
+  
+  // 2. Definimos la lista de correos permitidos
+  const admins = ["administracion@sansce.com", "alejandra.mendez@sansce.com"];
+  
+  // 3. Verificamos: ¿Existe usuario? Y ¿Su correo está en la lista?
+  const esAdmin = user?.email && admins.includes(user.email);
 
   useEffect(() => {
     // 🔒 ESTRATEGIA: Rango de tiempo estricto (00:00 a 23:59 de HOY)
@@ -110,34 +119,37 @@ export default function CorteDia() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
       
-      {/* Tarjeta 1: Ventas Totales */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      {/* Tarjeta 1: Ventas Totales (CON CANDADO DE PRIVACIDAD) */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative">
         <div className="absolute top-0 right-0 bg-blue-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-lg">HOY</div>
-        <p className="text-xs font-bold text-slate-400 uppercase">Ventas Totales</p>
-        <p className="text-2xl font-bold text-slate-800">${totalVendido.toFixed(2)}</p>
-        {/* Desglose visual actualizado */}
-        <div className="mt-2 text-[10px] text-slate-500 flex flex-col gap-1">
-            <div className="flex justify-between"><span>💳 Banco:</span> <span>${dineroBanco.toFixed(2)}</span></div>
-            <div className="flex justify-between"><span>💵 Caja Recep:</span> <span>${efectivoEntrada.toFixed(2)}</span></div>
-            {/* ✅ Mostramos explícitamente cuánto tienen los médicos */}
-            <div className="flex justify-between text-indigo-600 font-bold">
-                <span>👨‍⚕️ Efectivo PS:</span> 
-                <span>${efectivoPS.toFixed(2)}</span>
+        
+        {esAdmin ? (
+          /* --- VISTA DE ADMINISTRADOR (VE TODO EL DINERO) --- */
+          <>
+            <p className="text-xs font-bold text-slate-400 uppercase">Ventas Totales</p>
+            <p className="text-2xl font-bold text-slate-800">${totalVendido.toFixed(2)}</p>
+            
+            <div className="mt-2 text-[10px] text-slate-500 flex flex-col gap-1">
+                <div className="flex justify-between"><span>💳 Banco:</span> <span>${dineroBanco.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>💵 Caja Recep:</span> <span>${efectivoEntrada.toFixed(2)}</span></div>
+                <div className="flex justify-between text-indigo-600 font-bold">
+                    <span>👨‍⚕️ Efectivo PS:</span> <span>${efectivoPS.toFixed(2)}</span>
+                </div>
             </div>
-        </div>
 
-        {/* 📊 MINI-DESGLOSE TÉCNICO DE TERMINALES */}
-        <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-y-1 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-            <div className="flex justify-between pr-2 border-r border-slate-100">
-                <span className="text-sky-600">MP:</span>
-                <span className="text-slate-700">${tpvMP.toFixed(2)}</span>
+            <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-y-1 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                <div className="flex justify-between pr-2 border-r border-slate-100"><span className="text-sky-600">MP:</span><span className="text-slate-700">${tpvMP.toFixed(2)}</span></div>
+                <div className="flex justify-between pl-2"><span className="text-emerald-700">BAN:</span><span className="text-slate-700">${tpvBAN.toFixed(2)}</span></div>
             </div>
-            <div className="flex justify-between pl-2">
-                <span className="text-emerald-700">BAN:</span>
-                <span className="text-slate-700">${tpvBAN.toFixed(2)}</span>
-            </div>
-        </div>
-
+          </>
+        ) : (
+          /* --- VISTA DE RECEPCIÓN (SOLO VE SU CAJA) --- */
+          <>
+            <p className="text-xs font-bold text-slate-400 uppercase">💵 Efectivo en Caja</p>
+            <p className="text-3xl font-bold text-blue-600 mt-2 mb-2">${efectivoEntrada.toFixed(2)}</p>
+            <p className="text-[10px] text-slate-400 italic">Total cobrado en efectivo por recepción el día de hoy.</p>
+          </>
+        )}
       </div>
 
       {/* Tarjeta 2: Salidas (Gastos) */}
