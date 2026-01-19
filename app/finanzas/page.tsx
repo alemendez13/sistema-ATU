@@ -16,6 +16,8 @@ export default function FinanzasPage() {
   const [loading, setLoading] = useState(true);
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
   const { user } = useAuth() as any; 
+  const admins = ["administracion@sansce.com", "alejandra.mendez@sansce.com"];
+  const esAdmin = user?.email && admins.includes(user.email);
   const [verCarteraVencida, setVerCarteraVencida] = useState(false);
   const [opParaTarjeta, setOpParaTarjeta] = useState<Operacion | null>(null);
   const [opParaPagoMixto, setOpParaPagoMixto] = useState<Operacion | null>(null);
@@ -172,15 +174,26 @@ const totalListaActual = pendientes.reduce((acc, op) => {
                   </span>
               </div>
 
-              {/* Badge de MONTO TOTAL (La Solución) */}
+              {/* Badge de MONTO TOTAL (CON PRIVACIDAD) */}
               {pendientes.length > 0 && (
                   <div className={`px-4 py-2 rounded-lg border flex items-center gap-2 ${verCarteraVencida ? 'bg-red-50 border-red-200 text-red-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
                       <span className="text-[10px] uppercase font-bold opacity-70">
                           {verCarteraVencida ? "Total Deuda:" : "Por Cobrar Hoy:"}
                       </span>
+                      
+                      {/* INICIO DE LA CONDICIÓN DE PRIVACIDAD */}
                       <span className="text-lg font-black font-mono">
-                          {formatCurrency(totalListaActual)}
+                          {esAdmin ? (
+                              // Si es Admin, ve el monto real siempre
+                              formatCurrency(totalListaActual)
+                          ) : (
+                              // Si NO es Admin...
+                              verCarteraVencida 
+                                ? "---" // En Cartera Vencida (histórico) ve guiones ocultos
+                                : formatCurrency(totalListaActual) // En Cobranza del Día (lo de hoy) sí ve el monto para saber cuánto falta cobrar
+                          )}
                       </span>
+                      {/* FIN DE LA CONDICIÓN */}
                   </div>
               )}
           </div>
