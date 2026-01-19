@@ -72,13 +72,20 @@ export default function ReporteIngresosMedicos() {
 
       // 🟢 1. CONSULTA UNIFICADA POR FECHA CITA (String ISO)
       // Buscamos directamente por el día que ocurrió la cita, no por el registro
+      // A. Configurar Rango de Fechas (Inicio 00:00 - Fin 23:59)
+      const start = new Date(fechaInicio);
+      start.setHours(0,0,0,0);
+      const end = new Date(fechaFin);
+      end.setHours(23,59,59,999);
+
+      // B. Consulta corregida: Filtrar por FECHA DE PAGO (Cash Flow)
       const q = query(
         collection(db, "operaciones"),
         where("doctorId", "==", medicoId),
-        where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]), // 🎯 Incluye las cortesías de $0
-        where("fechaCita", ">=", fechaInicio), // 🎯 Filtro por String "YYYY-MM-DD"
-        where("fechaCita", "<=", fechaFin),
-        orderBy("fechaCita", "desc")
+        where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]),
+        where("fechaPago", ">=", start),
+        where("fechaPago", "<=", end),
+        orderBy("fechaPago", "desc")
       );
 
       const snapshot = await getDocs(q);
@@ -295,7 +302,7 @@ export default function ReporteIngresosMedicos() {
                         <tbody className="divide-y divide-slate-100">
                             {movimientos.map((mov) => (
                                 <tr key={mov.id} className="hover:bg-slate-50">
-                                    <td className="px-4 py-3 font-mono text-xs text-slate-500">{mov.fecha}</td>
+                                    <td className="px-4 py-3 font-mono text-xs text-slate-500">{/* Muestra la fecha de pago real formateada */}{new Date(mov.fechaPago?.seconds * 1000 || Date.now()).toLocaleDateString('es-MX')}</td>
                                     <td className="px-4 py-3 font-bold text-slate-700">{mov.paciente}</td>
                                     <td className="px-4 py-3 text-slate-600 text-xs">{mov.concepto}</td>
                                     <td className="px-4 py-3">{mov.formaPago}</td>

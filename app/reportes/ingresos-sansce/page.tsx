@@ -65,11 +65,19 @@ export default function ReporteIngresosPage() {
     setLoading(true);
     try {
       // 1. Consulta principal
+      // 1. Definir rango de tiempo (00:00:00 a 23:59:59 del día seleccionado)
+      const inicioDia = new Date(fechaSeleccionada);
+      inicioDia.setHours(0, 0, 0, 0);
+      const finDia = new Date(fechaSeleccionada);
+      finDia.setHours(23, 59, 59, 999);
+
+      // 2. Consulta corregida: Filtrar por FECHA DE PAGO real
       const q = query(
         collection(db, "operaciones"),
         where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]),
-        where("fechaCita", "==", fechaSeleccionada),
-        orderBy("fecha", "desc")
+        where("fechaPago", ">=", inicioDia),
+        where("fechaPago", "<=", finDia),
+        orderBy("fechaPago", "desc")
       );
 
       const snapshot = await getDocs(q);

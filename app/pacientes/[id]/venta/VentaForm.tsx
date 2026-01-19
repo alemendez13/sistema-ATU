@@ -210,7 +210,11 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
         folioInterno: generateFolio("FIN-FR-09", ""), 
         fecha: serverTimestamp(),
         // Si el precio es 0, se marca como pagado para no generar deuda histórica [cite: 14]
+        // VentaForm.tsx (Código CORREGIDO)
+        // Si es cortesía ($0), definimos que se pagó HOY mismo.
         estatus: Number(precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
+        fechaPago: Number(precioFinal) === 0 ? serverTimestamp() : null, // 👈 AGREGAR ESTA LÍNEA
+        metodoPago: Number(precioFinal) === 0 ? "Cortesía" : null,       // 👈 AGREGAR ESTA LÍNEA
         
         esCita: esServicio,
         doctorId: medicoId || null,
