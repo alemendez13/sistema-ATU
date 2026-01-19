@@ -21,7 +21,7 @@ export default function PatientActions({ pacienteId, datosActuales, descuentos }
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  
+  const [bloqueoDuplicado, setBloqueoDuplicado] = useState(false);
   // Estados para archivos y teléfonos dinámicos
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [listaTelefonos, setListaTelefonos] = useState<string[]>(
@@ -68,6 +68,11 @@ export default function PatientActions({ pacienteId, datosActuales, descuentos }
   };
 
   const onUpdate = async (data: any) => {
+    //Seguridad Extra (No confiar solo en UI deshabilitada)
+    if (bloqueoDuplicado) {
+        toast.error("No se puede guardar: Datos duplicados con otro paciente.");
+        return;
+    }
     setLoading(true);
     try {
       let finalFotoUrl = datosActuales.fotoUrl || null;
@@ -113,6 +118,13 @@ export default function PatientActions({ pacienteId, datosActuales, descuentos }
     finally { setLoading(false); }
   };
 
+  // Reseteo de seguridad al abrir/cerrar modal
+  useEffect(() => {
+    if (isEditing) {
+        setBloqueoDuplicado(false);
+    }
+  }, [isEditing]);
+
   return (
     <>
       <div className="flex gap-2 mt-4">
@@ -150,6 +162,9 @@ export default function PatientActions({ pacienteId, datosActuales, descuentos }
                     setFotoFile={setFotoFile}
                     currentFotoUrl={datosActuales.fotoUrl || undefined}
                     isEditing={true}
+                    // Pasamos la función obligatoria
+                    setBloqueoDuplicado={setBloqueoDuplicado}
+                    datosActuales={datosActuales} // Aseguramos que se pase para que la lógica de "ignorarse a sí mismo" funcione
                 />
             </form>
 
@@ -160,10 +175,17 @@ export default function PatientActions({ pacienteId, datosActuales, descuentos }
                 <button 
                     type="submit"
                     onClick={handleSubmit(onUpdate)}
-                    disabled={loading}
-                    className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700 disabled:opacity-50"
+                    disabled={loading || bloqueoDuplicado} // Bloqueo visual
+                    className={`px-6 py-2 text-white font-bold rounded-lg shadow transition-colors disabled:opacity-50 ${
+                        bloqueoDuplicado 
+                        ? "bg-slate-400 cursor-not-allowed" 
+                        : "bg-blue-600 hover:bg-blue-700"
+                    }`}
                 >
-                    {loading ? "Sincronizando..." : "💾 Guardar Cambios"}
+                    {bloqueoDuplicado 
+                        ? "⛔ Duplicado Detectado" 
+                        : (loading ? "Sincronizando..." : "💾 Guardar Cambios")
+                    }
                 </button>
             </div>
           </div>
