@@ -9,29 +9,31 @@ export default function CorteDia() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Definir el inicio del día (00:00 hrs)
+    // 🔒 ESTRATEGIA: Rango de tiempo estricto (00:00 a 23:59 de HOY)
     const inicioDia = new Date();
     inicioDia.setHours(0, 0, 0, 0);
+    
+    const finDia = new Date();
+    finDia.setHours(23, 59, 59, 999);
 
-    // 1. Escuchar INGRESOS (Pagados hoy)
+    // 1. Escuchar INGRESOS (Estrictamente Pagados HOY)
     const qIngresos = query(
-  collection(db, "operaciones"),
-  where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]), // 🎯 Ahora detecta ambos
-  where("fechaPago", ">=", inicioDia),
-  orderBy("fechaPago", "desc")
-      // 💡 Nota: Si quieres agrupar también aquí por doctor, 
-      // debes añadir orderBy("doctorNombre", "asc") y crear el índice.
+      collection(db, "operaciones"),
+      where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]),
+      where("fechaPago", ">=", inicioDia),
+      where("fechaPago", "<=", finDia), // 🛡️ Bloqueo de fechas futuras o errores
+      orderBy("fechaPago", "desc")
     );
 
-    // 2. Escuchar GASTOS (De hoy)
+    // 2. Escuchar GASTOS (Estrictamente de HOY)
     const qGastos = query(
       collection(db, "gastos"),
       where("fecha", ">=", inicioDia),
+      where("fecha", "<=", finDia),
       orderBy("fecha", "desc")
     );
 
-    // Suscripciones en tiempo real
-   const unsubscribeIngresos = onSnapshot(qIngresos, (snap) => {
+    const unsubscribeIngresos = onSnapshot(qIngresos, (snap) => {
       setIngresos(snap.docs.map(d => d.data()));
     }, (error) => console.error("Error en Ingresos:", error));
 
@@ -110,6 +112,7 @@ export default function CorteDia() {
       
       {/* Tarjeta 1: Ventas Totales */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div className="absolute top-0 right-0 bg-blue-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-lg">HOY</div>
         <p className="text-xs font-bold text-slate-400 uppercase">Ventas Totales</p>
         <p className="text-2xl font-bold text-slate-800">${totalVendido.toFixed(2)}</p>
         {/* Desglose visual actualizado */}
