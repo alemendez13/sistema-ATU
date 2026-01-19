@@ -1,13 +1,12 @@
 /* app/reportes/cotizacion-lab/ClientCotizador.tsx */
 "use client";
 import { useState, useEffect } from "react";
-// CAMBIO CLAVE: Usamos el componente directo, no el hook complejo
 import { PDFDownloadLink } from "@react-pdf/renderer"; 
 import CotizacionLabPDF from "../../../components/documents/CotizacionLabPDF";
 import Link from "next/link";
 import { collection, query, where, getDocs, limit } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
-import { cleanPrice } from "../../../lib/utils"; // ⬅️ Importa tu nueva utilidad
+import { cleanPrice } from "../../../lib/utils";
 
 export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[], medicos: any[] }) {
   // Estados
@@ -24,13 +23,11 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
   // 1. BUSCADOR DE PACIENTES (Firebase)
   useEffect(() => {
     const buscar = async () => {
-      // Si escribimos menos de 3 letras, limpiamos lista
       if (pacienteInput.length < 3) {
         setResultadosPacientes([]);
         return;
       }
 
-      // Consultamos Firebase
       try {
         const q = query(
             collection(db, "pacientes"),
@@ -45,15 +42,13 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
       }
     };
 
-    // Debounce de 300ms
     const timer = setTimeout(buscar, 300);
     return () => clearTimeout(timer);
   }, [pacienteInput]);
 
-  // Al seleccionar un paciente de la lista
   const seleccionarPaciente = (nombre: string) => {
-      setPacienteInput(nombre); // Llenamos el input
-      setResultadosPacientes([]); // Ocultamos la lista MÁGICAMENTE
+      setPacienteInput(nombre); 
+      setResultadosPacientes([]); 
   };
 
   // 2. FILTRO DE ESTUDIOS (Local)
@@ -78,7 +73,6 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
 
   const total = itemsSeleccionados.reduce((acc, curr) => acc + (curr.precio || 0), 0);
 
-  // Objeto de datos para el PDF (Siempre fresco)
   const datosPDF = {
       paciente: pacienteInput.toUpperCase() || "PÚBLICO EN GENERAL",
       medico: medicoInput || "SANSCE",
@@ -97,8 +91,14 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
                 <h1 className="text-2xl font-bold text-slate-800">Cotizador de Laboratorio</h1>
             </div>
 
+            {/* AVISO DE CONEXIÓN (Solo aparece si falló Google Sheets) */}
+            {catalogo.length === 0 && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg text-sm">
+                    ⚠️ <strong>Modo Sin Conexión:</strong> No se pudo conectar con el catálogo de precios. Verifica tu conexión a Google Sheets.
+                </div>
+            )}
+
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4 relative">
-                {/* BUSCADOR PACIENTE */}
                 <div className="relative">
                     <label className="block text-xs font-bold text-slate-500 mb-1">Paciente</label>
                     <input 
@@ -109,7 +109,6 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
                         autoComplete="off"
                     />
                     
-                    {/* LISTA FLOTANTE DE RESULTADOS (Solo si hay resultados y estamos escribiendo) */}
                     {resultadosPacientes.length > 0 && (
                         <div className="absolute z-50 w-full bg-white border border-slate-200 shadow-xl mt-1 rounded-lg max-h-60 overflow-y-auto">
                             {resultadosPacientes.map((p, i) => (
@@ -126,7 +125,6 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
                     )}
                 </div>
 
-                {/* SELECTOR MÉDICO */}
                 <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">Médico Solicitante</label>
                     <select 
@@ -143,7 +141,6 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
                 </div>
             </div>
 
-            {/* BUSCADOR ESTUDIOS */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative z-0">
                 <label className="block text-xs font-bold text-slate-500 mb-2">Agregar Estudio</label>
                 <input 
@@ -151,6 +148,7 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
                     value={busquedaEstudio}
                     onChange={e => setBusquedaEstudio(e.target.value)}
                     placeholder="🔍 Ej. Antígeno, Biometría..."
+                    disabled={catalogo.length === 0} // Bloquear si no hay datos
                 />
                 
                 {resultadosEstudios.length > 0 && (
@@ -185,21 +183,17 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
             <div className="flex-1 overflow-y-auto space-y-2 mb-6">
                 {itemsSeleccionados.length === 0 && <p className="text-slate-400 text-center italic py-10">Lista vacía...</p>}
                 
-                {/* DENTRO DEL MAP DE ITEMS SELECCIONADOS */}
                 {itemsSeleccionados.map((item, idx) => (
                     <div key={idx} className="flex justify-between items-start bg-slate-50 p-3 rounded border border-slate-100">
                         <div className="flex-1 pr-2">
                             <p className="font-medium text-sm text-slate-800">{item.nombre}</p>
                             <p className="text-[10px] text-slate-500 mb-1">{item.tiempo} • {item.muestra}</p>
                             
-                            {/* 👇 AQUÍ AGREGAMOS LA NOTA INTERNA 👇 */}
                             {item.indicacionesPersonal && (
                                 <div className="bg-amber-50 text-amber-700 text-[10px] px-2 py-1 rounded border border-amber-100 inline-block mt-1 font-medium">
                                     ⚠️ <strong>Ojo Clínico:</strong> {item.indicacionesPersonal}
                                 </div>
                             )}
-                            {/* 👆 FIN DE LA MODIFICACIÓN 👆 */}
-                        
                         </div>
                         <div className="flex flex-col items-end gap-1">
                             <span className="font-bold text-slate-700 text-sm">${(item.precio || 0).toFixed(2)}</span>
@@ -209,7 +203,6 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
                 ))}
             </div>
 
-            {/* GENERADOR PDF REACTIVO */}
             {itemsSeleccionados.length > 0 && isClient && (
                 <div className="pt-4 border-t">
                     <PDFDownloadLink 

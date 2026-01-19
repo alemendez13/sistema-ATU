@@ -1,16 +1,31 @@
 /* app/reportes/cotizacion-lab/page.tsx */
-// ✅ MODIFICACIÓN: Cambiamos getCatalogoLaboratorio por getLaboratorios
 import { getLaboratorios, getMedicos } from "../../../lib/googleSheets"; 
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import ClientCotizador from "./ClientCotizador"; 
 
+// 🛡️ CONFIGURACIÓN VITAL PARA NETLIFY
+export const revalidate = 60; 
+export const dynamic = 'force-dynamic';
+
 export default async function CotizadorPage() {
-  // Cargamos ambos catálogos en paralelo para velocidad
-  const [catalogo, medicos] = await Promise.all([
-    // ✅ MODIFICACIÓN: Usamos la función correcta
-    getLaboratorios(),
-    getMedicos()
-  ]);
+  // 👇 AQUÍ ESTÁ LA CORRECCIÓN: Agregamos el tipo ": any[]" explícito
+  let catalogo: any[] = [];
+  let medicos: any[] = [];
+
+  try {
+    // Intentamos cargar los catálogos en paralelo
+    const [dataLab, dataMed] = await Promise.all([
+      getLaboratorios(),
+      getMedicos()
+    ]);
+    catalogo = dataLab || [];
+    medicos = dataMed || [];
+  } catch (error) {
+    console.error("⚠️ Error conectando con Google Sheets (Build Safe Mode):", error);
+    // En caso de error, enviamos arrays vacíos para NO ROMPER EL BUILD
+    catalogo = [];
+    medicos = [];
+  }
 
   return (
     <ProtectedRoute>
