@@ -312,7 +312,11 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
         monto: Number(precioFinal), 
         montoOriginal: cleanPrice(servicioDetalle?.precio),
         descuentoAplicado: descuentoSeleccionado?.nombre || null,
+        // Corrección para alinear con Caja y Reportes:
         estatus: Number(precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
+        // Si es cortesía ($0), registramos la fecha de pago HOY para que salga en el corte:
+        fechaPago: Number(precioFinal) === 0 ? serverTimestamp() : null,
+        metodoPago: Number(precioFinal) === 0 ? "Cortesía" : null,
         fecha: serverTimestamp(), fechaCita: fechaSeleccionada,
         doctorNombre: data!.doctor.nombre, origen: "Agenda"
       });
