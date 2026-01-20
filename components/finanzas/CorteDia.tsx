@@ -58,61 +58,46 @@ export default function CorteDia() {
   }, []);
 
   // --- CÁLCULOS MATEMÁTICOS ---
-  // Función para limpiar precios
-  // 1. Definición de la función de suma técnica
-  const sumarMonto = (arr: any[]) => 
-    arr.reduce((acc, curr) => {
-        // 🎯 Verificamos si existe el cobro final (montoPagado), incluso si es 0.
-        // Si no existe (está pendiente), usamos el monto base de la cita.
-        const valorFinal = (curr.montoPagado !== undefined && curr.montoPagado !== null) 
+  // 🛠️ FUNCIÓN DE SUMA ROBUSTA (Corregida para el problema de los ceros)
+  const calcularTotal = (arr: any[], filtro?: string) => {
+    return arr.reduce((acc, curr) => {
+        let montoItem = 0;
+        
+        // 1. Determinar el monto real de este ítem (Priorizamos 'montoPagado')
+        const valorBase = (curr.montoPagado !== undefined && curr.montoPagado !== null) 
             ? Number(curr.montoPagado) 
             : Number(curr.monto);
-            
-        // Sumamos solo si es un número válido para evitar el error "NaN"
-        return acc + (isNaN(valorFinal) ? 0 : valorFinal);
-    }, 0);
-
-    const sumarPorMetodo = (arr: any[], metodoDeseado: string) => 
-    arr.reduce((acc, curr) => {
-        // 1. Si la operación tiene desglose (Pago Mixto)
-        if (curr.desglosePagos && Array.isArray(curr.desglosePagos)) {
-            const parcial = curr.desglosePagos
-                .filter((p: any) => p.metodo === metodoDeseado)
-                .reduce((a: number, c: any) => a + c.monto, 0);
-            return acc + parcial;
+        
+        // 2. Lógica de filtrado
+        if (!filtro) {
+            montoItem = valorBase;
+        } else {
+            // A. Revisar desglose (Pagos Mixtos)
+            if (curr.desglosePagos && Array.isArray(curr.desglosePagos) && curr.desglosePagos.length > 0) {
+                montoItem = curr.desglosePagos
+                    .filter((p: any) => p.metodo && p.metodo.includes(filtro))
+                    .reduce((a: number, c: any) => a + (Number(c.monto) || 0), 0);
+            } 
+            // B. Revisar pago simple (Flexible con .includes)
+            else if (curr.metodoPago && curr.metodoPago.includes(filtro)) {
+                montoItem = valorBase;
+            }
         }
-        // 2. Si es un pago tradicional (Efectivo, Tarjeta, etc.)
-        return acc + (curr.metodoPago === metodoDeseado ? (curr.montoPagado || 0) : 0);
+        
+        return acc + (isNaN(montoItem) ? 0 : montoItem);
     }, 0);
+  };
 
-  // 2. Mantenimiento de variables originales para el reporte
-  const totalVendido    = sumarMonto(ingresos);
-  const efectivoEntrada = sumarPorMetodo(ingresos, 'Efectivo');
-  const efectivoPS = sumarPorMetodo(ingresos, 'Efectivo PS');
-  // Usamos .includes() para capturar 'TPV MP', 'TPV Cred MP', 'TPV DebMP', etc.
-  const tpvMP = ingresos.reduce((acc, curr) => {
-      if (curr.desglosePagos) {
-          // Suma las partes de MP dentro de un pago mixto
-          return acc + curr.desglosePagos
-              .filter((p: any) => p.metodo.includes('MP'))
-              .reduce((a: number, c: any) => a + c.monto, 0);
-      }
-      // Suma pagos directos
-      return acc + (curr.metodoPago?.includes('MP') ? (curr.montoPagado || 0) : 0);
-  }, 0);
-
-  const tpvBAN = ingresos.reduce((acc, curr) => {
-      if (curr.desglosePagos) {
-          // Suma las partes de BANORTE dentro de un pago mixto
-          return acc + curr.desglosePagos
-              .filter((p: any) => p.metodo.includes('BAN'))
-              .reduce((a: number, c: any) => a + c.monto, 0);
-      }
-      return acc + (curr.metodoPago?.includes('BAN') ? (curr.montoPagado || 0) : 0);
-  }, 0);
-  const dineroBanco = totalVendido - efectivoEntrada - efectivoPS;
-  const totalGastos     = sumarMonto(gastos);
-  const balanceCaja     = efectivoEntrada - totalGastos;
+  const totalVendido = calcularTotal(ingresos); 
+  const totalGastos = calcularTotal(gastos);
+  
+  // Filtros flexibles: "Efectivo" suma tanto Recepción como PS
+  const efectivo = calcularTotal(ingresos, "Efectivo");
+  const tpvMP = calcularTotal(ingresos, "MP");   // Atrapa Cred y Deb MP
+  const tpvBAN = calcularTotal(ingresos, "BAN"); // Atrapa Cred y Deb BAN
+  
+  const dineroBanco = totalVendido - efectivo;
+  const balanceCaja = efectivo - totalGastos;
 
   if (loading) return <div className="p-4 text-center text-slate-400">Calculando corte...</div>;
 
@@ -124,29 +109,34 @@ export default function CorteDia() {
         <div className="absolute top-0 right-0 bg-blue-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-lg">HOY</div>
         
         {esAdmin ? (
-          /* --- VISTA DE ADMINISTRADOR (VE TODO EL DINERO) --- */
+          /* --- VISTA DE ADMINISTRADOR (MEJORADA) --- */
           <>
             <p className="text-xs font-bold text-slate-400 uppercase">Ventas Totales</p>
             <p className="text-2xl font-bold text-slate-800">${totalVendido.toFixed(2)}</p>
             
             <div className="mt-2 text-[10px] text-slate-500 flex flex-col gap-1">
-                <div className="flex justify-between"><span>💳 Banco:</span> <span>${dineroBanco.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>💵 Caja Recep:</span> <span>${efectivoEntrada.toFixed(2)}</span></div>
-                <div className="flex justify-between text-indigo-600 font-bold">
-                    <span>👨‍⚕️ Efectivo PS:</span> <span>${efectivoPS.toFixed(2)}</span>
+                <div className="flex justify-between border-b border-slate-50 pb-1">
+                    <span>💵 Efectivo (Recep + PS):</span> 
+                    <span className="font-bold text-slate-700">${efectivo.toFixed(2)}</span>
                 </div>
-            </div>
-
-            <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-y-1 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                <div className="flex justify-between pr-2 border-r border-slate-100"><span className="text-sky-600">MP:</span><span className="text-slate-700">${tpvMP.toFixed(2)}</span></div>
-                <div className="flex justify-between pl-2"><span className="text-emerald-700">BAN:</span><span className="text-slate-700">${tpvBAN.toFixed(2)}</span></div>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                    <div className="bg-sky-50 px-2 py-1 rounded">
+                        <span className="block text-sky-600 font-bold">MP</span>
+                        <span className="block text-slate-700">${tpvMP.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-red-50 px-2 py-1 rounded">
+                        <span className="block text-red-600 font-bold">BANORTE</span>
+                        <span className="block text-slate-700">${tpvBAN.toFixed(2)}</span>
+                    </div>
+                </div>
             </div>
           </>
         ) : (
+
           /* --- VISTA DE RECEPCIÓN (SOLO VE SU CAJA) --- */
           <>
             <p className="text-xs font-bold text-slate-400 uppercase">💵 Efectivo en Caja</p>
-            <p className="text-3xl font-bold text-blue-600 mt-2 mb-2">${efectivoEntrada.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-blue-600 mt-2 mb-2">${efectivo.toFixed(2)}</p>
             <p className="text-[10px] text-slate-400 italic">Total cobrado en efectivo por recepción el día de hoy.</p>
           </>
         )}
@@ -166,7 +156,7 @@ export default function CorteDia() {
             <p className="text-3xl font-bold">${balanceCaja.toFixed(2)}</p>
         </div>
         <div className="text-right text-xs text-slate-400">
-            <p>Entradas Efec: +${efectivoEntrada}</p>
+            <p>Entradas Efec: +${efectivo.toFixed(2)}</p>
             <p>Salidas Efec: -${totalGastos}</p>
             <div className="border-t border-slate-600 mt-1 pt-1 font-bold text-white">
                 Total: ${balanceCaja}
