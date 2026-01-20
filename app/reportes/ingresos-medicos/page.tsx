@@ -67,19 +67,43 @@ export default function ReporteIngresosMedicos() {
 
     try {
       const medicoSelected = medicos.find(m => m.id === medicoId);
-      // Limpieza del porcentaje
-      const porcentaje = parseFloat((medicoSelected?.porcentajeComision || "0").toString().replace('%', '')) / 100;
+      
+      // 🛡️ Lógica Blindada: Manejo de "Renta", "Nómina" y porcentajes
+      let rawPorcentaje = medicoSelected?.porcentajeComision || "0";
+      let porcentaje = 0;
 
-      // 🟢 1. CONSULTA UNIFICADA POR FECHA CITA (String ISO)
-      // Buscamos directamente por el día que ocurrió la cita, no por el registro
+      // Si el Excel dice explícitamente "Renta" o "Nómina", la comisión variable es 0
+      const textoNormalizado = String(rawPorcentaje).toLowerCase();
+      if (textoNormalizado.includes("renta") || textoNormalizado.includes("nomina") || textoNormalizado.includes("nómina")) {
+          porcentaje = 0;
+      } else {
+          // Si es un número (ej. "30%"), limpiamos símbolos y dividimos
+          const soloNumeros = String(rawPorcentaje).replace(/[^0-9.]/g, '');
+          porcentaje = (parseFloat(soloNumeros) || 0) / 100;
+          
+          // Caso especial: Si pusieron "100" (sin %), asumimos que es 100% (1.0)
+          // Ajusta esta lógica si "100" en tu Excel significa otra cosa.
+          if (porcentaje > 1) porcentaje = porcentaje / 100; 
+      }
+      
+      console.log(`🧮 Calculando liquidación para ${medicoSelected?.nombre}: Comisión detectada ${porcentaje * 100}%`);
+
+      // 🟢 1. CONSULTA HÍBRIDA (Corrección para recuperar datos históricos)
+      // Validamos primero que el médico tenga nombre para evitar errores
+      if (!medicoSelected?.nombre) {
+          toast.error("Error: El médico seleccionado no tiene nombre asociado.");
+          setLoading(false);
+          return;
+      }
+
       // A. Configurar Rango de Fechas (Inicio 00:00 - Fin 23:59)
       const start = new Date(fechaInicio + 'T00:00:00');
-const end = new Date(fechaFin + 'T23:59:59.999');
+      const end = new Date(fechaFin + 'T23:59:59.999');
 
-      // B. Consulta corregida: Filtrar por FECHA DE PAGO (Cash Flow)
+      // B. Consulta corregida: Buscamos por NOMBRE en lugar de ID
       const q = query(
         collection(db, "operaciones"),
-        where("doctorId", "==", medicoId),
+        where("doctorNombre", "==", medicoSelected.nombre), // <--- ESTA ES LA CLAVE
         where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]),
         where("fechaPago", ">=", start),
         where("fechaPago", "<=", end),
