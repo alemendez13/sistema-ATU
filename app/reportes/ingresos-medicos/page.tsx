@@ -73,10 +73,8 @@ export default function ReporteIngresosMedicos() {
       // 🟢 1. CONSULTA UNIFICADA POR FECHA CITA (String ISO)
       // Buscamos directamente por el día que ocurrió la cita, no por el registro
       // A. Configurar Rango de Fechas (Inicio 00:00 - Fin 23:59)
-      const start = new Date(fechaInicio);
-      start.setHours(0,0,0,0);
-      const end = new Date(fechaFin);
-      end.setHours(23,59,59,999);
+      const start = new Date(fechaInicio + 'T00:00:00');
+const end = new Date(fechaFin + 'T23:59:59.999');
 
       // B. Consulta corregida: Filtrar por FECHA DE PAGO (Cash Flow)
       const q = query(

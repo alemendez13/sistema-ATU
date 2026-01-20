@@ -66,10 +66,8 @@ export default function ReporteIngresosPage() {
     try {
       // 1. Consulta principal
       // 1. Definir rango de tiempo (00:00:00 a 23:59:59 del día seleccionado)
-      const inicioDia = new Date(fechaSeleccionada);
-      inicioDia.setHours(0, 0, 0, 0);
-      const finDia = new Date(fechaSeleccionada);
-      finDia.setHours(23, 59, 59, 999);
+      const inicioDia = new Date(fechaSeleccionada + 'T00:00:00');
+const finDia = new Date(fechaSeleccionada + 'T23:59:59.999');
 
       // 2. Consulta corregida: Filtrar por FECHA DE PAGO real
       const q = query(
