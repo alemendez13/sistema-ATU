@@ -191,7 +191,18 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
                   where("estatus", "in", ["Pendiente de Pago", "Pagado (Cortesía)"])
               );
               const snapOldOp = await getDocs(qOldOp);
-              for (const d of snapOldOp.docs) { await deleteDoc(doc(db, "operaciones", d.id)); }
+              for (const d of snapOldOp.docs) {
+                const dataOp = d.data();
+                // Solo borramos si NO hay pagos parciales registrados
+                if (!dataOp.desglosePagos || dataOp.desglosePagos.length === 0) {
+                    await deleteDoc(doc(db, "operaciones", d.id));
+                } else {
+                    // OPCIÓN A: Bloquear la edición y pedir al usuario que cancele los pagos primero.
+                    toast.error("⚠️ No se puede mover la cita automáticamente porque tiene PAGOS PARCIALES. Ajuste la deuda manualmente.");
+                    setLoading(false);
+                    return;
+                    }
+            }
           }
 
           // 3. Gestión con Google Calendar
@@ -318,7 +329,9 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
         fechaPago: Number(precioFinal) === 0 ? serverTimestamp() : null,
         metodoPago: Number(precioFinal) === 0 ? "Cortesía" : null,
         fecha: serverTimestamp(), fechaCita: fechaSeleccionada,
-        doctorNombre: data!.doctor.nombre, origen: "Agenda"
+        doctorNombre: data!.doctor.nombre, 
+        doctorId: data!.doctor.id,
+        origen: "Agenda"
       });
 
       if (data?.waitingListId) await deleteDoc(doc(db, "lista_espera", data.waitingListId));
