@@ -37,7 +37,11 @@ export default function ReporteIngresosMedicos() {
 
   // 1. Cargar médicos
   useEffect(() => {
-    getMedicosAction().then(setMedicos).catch(err => {
+    getMedicosAction().then(data => {
+        console.log("👨‍⚕️ Médicos cargados:", data); // <--- AGREGAR ESTA LÍNEA PARA VERIFICAR EN CONSOLA
+        if (data.length === 0) toast.warning("Alerta: El catálogo de médicos llegó vacío.");
+        setMedicos(data);
+    }).catch(err => {
         console.error("Error médicos:", err);
         toast.error("Error cargando catálogo de médicos");
     });
