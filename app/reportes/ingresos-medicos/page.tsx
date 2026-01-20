@@ -9,6 +9,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { LiquidacionMedicoPDF } from '../../../components/documents/LiquidacionMedicoPDF';
+import { cleanPrice } from "../../../lib/utils";
 
 export default function ReporteIngresosMedicos() {
   const [medicos, setMedicos] = useState<any[]>([]);
@@ -30,8 +31,8 @@ export default function ReporteIngresosMedicos() {
     cobrado: 0, 
     comisionSansce: 0, 
     aPagarMedico: 0,
-    tpvMP: 0,  // 🎯 Añadir esto
-    tpvBAN: 0  // 🎯 Añadir esto
+    tpvMP: 0,  
+    tpvBAN: 0  
 });
 
   // 1. Cargar médicos
@@ -43,20 +44,25 @@ export default function ReporteIngresosMedicos() {
   }, []);
 
 
-  const sumarPorMetodo = (arr: any[], metodoDeseado: string) => 
-    arr.reduce((acc, curr) => {
-        // 1. Si la operación tiene desglose (Pago Mixto)
-        if (curr.desglosePagos && Array.isArray(curr.desglosePagos)) {
-            const parcial = curr.desglosePagos
-                .filter((p: any) => p.metodo === metodoDeseado)
-                .reduce((a: number, c: any) => a + c.monto, 0);
-            return acc + parcial;
-        }
-        // 2. Si es un pago tradicional
-        return acc + (curr.formaPago === metodoDeseado ? (curr.monto || 0) : 0);
-    }, 0);
+  const sumarFlex = (arr: any[], keyword: string) => {
+    return arr.reduce((acc, curr) => {
+        let montoParcial = 0;
 
-  // 2. Generar Reporte (Versión "Experiencia 5 Estrellas" ⭐)
+        // 1. Revisar Desglose (Pagos Mixtos)
+        if (curr.desglosePagos && Array.isArray(curr.desglosePagos) && curr.desglosePagos.length > 0) {
+            montoParcial = curr.desglosePagos
+                .filter((p: any) => p.metodo && p.metodo.includes(keyword)) // BUSCA LA SUB-CADENA
+                .reduce((a: number, c: any) => a + (Number(c.monto) || 0), 0);
+        } 
+        // 2. Revisar Pago Único
+        else if (curr.formaPago && curr.formaPago.includes(keyword)) {
+            montoParcial = Number(curr.monto) || 0;
+        }
+
+        return acc + montoParcial;
+    }, 0);
+  };
+
   // 2. Generar Reporte (Versión Corregida 2026 - Trazabilidad Total)
   const generarCorte = async () => {
     if (!medicoId) return toast.warning("Selecciona un médico");
@@ -133,14 +139,14 @@ export default function ReporteIngresosMedicos() {
       });
 
       // 🟢 3. CÁLCULO MATEMÁTICO BLINDADO
-      // Realizamos la suma una vez que tenemos todos los datos finales
       const totalCobradoReal = resultadosFiltrados.reduce((acc, curr) => acc + curr.monto, 0);
       
-            // ✅ CÁLCULO MEJORADO: Ahora busca montos dentro de pagos mixtos
-            const totalMP = sumarPorMetodo(resultadosFiltrados, 'Tarjeta (TPV MP)');
-            const totalBAN = sumarPorMetodo(resultadosFiltrados, 'Tarjeta (TPV BAN)');
-            const comision = totalCobradoReal * porcentaje;
-            const aPagar = totalCobradoReal - comision;
+      // ✅ CÁLCULO CORREGIDO: Usamos keywords cortas para atrapar todo (Cred, Deb, etc.)
+      const totalMP = sumarFlex(resultadosFiltrados, "MP");   // Atrapa: "TPV Cred MP", "TPV Deb MP"
+      const totalBAN = sumarFlex(resultadosFiltrados, "BAN"); // Atrapa: "TPV Cred BAN", "TPV Deb BAN"
+      
+      const comision = totalCobradoReal * porcentaje;
+      const aPagar = totalCobradoReal - comision;
 
       // 🟢 4. ACTUALIZACIÓN DE INTERFAZ
       setMovimientos(resultadosFiltrados);
