@@ -260,6 +260,7 @@ const onSubmit = async (data: any) => {
       esCita: esServicioMedico,
       fechaCita: data.fechaCita || null, 
       horaCita: data.horaCita || null,
+      doctorId: selectedMedicoId || null, // <--- AGREGAR ESTA LÍNEA
       doctorNombre: medicos.find(m => m.id === selectedMedicoId)?.nombre || null
     });
     
