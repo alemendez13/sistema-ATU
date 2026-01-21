@@ -316,23 +316,28 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
       // 4. OPERACIÓN FINANCIERA (Reporte Ingresos)
       // Solo creamos la deuda si no es una edición de "Solo cambio de hora" donde ya existía un pago,
       // pero como arriba borramos las deudas pendientes, aquí regeneramos la deuda actualizada.
-      await addDoc(collection(db, "operaciones"), {
-        pacienteId: idFinal, pacienteNombre: nombreFinal,
-        requiereFactura: requiereFactura,
-        servicioSku: servicioDetalle?.sku, servicioNombre: tituloCita,
-        monto: Number(precioFinal), 
-        montoOriginal: cleanPrice(servicioDetalle?.precio),
-        descuentoAplicado: descuentoSeleccionado?.nombre || null,
-        // Corrección para alinear con Caja y Reportes:
-        estatus: Number(precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
-        // Si es cortesía ($0), registramos la fecha de pago HOY para que salga en el corte:
-        fechaPago: Number(precioFinal) === 0 ? serverTimestamp() : null,
-        metodoPago: Number(precioFinal) === 0 ? "Cortesía" : null,
-        fecha: serverTimestamp(), fechaCita: fechaSeleccionada,
-        doctorNombre: data!.doctor.nombre, 
-        doctorId: data!.doctor.id,
-        origen: "Agenda"
-      });
+      const fechaCitaIso = new Date(`${fechaSeleccionada}T${horaSeleccionada}:00`);
+
+            await addDoc(collection(db, "operaciones"), {
+            pacienteId: idFinal, pacienteNombre: nombreFinal,
+            requiereFactura: requiereFactura,
+            servicioSku: servicioDetalle?.sku, servicioNombre: tituloCita,
+            monto: Number(precioFinal), 
+            montoOriginal: cleanPrice(servicioDetalle?.precio),
+            descuentoAplicado: descuentoSeleccionado?.nombre || null,
+            
+            estatus: Number(precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
+            
+            // Ahora: Si es cortesía, usamos la fecha futura de la cita. Si es pago real pendiente, null.
+            fechaPago: Number(precioFinal) === 0 ? fechaCitaIso : null,
+            
+            metodoPago: Number(precioFinal) === 0 ? "Cortesía" : null,
+            fecha: serverTimestamp(), // Fecha de creación del registro (Auditoría)
+            fechaCita: fechaSeleccionada, // String YYYY-MM-DD para filtros rápidos
+            doctorNombre: data!.doctor.nombre, 
+            doctorId: data!.doctor.id,
+            origen: "Agenda"
+            });
 
       if (data?.waitingListId) await deleteDoc(doc(db, "lista_espera", data.waitingListId));
       onClose(); 
