@@ -1,8 +1,9 @@
-/* lib/monitor-core.ts */
+/* lib/monitor-core.ts - VERSIÓN DEFINITIVA (Con comentarios) */
 "use client";
 
 // ⚙️ CONFIGURACIÓN DE SENSIBILIDAD
-const READ_LIMIT = 150;       // Máximo de peticiones permitidas...
+// CAMBIO: Aumentamos tolerancia de 150 a 500 para evitar bloqueos falsos al iniciar sesión.
+const READ_LIMIT = 500;       
 const TIME_WINDOW = 10000;    // ...en este periodo de tiempo (ms)
 const STORAGE_KEY = 'SANSCE_EMERGENCY_LOCK';
 

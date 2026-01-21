@@ -1,10 +1,9 @@
-/* hooks/useAuth.js - VERSIÓN BLINDADA */
+/* hooks/useAuth.js - VERSIÓN DEFINITIVA (Híbrida) */
 import { useState, useEffect, useContext, createContext } from "react";
 import { onIdTokenChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 
-// 1. Definimos el valor por defecto explícito
 const defaultAuth = { user: null, loading: true };
 const AuthContext = createContext(defaultAuth);
 
@@ -14,35 +13,36 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onIdTokenChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        try {
-
+      // 1. Iniciamos bloque de seguridad
+      try {
+        if (currentUser) {
+          // --- BLOQUE RESTAURADO DEL ORIGINAL (TRAZABILIDAD) ---
           console.log("------------------------------------------------");
           console.log("🆔 UID del Usuario Logueado (Auth):", currentUser.uid);
           console.log("📂 Buscando en colección Firestore: usuarios_roles");
 
-          console.log("🔍 Usuario detectado:", currentUser.uid); // Debug
           const docRef = doc(db, "usuarios_roles", currentUser.uid);
           
-          // Leemos el rol con timeout implícito (si falla, sigue)
+          // --- LOGICA ORIGINAL RESTAURADA: Si falla Firestore, no bloquea el Auth ---
           const docSnap = await getDoc(docRef).catch(e => {
-             console.warn("Error leyendo rol:", e);
+             console.warn("⚠️ Error leyendo rol (Se asignará visitante):", e);
              return null;
           });
 
           let userRole = "visitante";
+          
           if (docSnap && docSnap.exists()) {
             // ÉXITO: Encontramos el documento
             console.log("✅ ¡DOCUMENTO ENCONTRADO! Datos:", docSnap.data());
             userRole = docSnap.data().rol;
             console.log("👑 Rol extraído:", userRole);
           } else {
-            // ERROR: No existe el documento
+            // ERROR: No existe el documento (Logs originales)
             console.error("❌ NO ENCONTRADO. El documento en Firestore no existe.");
             console.warn("⚠️ Verifica que el ID del documento en 'usuarios_roles' sea EXACTAMENTE:", currentUser.uid);
-            console.warn("⚠️ Verifica mayúsculas, minúsculas y ceros vs letras O.");
           }
           console.log("------------------------------------------------");
+          // -----------------------------------------------------
 
           setUser({ 
              ...currentUser, 
@@ -56,15 +56,20 @@ export function AuthProvider({ children }) {
           const token = await currentUser.getIdToken();
           document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`;
 
-        } catch (error) {
-          console.error("❌ Error crítico Auth:", error);
-          setUser({ ...currentUser, rol: "visitante" });
+        } else {
+          // No hay usuario logueado
+          setUser(null);
+          document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
         }
-      } else {
+      } catch (error) {
+        console.error("❌ Error crítico Auth:", error);
+        // En caso de error catastrófico, limpiamos usuario
         setUser(null);
-        document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
+      } finally {
+        // ✅ MEJORA CRÍTICA: Esto garantiza que la pantalla de carga desaparezca
+        // independientemente de si hubo éxito, error, o usuario nulo.
+        setLoading(false); 
       }
-      setLoading(false); // <--- IMPORTANTE: Siempre terminamos de cargar
     });
 
     return () => unsubscribe();
@@ -80,8 +85,6 @@ export function AuthProvider({ children }) {
 // 2. EL BLINDAJE FINAL PARA EL BUILD
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  // Si el contexto falla o es undefined, devolvemos el objeto por defecto.
-  // Esto engaña a Next.js durante el build para que no rompa las páginas.
   if (!context) return defaultAuth;
   return context;
 };
