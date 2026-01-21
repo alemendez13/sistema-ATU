@@ -1,3 +1,4 @@
+/* components/ui/Sidebar.tsx - CÓDIGO LIMPIO */
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -6,10 +7,8 @@ import {
   Users, Package, ClipboardList, BarChart3, 
   LayoutDashboard, Calendar, FolderOpen, FileText 
 } from "lucide-react";
-// Importamos el hook modificado que ahora trae el rol
 import { useAuth } from "../../hooks/useAuth"; 
 
-// Definimos interfaz para TypeScript para evitar errores de tipo
 interface UserData {
   rol?: string;
 }
@@ -18,22 +17,19 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth() as { user: UserData | null };
   
-  // Si no hay rol cargado aún, asumimos "visitante" para proteger
+  // Si no hay rol, es visitante.
   const currentRole = user?.rol || "visitante";
 
-  // 🔒 Regla de seguridad: Ocultar en Login o Portales externos
   if (pathname === "/login" || pathname.startsWith("/portal")) return null;
 
-  // MATRIZ DE GOBIERNO DE DATOS
-  // Aquí definimos quién ve qué basándonos en tu documentación normativa
   const menuItems = [
     { 
       id: 0, 
-      name: "Inicio (Dashboard)", 
+      name: "Inicio", 
       icon: <LayoutDashboard size={20} />, 
       href: "/", 
       color: "text-slate-500",
-      allowedRoles: ["admin", "recepcion", "medico"] 
+      allowedRoles: ["admin", "recepcion", "medico", "visitante"] 
     },
     { 
       id: 1, 
@@ -41,7 +37,7 @@ export default function Sidebar() {
       icon: <Settings size={20} />, 
       href: "/configuracion/conocimiento", 
       color: "text-slate-600",
-      allowedRoles: ["admin"] // EXCLUSIVO: Solo quien gestiona el Cerebro ISO [cite: 5]
+      allowedRoles: ["admin"] 
     },   
     { 
       id: 10, 
@@ -65,7 +61,7 @@ export default function Sidebar() {
       icon: <Target size={20} />, 
       href: "/planeacion", 
       color: "text-blue-600",
-      allowedRoles: ["admin"] // Estratégico (MG/PMR) [cite: 5]
+      allowedRoles: ["admin"] 
     },
     { 
       id: 3, 
@@ -73,7 +69,7 @@ export default function Sidebar() {
       icon: <GitBranch size={20} />, 
       href: "/procesos", 
       color: "text-purple-600",
-      allowedRoles: ["admin"] // Estratégico
+      allowedRoles: ["admin"] 
     },
     { 
       id: 4, 
@@ -81,7 +77,7 @@ export default function Sidebar() {
       icon: <HeartPulse size={20} />, 
       href: "/pacientes", 
       color: "text-red-600",
-      allowedRoles: ["admin", "recepcion", "medico"] // Operativo diario
+      allowedRoles: ["admin", "recepcion", "medico"] 
     },
     { 
       id: 12, 
@@ -89,7 +85,7 @@ export default function Sidebar() {
       icon: <FileText size={20} />, 
       href: "/expedientes", 
       color: "text-indigo-600", 
-      allowedRoles: ["admin", "medico"] // Recepción no debería ver expediente clínico completo (Privacidad)
+      allowedRoles: ["admin", "medico"] 
     }, 
     { 
       id: 5, 
@@ -97,7 +93,7 @@ export default function Sidebar() {
       icon: <Users size={20} />, 
       href: "/personal", 
       color: "text-orange-600",
-      allowedRoles: ["admin"] // Sensible (RHU) [cite: 5]
+      allowedRoles: ["admin"] 
     },
     { 
       id: 6, 
@@ -105,7 +101,7 @@ export default function Sidebar() {
       icon: <Package size={20} />, 
       href: "/inventarios", 
       color: "text-amber-600",
-      allowedRoles: ["admin", "recepcion"] // Operativo (GEM/IYM) [cite: 5]
+      allowedRoles: ["admin", "recepcion"] 
     },
     { 
       id: 7, 
@@ -113,7 +109,7 @@ export default function Sidebar() {
       icon: <ClipboardList size={20} />, 
       href: "/mantenimiento", 
       color: "text-emerald-600",
-      allowedRoles: ["admin", "recepcion"] // Comunicación operativa (COM) [cite: 5]
+      allowedRoles: ["admin", "recepcion"] 
     }, 
     { 
       id: 8, 
@@ -121,20 +117,19 @@ export default function Sidebar() {
       icon: <BarChart3 size={20} />, 
       href: "/finanzas", 
       color: "text-indigo-600",
-      allowedRoles: ["admin"] // Financiero (FIN) [cite: 5]
+      allowedRoles: ["admin"] 
     }, 
   ];
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-[260px] bg-white border-r border-slate-200 z-40 hidden md:flex flex-col shadow-sm">
-      {/* Espaciador */}
+    <aside className="fixed left-0 top-0 h-screen w-[260px] bg-white border-r border-slate-200 z-40 flex flex-col shadow-sm">
+      
       <div className="h-16 flex items-center px-6 border-b border-slate-50">
          <span className="text-xs font-black text-blue-600 tracking-widest uppercase">Menú Principal</span>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
-          // FILTRO DE SEGURIDAD: Si el rol del usuario no está en la lista permitida, no renderizamos el botón
           if (!item.allowedRoles.includes(currentRole)) return null;
 
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
@@ -158,7 +153,6 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer del Sidebar */}
       <div className="p-4 border-t border-slate-100">
           <div className="bg-slate-50 p-3 rounded-lg text-center">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">SANSCE OS v2.0</p>
