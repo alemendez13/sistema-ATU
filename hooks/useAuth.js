@@ -1,30 +1,59 @@
-/* hooks/useAuth.js */
-import { useState, useEffect } from "react";
-import { onIdTokenChanged } from "firebase/auth"; // 👈 CAMBIO CLAVE
-import { auth } from "../lib/firebase";
+/* hooks/useAuth.js - VERSIÓN DEFINITIVA FASE 12 */
+import { useState, useEffect, useContext, createContext } from "react";
+import { onIdTokenChanged } from "firebase/auth"; // ✅ CONSERVADO: Listener robusto
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../lib/firebase";
 
-export function useAuth() {
+const AuthContext = createContext();
+
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Usamos onIdTokenChanged en lugar de onAuthStateChanged
-    // Esto se dispara al login, al logout Y cuando el token se refresca automáticamente (cada hora)
+    // ✅ CONSERVADO: Usamos onIdTokenChanged para detectar login, logout Y refresco de token
     const unsubscribe = onIdTokenChanged(auth, async (currentUser) => {
       if (currentUser) {
-        // 1. El usuario está logueado o refrescó token
-        setUser(currentUser);
-        
-        // 2. Obtenemos el token FRESCO
-        const token = await currentUser.getIdToken();
-        
-        // 3. Actualizamos la cookie silenciosamente para que el Middleware siempre vea un pase válido
-        // Max-Age 86400 = 24 horas
-        document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`;
+        try {
+          // --- NUEVA LÓGICA (FASE 12): OBTENER ROL ---
+          // REGLA ZERO-LOOP: getDoc asegura una sola lectura, no un listener infinito
+          const docRef = doc(db, "usuarios_roles", currentUser.uid);
+          const docSnap = await getDoc(docRef);
+
+          let userRole = "visitante"; // Rol por defecto (seguridad)
+
+          if (docSnap.exists()) {
+            userRole = docSnap.data().rol;
+          }
+
+          // --- FUSIÓN DE DATOS ---
+          // ✅ CONSERVADO: No "recortamos" el usuario. Usamos spread operator (...currentUser)
+          // para mantener photoURL, displayName, etc., y le pegamos el rol.
+          // Nota: currentUser es un objeto complejo, lo asignamos y extendemos.
+          const userWithRole = { 
+             ...currentUser, 
+             uid: currentUser.uid, // Aseguramos que UID esté visible
+             email: currentUser.email,
+             rol: userRole,
+             // Hack para mantener acceso a métodos originales si fuera necesario
+             getIdToken: () => currentUser.getIdToken() 
+          };
+          
+          setUser(userWithRole);
+
+          // --- LÓGICA ORIGINAL CRÍTICA (COOKIES) ---
+          // ✅ CONSERVADO: Actualización de cookie para el Middleware
+          const token = await currentUser.getIdToken();
+          document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`;
+
+        } catch (error) {
+          console.error("Error crítico en Auth:", error);
+          // En fallo, permitimos login pero sin rol privilegiado
+          setUser({ ...currentUser, rol: "visitante" });
+        }
       } else {
-        // 4. El usuario cerró sesión
+        // ✅ CONSERVADO: Limpieza de sesión y cookies
         setUser(null);
-        // Borramos la cookie para asegurar que el Middleware bloquee el paso
         document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
       }
       
@@ -34,5 +63,12 @@ export function useAuth() {
     return () => unsubscribe();
   }, []);
 
-  return { user, loading };
+  return (
+    <AuthContext.Provider value={{ user, loading }}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
 }
+
+// Hook para consumir el contexto
+export const useAuth = () => useContext(AuthContext);
