@@ -8,25 +8,35 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   const router = useRouter();
 
   useEffect(() => {
-    // Si ya terminamos de cargar y NO hay usuario...
+    // Solo redirigimos si ya terminó de cargar Y NO hay usuario
     if (!loading && !user) {
-      // ...lo mandamos a la pantalla de entrada (Login)
       router.push("/login");
     }
   }, [user, loading, router]);
 
-  // Mientras revisamos, mostramos un mensaje de espera
-  if (loading) {
+  // CAMBIO CLAVE:
+  // Solo mostramos el bloqueo si está cargando Y TODAVÍA NO TENEMOS USUARIO.
+  // Si 'user' ya tiene datos (aunque sea "visitante"), dejamos que pase 
+  // y el Sidebar se encargará de ocultarle los menús.
+  if (loading && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <p className="text-slate-500 animate-pulse">🔒 Verificando acceso...</p>
+        <div className="text-center">
+            <p className="text-slate-500 animate-pulse mb-2">🔒 Verificando acceso...</p>
+            {/* Opcional: Un botón de escape por si se traba */}
+            <button 
+                onClick={() => window.location.reload()} 
+                className="text-xs text-blue-400 underline"
+            >
+                ¿Tarda mucho? Recargar
+            </button>
+        </div>
       </div>
     );
   }
 
-  // Si no hay usuario, no mostramos nada (mientras se hace la redirección)
+  // Si no hay usuario (y ya cargó), devolvemos null mientras el useEffect redirige
   if (!user) return null;
 
-  // Si todo está bien, mostramos el contenido protegido (la página real)
   return <>{children}</>;
 }
