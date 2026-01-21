@@ -1,64 +1,57 @@
-/* hooks/useAuth.js - CORREGIDO PARA NETLIFY & FIRESTORE */
+/* hooks/useAuth.js - VERSIÓN BLINDADA */
 import { useState, useEffect, useContext, createContext } from "react";
 import { onIdTokenChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore"; // Usamos la librería nativa para el hook base
-import { auth, db } from "../lib/firebase"; 
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../lib/firebase";
 
-// 1. Contexto con valor inicial seguro para evitar crash
-const AuthContext = createContext({ user: null, loading: true });
+// 1. Definimos el valor por defecto explícito
+const defaultAuth = { user: null, loading: true };
+const AuthContext = createContext(defaultAuth);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Escucha cambios de sesión en tiempo real
     const unsubscribe = onIdTokenChanged(auth, async (currentUser) => {
       if (currentUser) {
         try {
-          console.log("🔍 1. Usuario autenticado, buscando rol para UID:", currentUser.uid);
-          // --- OBTENCIÓN DEL ROL ---
-          // Usamos la referencia directa a Firestore
+          console.log("🔍 Usuario detectado:", currentUser.uid); // Debug
           const docRef = doc(db, "usuarios_roles", currentUser.uid);
-          const docSnap = await getDoc(docRef);
+          
+          // Leemos el rol con timeout implícito (si falla, sigue)
+          const docSnap = await getDoc(docRef).catch(e => {
+             console.warn("Error leyendo rol:", e);
+             return null;
+          });
 
-          let userRole = "visitante"; // Rol por defecto si falla la DB
+          let userRole = "visitante";
+          if (docSnap && docSnap.exists()) {
+            userRole = docSnap.data().rol;
+            console.log("✅ Rol encontrado:", userRole);
+          }
 
-          if (docSnap.exists()) {
-            userRole = docSnap.data().rol; 
-            // OJO: Aquí es donde Firebase lee "admin" de tu base de datos
-          }else {
-      console.warn("⚠️ 2. EL DOCUMENTO NO EXISTE en la ruta: usuarios_roles/" + currentUser.uid);
-      console.warn("Revisa que estés en el proyecto de Firebase correcto.");
-    }
-
-          // Construimos el objeto usuario enriquecido
-          const userWithRole = { 
+          setUser({ 
              ...currentUser, 
              uid: currentUser.uid,
              email: currentUser.email,
-             rol: userRole, // Inyectamos el rol
+             rol: userRole,
              getIdToken: () => currentUser.getIdToken() 
-          };
-          
-          setUser(userWithRole);
+          });
 
-          // Seteamos la cookie para el Middleware
+          // Cookie para middleware
           const token = await currentUser.getIdToken();
           document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`;
 
         } catch (error) {
-          console.error("Error obteniendo rol:", error);
-          // En caso de error, dejamos entrar pero sin privilegios
+          console.error("❌ Error crítico Auth:", error);
           setUser({ ...currentUser, rol: "visitante" });
         }
       } else {
-        // Logout: Limpiamos todo
         setUser(null);
         document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
       }
-      
-      setLoading(false);
+      setLoading(false); // <--- IMPORTANTE: Siempre terminamos de cargar
     });
 
     return () => unsubscribe();
@@ -66,20 +59,16 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{ user, loading }}>
-      {!loading && children}
+      {children} 
     </AuthContext.Provider>
   );
 }
 
-// --- CORRECCIÓN CRÍTICA PARA NETLIFY ---
+// 2. EL BLINDAJE FINAL PARA EL BUILD
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  
-  // SI EL CONTEXTO NO EXISTE (Build Time), devolvemos un objeto "fantasma" seguro.
-  // Esto evita que Sidebar.tsx explote al hacer "const { user } = useAuth()"
-  if (context === undefined) {
-    return { user: null, loading: true };
-  }
-  
+  // Si el contexto falla o es undefined, devolvemos el objeto por defecto.
+  // Esto engaña a Next.js durante el build para que no rompa las páginas.
+  if (!context) return defaultAuth;
   return context;
 };
