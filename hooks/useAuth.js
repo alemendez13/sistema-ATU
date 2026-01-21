@@ -16,6 +16,7 @@ export function AuthProvider({ children }) {
     const unsubscribe = onIdTokenChanged(auth, async (currentUser) => {
       if (currentUser) {
         try {
+          console.log("🔍 1. Usuario autenticado, buscando rol para UID:", currentUser.uid);
           // --- OBTENCIÓN DEL ROL ---
           // Usamos la referencia directa a Firestore
           const docRef = doc(db, "usuarios_roles", currentUser.uid);
@@ -26,7 +27,10 @@ export function AuthProvider({ children }) {
           if (docSnap.exists()) {
             userRole = docSnap.data().rol; 
             // OJO: Aquí es donde Firebase lee "admin" de tu base de datos
-          }
+          }else {
+      console.warn("⚠️ 2. EL DOCUMENTO NO EXISTE en la ruta: usuarios_roles/" + currentUser.uid);
+      console.warn("Revisa que estés en el proyecto de Firebase correcto.");
+    }
 
           // Construimos el objeto usuario enriquecido
           const userWithRole = { 
