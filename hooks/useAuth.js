@@ -1,90 +1,75 @@
-/* hooks/useAuth.js - VERSIÓN DEFINITIVA (Híbrida) */
-import { useState, useEffect, useContext, createContext } from "react";
-import { onIdTokenChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "../lib/firebase";
+/* hooks/useAuth.js */
 
-const defaultAuth = { user: null, loading: true };
-const AuthContext = createContext(defaultAuth);
+import { useState, useEffect } from "react";
 
-export function AuthProvider({ children }) {
+import { onIdTokenChanged } from "firebase/auth"; // 👈 CAMBIO CLAVE
+
+import { auth } from "../lib/firebase";
+
+
+
+export function useAuth() {
+
   const [user, setUser] = useState(null);
+
   const [loading, setLoading] = useState(true);
 
+
+
   useEffect(() => {
+
+    // Usamos onIdTokenChanged en lugar de onAuthStateChanged
+
+    // Esto se dispara al login, al logout Y cuando el token se refresca automáticamente (cada hora)
+
     const unsubscribe = onIdTokenChanged(auth, async (currentUser) => {
-      // 1. Iniciamos bloque de seguridad
-      try {
-        if (currentUser) {
-          // --- BLOQUE RESTAURADO DEL ORIGINAL (TRAZABILIDAD) ---
-          console.log("------------------------------------------------");
-          console.log("🆔 UID del Usuario Logueado (Auth):", currentUser.uid);
-          console.log("📂 Buscando en colección Firestore: usuarios_roles");
 
-          const docRef = doc(db, "usuarios_roles", currentUser.uid);
-          
-          // --- LOGICA ORIGINAL RESTAURADA: Si falla Firestore, no bloquea el Auth ---
-          const docSnap = await getDoc(docRef).catch(e => {
-             console.warn("⚠️ Error leyendo rol (Se asignará visitante):", e);
-             return null;
-          });
+      if (currentUser) {
 
-          let userRole = "visitante";
-          
-          if (docSnap && docSnap.exists()) {
-            // ÉXITO: Encontramos el documento
-            console.log("✅ ¡DOCUMENTO ENCONTRADO! Datos:", docSnap.data());
-            userRole = docSnap.data().rol;
-            console.log("👑 Rol extraído:", userRole);
-          } else {
-            // ERROR: No existe el documento (Logs originales)
-            console.error("❌ NO ENCONTRADO. El documento en Firestore no existe.");
-            console.warn("⚠️ Verifica que el ID del documento en 'usuarios_roles' sea EXACTAMENTE:", currentUser.uid);
-          }
-          console.log("------------------------------------------------");
-          // -----------------------------------------------------
+        // 1. El usuario está logueado o refrescó token
 
-          setUser({ 
-             ...currentUser, 
-             uid: currentUser.uid,
-             email: currentUser.email,
-             rol: userRole,
-             getIdToken: () => currentUser.getIdToken() 
-          });
+        setUser(currentUser);
 
-          // Cookie para middleware
-          const token = await currentUser.getIdToken();
-          document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`;
+        
 
-        } else {
-          // No hay usuario logueado
-          setUser(null);
-          document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
-        }
-      } catch (error) {
-        console.error("❌ Error crítico Auth:", error);
-        // En caso de error catastrófico, limpiamos usuario
+        // 2. Obtenemos el token FRESCO
+
+        const token = await currentUser.getIdToken();
+
+        
+
+        // 3. Actualizamos la cookie silenciosamente para que el Middleware siempre vea un pase válido
+
+        // Max-Age 86400 = 24 horas
+
+        document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`;
+
+      } else {
+
+        // 4. El usuario cerró sesión
+
         setUser(null);
-      } finally {
-        // ✅ MEJORA CRÍTICA: Esto garantiza que la pantalla de carga desaparezca
-        // independientemente de si hubo éxito, error, o usuario nulo.
-        setLoading(false); 
+
+        // Borramos la cookie para asegurar que el Middleware bloquee el paso
+
+        document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
+
       }
+
+      
+
+      setLoading(false);
+
     });
 
+
+
     return () => unsubscribe();
+
   }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, loading }}>
-      {children} 
-    </AuthContext.Provider>
-  );
-}
 
-// 2. EL BLINDAJE FINAL PARA EL BUILD
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) return defaultAuth;
-  return context;
-};
+
+  return { user, loading };
+
+}
