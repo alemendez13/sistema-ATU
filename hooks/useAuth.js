@@ -16,6 +16,11 @@ export function AuthProvider({ children }) {
     const unsubscribe = onIdTokenChanged(auth, async (currentUser) => {
       if (currentUser) {
         try {
+
+          console.log("------------------------------------------------");
+          console.log("🆔 UID del Usuario Logueado (Auth):", currentUser.uid);
+          console.log("📂 Buscando en colección Firestore: usuarios_roles");
+
           console.log("🔍 Usuario detectado:", currentUser.uid); // Debug
           const docRef = doc(db, "usuarios_roles", currentUser.uid);
           
@@ -27,9 +32,17 @@ export function AuthProvider({ children }) {
 
           let userRole = "visitante";
           if (docSnap && docSnap.exists()) {
+            // ÉXITO: Encontramos el documento
+            console.log("✅ ¡DOCUMENTO ENCONTRADO! Datos:", docSnap.data());
             userRole = docSnap.data().rol;
-            console.log("✅ Rol encontrado:", userRole);
+            console.log("👑 Rol extraído:", userRole);
+          } else {
+            // ERROR: No existe el documento
+            console.error("❌ NO ENCONTRADO. El documento en Firestore no existe.");
+            console.warn("⚠️ Verifica que el ID del documento en 'usuarios_roles' sea EXACTAMENTE:", currentUser.uid);
+            console.warn("⚠️ Verifica mayúsculas, minúsculas y ceros vs letras O.");
           }
+          console.log("------------------------------------------------");
 
           setUser({ 
              ...currentUser, 
