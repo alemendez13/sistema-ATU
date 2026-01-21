@@ -1,58 +1,48 @@
-/* hooks/useAuth.js - VERSIÓN DEFINITIVA FASE 12 */
+/* hooks/useAuth.js - CORREGIDO PARA NETLIFY */
 import { useState, useEffect, useContext, createContext } from "react";
-import { onIdTokenChanged } from "firebase/auth"; // ✅ CONSERVADO: Listener robusto
+import { onIdTokenChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 
-const AuthContext = createContext();
+const AuthContext = createContext({ user: null, loading: true }); // ✅ MEJORA 1: Valor por defecto inicial
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // ✅ CONSERVADO: Usamos onIdTokenChanged para detectar login, logout Y refresco de token
     const unsubscribe = onIdTokenChanged(auth, async (currentUser) => {
       if (currentUser) {
         try {
-          // --- NUEVA LÓGICA (FASE 12): OBTENER ROL ---
-          // REGLA ZERO-LOOP: getDoc asegura una sola lectura, no un listener infinito
+          // Lógica de Rol
           const docRef = doc(db, "usuarios_roles", currentUser.uid);
           const docSnap = await getDoc(docRef);
 
-          let userRole = "visitante"; // Rol por defecto (seguridad)
+          let userRole = "visitante"; 
 
           if (docSnap.exists()) {
             userRole = docSnap.data().rol;
           }
 
-          // --- FUSIÓN DE DATOS ---
-          // ✅ CONSERVADO: No "recortamos" el usuario. Usamos spread operator (...currentUser)
-          // para mantener photoURL, displayName, etc., y le pegamos el rol.
-          // Nota: currentUser es un objeto complejo, lo asignamos y extendemos.
           const userWithRole = { 
              ...currentUser, 
-             uid: currentUser.uid, // Aseguramos que UID esté visible
+             uid: currentUser.uid,
              email: currentUser.email,
              rol: userRole,
-             // Hack para mantener acceso a métodos originales si fuera necesario
              getIdToken: () => currentUser.getIdToken() 
           };
           
           setUser(userWithRole);
 
-          // --- LÓGICA ORIGINAL CRÍTICA (COOKIES) ---
-          // ✅ CONSERVADO: Actualización de cookie para el Middleware
+          // Cookies para Middleware
           const token = await currentUser.getIdToken();
           document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`;
 
         } catch (error) {
           console.error("Error crítico en Auth:", error);
-          // En fallo, permitimos login pero sin rol privilegiado
           setUser({ ...currentUser, rol: "visitante" });
         }
       } else {
-        // ✅ CONSERVADO: Limpieza de sesión y cookies
         setUser(null);
         document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
       }
@@ -70,5 +60,15 @@ export function AuthProvider({ children }) {
   );
 }
 
-// Hook para consumir el contexto
-export const useAuth = () => useContext(AuthContext);
+// ✅ CORRECCIÓN CRÍTICA PARA NETLIFY:
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  
+  // Si el contexto es undefined (pasa durante el build de Next.js),
+  // devolvemos un objeto seguro para evitar el crash.
+  if (context === undefined) {
+    return { user: null, loading: true };
+  }
+  
+  return context;
+};
