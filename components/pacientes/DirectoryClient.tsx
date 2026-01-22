@@ -1,7 +1,5 @@
 /* components/pacientes/DirectoryClient.tsx */
-
 "use client";
-
 import { useState, useEffect } from "react";
 import { collection, query, orderBy, limit, getDocs, startAfter, where } from "@/lib/firebase-guard";
 import { db } from "../../lib/firebase";
@@ -276,22 +274,63 @@ const realizarBusqueda = async (e: React.FormEvent) => {
 
 function PacienteCard({ paciente, opcionesMensajes }: { paciente: Paciente, opcionesMensajes: MensajeConfig[] }) {
   const [mensajeSeleccionado, setMensajeSeleccionado] = useState("");
+  const [fechaCitaReal, setFechaCitaReal] = useState<string | null>(null);
   const mensajeFinal = mensajeSeleccionado || MENSAJES.UBICACION();
   const avatarClass = paciente.genero === 'Femenino' ? 'bg-pink-50 text-pink-600' : 'bg-blue-50 text-blue-600';
   const telefono = paciente.telefonoCelular || paciente.celular || "";
+
+  useEffect(() => {
+    const obtenerFechaCita = async () => {
+      try {
+        // Consultamos la colección 'citas' buscando coincidencias con este paciente
+        const q = query(
+            collection(db, "citas"),
+            where("pacienteId", "==", paciente.id),
+            orderBy("fecha", "desc"), // Ordenamos para traer la más futura o reciente
+            limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+            const dataCita = snap.docs[0].data();
+            // Guardamos la fecha encontrada (Ej: "2026-01-21")
+            setFechaCitaReal(dataCita.fecha);
+        }
+      } catch (error) {
+        console.error("Error obteniendo cita:", error);
+      }
+    };
+
+    if (paciente.id) obtenerFechaCita();
+  }, [paciente.id]);
 
   return (
     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group">
       <div>
         <div className="flex justify-between items-start mb-3">
+          {/* Avatar */}
           <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold ${avatarClass}`}>
             {paciente.nombreCompleto ? paciente.nombreCompleto.charAt(0) : '?'}
           </div>
-          {paciente.edad > 0 && (
-             <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full">
-                {paciente.edad} AÑOS
-             </span>
-          )}
+          
+          {/* 3. COLUMNA DERECHA: EDAD Y FECHA REAL */}
+          <div className="flex flex-col items-end gap-1">
+              {paciente.edad > 0 && (
+                 <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full">
+                    {paciente.edad} AÑOS
+                 </span>
+              )}
+              
+              {/* Aquí ocurre la magia visual: Cita vs Registro */}
+              {fechaCitaReal ? (
+                 <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-1 rounded border border-green-200 animate-fade-in">
+                    📅 {fechaCitaReal}
+                 </span>
+              ) : (
+                 <span className="text-[10px] text-slate-300">
+                    Reg: {paciente.fechaRegistro?.seconds ? new Date(paciente.fechaRegistro.seconds * 1000).toLocaleDateString() : "S/F"}
+                 </span>
+              )}
+          </div>
         </div>
         
         <h3 className="font-bold text-slate-800 text-sm mb-1 leading-tight group-hover:text-blue-700 transition-colors truncate" title={paciente.nombreCompleto}>
