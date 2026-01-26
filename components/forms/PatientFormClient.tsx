@@ -10,6 +10,7 @@ import { agendarCitaGoogle } from "../../lib/actions";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { cleanPrice, calculateAge, generateSearchTags, superNormalize } from "../../lib/utils";
 import { toast } from 'sonner';
+import { useAuth } from "@/hooks/useAuth";
 
 // COMPONENTES UI
 import Button from "../ui/Button"; 
@@ -33,6 +34,7 @@ interface PatientFormProps {
 
 export default function PatientFormClient({ servicios, medicos, descuentos }: PatientFormProps) {
   const router = useRouter();
+  const { user } = useAuth() as any; // Obtenemos la identidad de quien está logueado
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [age, setAge] = useState<number | null>(null);
   const [esLaboratorio, setEsLaboratorio] = useState(false);
@@ -187,6 +189,7 @@ const onSubmit = async (data: any) => {
         fechaRegistro: serverTimestamp(),
         origen: "mostrador_clinica",
         tutor: data.tutor || null,
+        elaboradoPor: user?.email || "Usuario Desconocido",
         // Agrupación correcta de datos fiscales
         datosFiscales: requiereFactura ? {
             tipoPersona: tipoPersona || "Fisica",
@@ -251,6 +254,7 @@ const onSubmit = async (data: any) => {
       pacienteId: result.id,
       pacienteNombre: nombreConstruido,
       folioPaciente: result.folio,
+      elaboradoPor: user?.email || "Usuario Desconocido",
       requiereFactura,
       servicioSku: servicioSeleccionado.sku,
       servicioNombre: servicioSeleccionado.nombre,
