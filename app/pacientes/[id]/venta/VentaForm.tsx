@@ -249,11 +249,14 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
       // Condición Unificada: (Es Producto O Es Lab) Y (Requiere Stock)
       if (servicioSeleccionado && (itemEsProducto || itemEsLaboratorio) && necesitaStock) {
         try {
+            const folioRastreo = generateFolio("FIN-FR-09", docRef.id); 
+
             await descontarStockPEPS(
                 servicioSeleccionado.sku, 
                 servicioSeleccionado.nombre, 
                 1, 
-                pSedeId 
+                // ✅ CORRECCIÓN: Enviamos Folio + Nombre para trazabilidad perfecta
+                `${folioRastreo} - ${pNombre}` 
             );
         } catch (err) { 
             console.warn("No se descontó stock para este ítem:", err); 
