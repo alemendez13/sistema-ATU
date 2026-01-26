@@ -22,6 +22,7 @@ interface Servicio {
   tipo?: string;
   duracion?: string; 
   area?: string;
+  requiereStock?: boolean;
 }
 
 interface PatientFormProps {
@@ -135,10 +136,12 @@ const onSubmit = async (data: any) => {
 
   try {
     // 1. VERIFICAR INVENTARIO (Regla Original VSC)
-    if (servicioSeleccionado.tipo === "Producto") {
+    const requiereStock = servicioSeleccionado.requiereStock !== false;
+
+    if (servicioSeleccionado.tipo === "Producto" && requiereStock) {
       const check = await verificarStock(servicioSeleccionado.sku, 1);
       if (!check.suficiente) { 
-        toast.error("Stock insuficiente."); 
+        toast.error("Stock insuficiente para este producto.");
         setIsSubmitting(false); 
         return; 
       }
@@ -203,10 +206,15 @@ const onSubmit = async (data: any) => {
       return { id: newPacRef.id, folio: folioExpediente };
     });
 
-    // 4. DESCONTAR STOCK (Mejora: Ahora con Folio para Trazabilidad)
-    if (servicioSeleccionado.tipo === "Producto") {
+    // 4. DESCONTAR STOCK (Mejora: Homologado con VentaForm para trazabilidad Folio + Nombre)
+    if (servicioSeleccionado.tipo === "Producto" && requiereStock) {
       // @ts-ignore
-      await descontarStockPEPS(servicioSeleccionado.sku, servicioSeleccionado.nombre, 1, result.folio);
+      await descontarStockPEPS(
+        servicioSeleccionado.sku, 
+        servicioSeleccionado.nombre, 
+        1, 
+        `${result.folio} - ${nombreConstruido}` // 👈 CAMBIO CLAVE: Concatenamos el nombre
+      );
     }
 
     // 5. AGENDA (Google + Firebase) - RECUPERADO: 'esTodoElDia'
