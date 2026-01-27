@@ -10,7 +10,7 @@ import { getDescuentosAction } from "../../../lib/actions"; // ✅ Ahora usamos 
 import Link from "next/link";
 import DownloadReciboButton from "../../../components/pdf/DownloadReciboButton";
 import PatientActions from "../../../components/pacientes/PatientActions";
-import { toast } from "sonner"; // Opcional: para notificar errores
+import { toast } from "sonner"; 
 
 // --- HELPERS (Conservados igual) ---
 function calcularEdad(fechaNacimiento?: string) {

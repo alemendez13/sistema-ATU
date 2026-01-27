@@ -47,6 +47,8 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
   const [precioFinal, setPrecioFinal] = useState<number | "">(""); 
   const [notaInterna, setNotaInterna] = useState(""); 
   const [historialCitas, setHistorialCitas] = useState<number>(0); 
+  const [extras, setExtras] = useState<any[]>([]); // Lista de items extra
+  const [extraSku, setExtraSku] = useState("");    // Selector temporal para el extra
 
   // Estados de Paciente y Formulario Base
   const [modo, setModo] = useState<'nuevo' | 'buscar'>('buscar');
@@ -83,12 +85,20 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
         if (!servicioSku) return;
         const servicio = catalogoServicios.find(s => s.sku === servicioSku);
         if (servicio) {
+            // 1. Calcular precio servicio principal
             let precioBase = cleanPrice(servicio.precio);
             const desc = descuentos.find((d: any) => d.id === (descuentoSeleccionado?.id || descuentoId));
+            
+            // Aplicar descuento SOLO al servicio principal (Regla de Negocio más segura)
             if (desc) {
                 precioBase = desc.tipo === "Porcentaje" ? precioBase - (precioBase * desc.valor / 100) : precioBase - desc.valor;
             }
-            setPrecioFinal(Math.max(0, precioBase));
+
+            // 2. Sumar los extras
+            const totalExtras = extras.reduce((sum, item) => sum + cleanPrice(item.precio), 0);
+            
+            // 3. Setear total final
+            setPrecioFinal(Math.max(0, precioBase + totalExtras));
         }
 
         if (pacienteSeleccionado?.id && servicioSku) {
@@ -134,6 +144,23 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
     const timer = setTimeout(buscarPacientes, 300);
     return () => clearTimeout(timer);
   }, [busqueda]);
+
+  // 👇 LÓGICA DEL CARRITO
+  const handleAgregarExtra = () => {
+      if (!extraSku) return;
+      const item = catalogoServicios.find(s => s.sku === extraSku);
+      if (item) {
+          setExtras([...extras, item]);
+          setExtraSku(""); // Limpiar selector
+          toast.success(`Agregado: ${item.nombre}`);
+      }
+  };
+
+  const handleRemoverExtra = (index: number) => {
+      const nuevosExtras = [...extras];
+      nuevosExtras.splice(index, 1);
+      setExtras(nuevosExtras);
+  };
 
   const handleGuardar = async (formData: any) => {
     if (!servicioSku) return toast.warning("Selecciona un servicio.");
@@ -341,6 +368,30 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
             origen: "Agenda"
             });
 
+      // 5. GUARDAR EXTRAS (Loop de Operaciones Adicionales)
+      for (const extra of extras) {
+          await addDoc(collection(db, "operaciones"), {
+            pacienteId: idFinal, pacienteNombre: nombreFinal,
+            requiereFactura: requiereFactura,
+            elaboradoPor: user?.email || "Usuario Desconocido",
+            servicioSku: extra.sku, 
+            servicioNombre: extra.nombre + " (Adicional)", // Etiqueta para diferenciar
+            monto: cleanPrice(extra.precio), // Precio de lista del extra
+            montoOriginal: cleanPrice(extra.precio),
+            descuentoAplicado: null, // Asumimos que el descuento fue al servicio principal
+            
+            estatus: "Pendiente de Pago",
+            fechaPago: null,
+            metodoPago: null,
+            
+            fecha: serverTimestamp(),
+            fechaCita: fechaSeleccionada, 
+            doctorNombre: data!.doctor.nombre, 
+            doctorId: data!.doctor.id,
+            origen: "Agenda Extra"
+          });
+      }
+
       if (data?.waitingListId) await deleteDoc(doc(db, "lista_espera", data.waitingListId));
       onClose(); 
       toast.success(citaExistente ? "✅ Cita re-programada con éxito." : "✅ Cita agendada correctamente.");
@@ -424,6 +475,56 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
                     </div>
                 )}
             </div>
+            {/* SECTOR EXTRAS (CARRITO) */}
+            {servicioSku && (
+                <div className="mt-4 border-t pt-4">
+                    <label className="text-xs font-bold text-slate-500 uppercase flex justify-between">
+                        <span>Items Adicionales (Misma Cita)</span>
+                        <span className="text-blue-600">{extras.length} items</span>
+                    </label>
+                    
+                    <div className="flex gap-2 mt-2">
+                        <select 
+                            className="flex-1 border p-2 rounded text-sm" 
+                            value={extraSku} 
+                            onChange={e => setExtraSku(e.target.value)}
+                        >
+                            <option value="">+ Agregar producto/estudio...</option>
+                            {catalogoServicios
+                                .filter(s => s.sku !== servicioSku) // No duplicar el principal
+                                .map(s => (
+                                <option key={s.sku} value={s.sku}>{s.nombre} - ${s.precio}</option>
+                            ))}
+                        </select>
+                        <button 
+                            type="button" 
+                            onClick={handleAgregarExtra}
+                            className="bg-green-100 text-green-700 px-3 rounded font-bold hover:bg-green-200"
+                        >
+                            +
+                        </button>
+                    </div>
+
+                    {/* LISTA DE EXTRAS AGREGADOS */}
+                    {extras.length > 0 && (
+                        <div className="mt-2 bg-slate-50 rounded border p-2 space-y-1">
+                            {extras.map((ex, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-xs bg-white p-1 rounded border shadow-sm">
+                                    <span className="truncate flex-1">{ex.nombre}</span>
+                                    <span className="font-bold text-slate-600 mx-2">${ex.precio}</span>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => handleRemoverExtra(idx)}
+                                        className="text-red-500 font-bold hover:bg-red-50 px-1 rounded"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
         </form>
 
         <div className="p-6 border-t bg-slate-50 flex gap-4">

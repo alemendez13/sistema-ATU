@@ -19,6 +19,22 @@ interface Props {
   descuentos: Descuento[]; // 👈 Recibimos los descuentos
 }
 
+interface ItemCarrito {
+  uniqueId: string;
+  servicioSku: string;
+  servicioNombre: string;
+  tipo: string;
+  precioOriginal: number;
+  precioFinal: number;
+  descuento: { id: string, nombre: string, monto: number } | null;
+  medicoId: string;
+  doctorNombre?: string;
+  fechaCita: string;
+  horaCita: string;
+  esLaboratorio: boolean;
+  requiereStock: boolean;
+}
+
 export default function VentaForm({ pacienteId, servicios, medicos, descuentos }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -28,7 +44,8 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
   
   // Estados del Formulario
   const [servicioSku, setServicioSku] = useState("");
-  const [descuentoId, setDescuentoId] = useState(""); // 👈 Nuevo Estado
+  const [descuentoId, setDescuentoId] = useState("");
+  const [descuentoSeleccionado, setDescuentoSeleccionado] = useState<any>(null);
   const [selectedArea, setSelectedArea] = useState("");
   const [selectedMedicoId, setSelectedMedicoId] = useState("");
   const [selectedTipo, setSelectedTipo] = useState("");
@@ -39,6 +56,7 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
   const [medicoId, setMedicoId] = useState("");
   const [fechaCita, setFechaCita] = useState("");
   const [horaCita, setHoraCita] = useState("");
+  const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
 
   // 🧠 LÓGICA DE FILTRADO (CASCADA) - NUEVO BLOQUE
   // 1. Áreas Disponibles
@@ -92,7 +110,6 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
 
   // 1. Encontrar objetos seleccionados
   const servicioSeleccionado = servicios.find(s => s.sku === servicioSku);
-  const descuentoSeleccionado = descuentos.find(d => d.id === descuentoId);
 
   // 2. Lógica de Precios
   const precioOriginal = cleanPrice(servicioSeleccionado?.precio);
@@ -155,148 +172,185 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
       aplicarConvenioAutomatico();
   }, [pacienteId, descuentos]);
 
-  const handleVenta = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!servicioSku) return;
+  // --- A. Función para agregar al carrito visual ---
+  const agregarAlCarrito = () => {
+    if (!servicioSku) return toast.warning("Selecciona un servicio primero.");
+    
+    // 🛡️ REGLA DE VALIDACIÓN 1: Laboratorio requiere médico responsable
+    if (esLaboratorio && !medicoId) return toast.error("⚠️ Es obligatorio asignar un responsable para el seguimiento de laboratorio.");
+    
+    // 🛡️ REGLA DE VALIDACIÓN 2: Servicios médicos requieren fecha y hora
+    if (!esLaboratorio && esServicio && (!medicoId || !fechaCita || !horaCita)) return toast.error("Faltan datos de la cita.");
 
-    // Reglas de validación operativa
-    if (esLaboratorio && !medicoId) {
-        toast.error("⚠️ Es obligatorio asignar un responsable para el seguimiento de laboratorio.");
-        return;
-    }
-    if (!esLaboratorio && esServicio && (!medicoId || !fechaCita || !horaCita)) {
-        toast.error("Faltan datos de la cita.");
-        return;
-    }
+    const servicioDetalle = servicios.find(s => s.sku === servicioSku);
+    const medicoDetalle = medicos.find(m => m.id === medicoId);
 
+    // 💰 CÁLCULO DE PRECIOS (Snapshot exacto del momento)
+    let montoOriginalItem = cleanPrice(servicioDetalle?.precio);
+    let montoDescuentoItem = 0;
+    
+    if (descuentoSeleccionado && montoOriginalItem > 0) {
+        if (descuentoSeleccionado.tipo === "Porcentaje") {
+            montoDescuentoItem = (montoOriginalItem * descuentoSeleccionado.valor) / 100;
+        } else {
+            montoDescuentoItem = descuentoSeleccionado.valor;
+        }
+    }
+    // Evitar negativos matemáticos
+    const precioFinalItem = Math.max(0, montoOriginalItem - montoDescuentoItem);
+
+    const nuevoItem: ItemCarrito = {
+        uniqueId: Date.now().toString(),
+        servicioSku,
+        servicioNombre: servicioDetalle?.nombre || "Desconocido",
+        tipo: servicioDetalle?.tipo || "Servicio",
+        precioOriginal: montoOriginalItem,
+        precioFinal: precioFinalItem,
+        descuento: descuentoSeleccionado ? {
+            id: descuentoSeleccionado.id,
+            nombre: descuentoSeleccionado.nombre,
+            monto: montoDescuentoItem
+        } : null,
+        medicoId,
+        doctorNombre: medicoDetalle?.nombre || "", // Se guarda string aquí, se limpia al procesar
+        fechaCita,
+        horaCita,
+        esLaboratorio,
+        // Regla Maestra de Stock: Solo false si explícitamente es false
+        requiereStock: servicioDetalle?.requiereStock !== false 
+    };
+
+    setCarrito([...carrito, nuevoItem]);
+    
+    // Limpieza de campos para agilidad operativa
+    setServicioSku("");
+    setDescuentoId(""); 
+    setDescuentoSeleccionado(null);
+    toast.success("Item agregado a la lista.");
+  };
+
+  const eliminarDelCarrito = (uniqueId: string) => {
+      setCarrito(carrito.filter(item => item.uniqueId !== uniqueId));
+  };
+
+  // --- B. Función Final (Procesamiento en Bucle / Batch) ---
+  const procesarVentaGlobal = async () => {
+    if (carrito.length === 0) return;
     setLoading(true);
 
     try {
-      // 1. Obtención de datos del paciente para trazabilidad
+      // 1. Obtención de datos del paciente (Una sola lectura para todo el lote)
       const pDoc = await getDoc(doc(db, "pacientes", pacienteId));
       let pNombre = "Desconocido";
-      let pSedeId = ""; // Inicializamos variable para capturar la sede 
-
       if (pDoc.exists()) {
           const dataPac = pDoc.data();
           pNombre = dataPac.nombreCompleto;
-          // Extraemos la sede necesaria para el inventario satélite 
-          pSedeId = dataPac.sedeId || ""; 
       }
 
-      const medicoElegido = medicos.find(m => m.id === medicoId);
-
-      // Si no hay hora y es laboratorio, se marca como evento de todo el día en Google Calendar 
-      const esTodoElDia = esLaboratorio && !horaCita;
-
-      // 2. Crear OPERACIÓN con Descuentos (Normalización Financiera) [cite: 14]
-      // >>> INICIO: NORMALIZACIÓN DE OPERACIÓN FINANCIERA <<<
-      const docRef = await addDoc(collection(db, "operaciones"), {
-        pacienteId,
-        pacienteNombre: pNombre,
-        requiereFactura, 
-        servicioSku: servicioSeleccionado?.sku,
-        servicioNombre: servicioSeleccionado?.nombre,
-        elaboradoPor: user?.email || "Usuario Desconocido",
-        
-        montoOriginal: precioOriginal,
-        descuentoAplicado: descuentoSeleccionado ? {
-            id: descuentoSeleccionado.id,
-            nombre: descuentoSeleccionado.nombre,
-            monto: montoDescuento
-        } : null,
-        monto: Number(precioFinal),
-        
-        folioInterno: generateFolio("FIN-FR-09", ""), 
-        fecha: serverTimestamp(), // Auditoría: Cuándo se tecleó
-
-        // 🔥 CORRECCIÓN DE TRAZABILIDAD:
-        estatus: Number(precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
-
-        // Lógica Temporal:
-        // Si es Cortesía Y hay fecha de cita definida -> Usar fecha cita
-        // Si es Cortesía Y NO hay cita (ej. producto inmediato) -> Usar serverTimestamp
-        // Si no es Cortesía -> null
-        fechaPago: Number(precioFinal) === 0 
-            ? (fechaCita && horaCita ? new Date(`${fechaCita}T${horaCita}:00`) : serverTimestamp()) 
-            : null,
-
-        metodoPago: Number(precioFinal) === 0 ? "Cortesía" : null,     
-        
-        esCita: esServicio,
-        doctorId: medicoId || null,
-        doctorNombre: medicoElegido?.nombre || null,
-        fechaCita: fechaCita, // Asegurado como String ISO para filtros [cite: 14]
-        horaCita: horaCita || null
-      });
-      // >>> FIN: NORMALIZACIÓN <<<
-
-      // 3. VINCULACIÓN DE FOLIO (Unificación de registro y archivo financiero) [cite: 14]
-      await setDoc(doc(db, "operaciones", docRef.id), { 
-        folioInterno: generateFolio("FIN-FR-09", docRef.id) 
-      }, { merge: true });
-
-      // 4. Gestión de Inventario PEPS (Primeras Entradas, Primeras Salidas)
-      // MEJORA VALIDADA v2: Nombres de variables únicos para evitar conflicto con línea 190.
-      
-      // Usamos nombres distintos (itemEs...) para no chocar con las variables de estado
-      const itemEsProducto = servicioSeleccionado?.tipo === "Producto";
-      const itemEsLaboratorio = servicioSeleccionado?.tipo === "Laboratorio";
-      
-      // Regla Maestra: Solo descontamos si el Excel NO dice explícitamente "No"
-      const necesitaStock = servicioSeleccionado?.requiereStock !== false; 
-
-      // Condición Unificada: (Es Producto O Es Lab) Y (Requiere Stock)
-      if (servicioSeleccionado && (itemEsProducto || itemEsLaboratorio) && necesitaStock) {
-        try {
-            const folioRastreo = generateFolio("FIN-FR-09", docRef.id); 
-
-            await descontarStockPEPS(
-                servicioSeleccionado.sku, 
-                servicioSeleccionado.nombre, 
-                1, 
-                // ✅ CORRECCIÓN: Enviamos Folio + Nombre para trazabilidad perfecta
-                `${folioRastreo} - ${pNombre}` 
-            );
-        } catch (err) { 
-            console.warn("No se descontó stock para este ítem:", err); 
-            toast.warning("Nota: Venta registrada, pero sin descuento de inventario.");
-        }
-      }
-
-      // 5. Agendar en base de datos local y Google Calendar si es servicio 
-      if (esServicio && medicoElegido) {
-        await addDoc(collection(db, "citas"), {
-            doctorId: medicoId,
-            doctorNombre: medicoElegido.nombre,
-            paciente: pNombre,
-            motivo: servicioSeleccionado?.nombre,
-            fecha: fechaCita,
-            hora: horaCita,
-            creadoEn: new Date(),
-            elaboradoPor: user?.email || "Usuario Desconocido"
-        });
-
-        const duracion = parseInt(servicioSeleccionado?.duracion || "30");
-        await agendarCitaGoogle({
-            doctorId: medicoId,
-            doctorNombre: medicoElegido.nombre,
-            calendarId: medicoElegido.calendarId,
+      // 🔄 BUCLE DE PROCESAMIENTO (Mantiene integridad por transacción individual)
+      for (const item of carrito) {
+          
+          // 2. Crear OPERACIÓN (Normalización Financiera idéntica al original)
+          const docRef = await addDoc(collection(db, "operaciones"), {
+            pacienteId,
             pacienteNombre: pNombre,
-            motivo: (esLaboratorio ? "🔬 LAB: " : "🩺 ") + servicioSeleccionado?.nombre,
-            fecha: fechaCita,
-            hora: horaCita || "00:00", 
-            duracionMinutos: duracion,
-            esTodoElDia: esTodoElDia
-        });
-      }
+            requiereFactura, // Checkbox global aplica al lote
+            servicioSku: item.servicioSku,
+            servicioNombre: item.servicioNombre,
+            elaboradoPor: user?.email || "Usuario Desconocido",
+            
+            montoOriginal: item.precioOriginal,
+            descuentoAplicado: item.descuento,
+            monto: Number(item.precioFinal),
+            
+            folioInterno: generateFolio("FIN-FR-09", ""), 
+            fecha: serverTimestamp(),
+            
+            // Lógica de Estatus Financiero
+            estatus: Number(item.precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
 
-      toast.success("✅ Operación registrada correctamente.");
+            // Lógica Temporal de Pago
+            fechaPago: Number(item.precioFinal) === 0 
+                ? (item.fechaCita && item.horaCita ? new Date(`${item.fechaCita}T${item.horaCita}:00`) : serverTimestamp()) 
+                : null,
+
+            metodoPago: Number(item.precioFinal) === 0 ? "Cortesía" : null,     
+            
+            esCita: item.tipo === 'Servicio' || item.tipo === 'Laboratorio',
+            doctorId: item.medicoId || null,
+            // Ajuste Quirúrgico: Convertimos cadena vacía a null para consistencia DB
+            doctorNombre: item.doctorNombre || null, 
+            fechaCita: item.fechaCita || null,
+            horaCita: item.horaCita || null
+          });
+
+          // 3. VINCULACIÓN DE FOLIO
+          await setDoc(doc(db, "operaciones", docRef.id), { 
+            folioInterno: generateFolio("FIN-FR-09", docRef.id) 
+          }, { merge: true });
+
+          // 4. Gestión de Inventario PEPS
+          const itemEsProducto = item.tipo === "Producto";
+          const itemEsLab = item.tipo === "Laboratorio";
+
+          if ((itemEsProducto || itemEsLab) && item.requiereStock) {
+            try {
+                const folioRastreo = generateFolio("FIN-FR-09", docRef.id); 
+                await descontarStockPEPS(
+                    item.servicioSku, 
+                    item.servicioNombre, 
+                    1, 
+                    `${folioRastreo} - ${pNombre}` 
+                );
+            } catch (err) { 
+                console.warn(`Error stock ${item.servicioSku}`, err); 
+            }
+          }
+
+          // 5. Agenda (Google + Local)
+          const esAgenda = (item.tipo === 'Servicio' || item.tipo === 'Laboratorio');
+          if (esAgenda && item.medicoId) {
+            
+            // Firebase Local
+            await addDoc(collection(db, "citas"), {
+                doctorId: item.medicoId,
+                doctorNombre: item.doctorNombre,
+                paciente: pNombre,
+                motivo: item.servicioNombre,
+                fecha: item.fechaCita,
+                hora: item.horaCita,
+                creadoEn: new Date(),
+                elaboradoPor: user?.email || "Usuario Desconocido"
+            });
+
+            // Google Calendar API
+            const medicoReal = medicos.find(m => m.id === item.medicoId);
+            const servicioReal = servicios.find(s => s.sku === item.servicioSku);
+            const duracion = parseInt(servicioReal?.duracion || "30");
+            
+            if (medicoReal) {
+                await agendarCitaGoogle({
+                    doctorId: item.medicoId,
+                    doctorNombre: medicoReal.nombre,
+                    calendarId: medicoReal.calendarId,
+                    pacienteNombre: pNombre,
+                    motivo: (item.esLaboratorio ? "🔬 LAB: " : "🩺 ") + item.servicioNombre,
+                    fecha: item.fechaCita,
+                    hora: item.horaCita || "00:00", 
+                    duracionMinutos: duracion,
+                    // Lógica original: es todo el día si es Lab y no tiene hora
+                    esTodoElDia: item.esLaboratorio && !item.horaCita
+                });
+            }
+          }
+      } // Fin del Loop
+
+      toast.success(`✅ ${carrito.length} operaciones registradas correctamente.`);
       router.push("/finanzas"); 
 
     } catch (error) {
-      console.error("Error en handleVenta:", error);
-      toast.error("Error al procesar la transacción");
+      console.error("Error procesando venta global:", error);
+      toast.error("Error al procesar la transacción.");
     } finally {
       setLoading(false);
     }
@@ -309,7 +363,7 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
             🛒 Nueva Venta / Cita
         </h1>
         
-        <form onSubmit={handleVenta} className="space-y-6">
+        <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
           
           {/* SELECCIÓN DE PRODUCTO */}
           {/* CASCADA DE SELECCIÓN (REEMPLAZO) */}
@@ -377,7 +431,12 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
                 <select 
                     className="w-full border p-3 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                     value={descuentoId}
-                    onChange={e => setDescuentoId(e.target.value)}
+                    onChange={e => {
+                        const val = e.target.value;
+                        setDescuentoId(val);
+                        // Esto conecta con el estado que creamos en el Paso 2
+                        setDescuentoSeleccionado(descuentos.find(d => d.id === val) || null);
+                    }}
                 >
                     <option value="">Ninguno (Precio de Lista)</option>
                     {descuentos.map(d => (
@@ -474,12 +533,88 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
               )}
           </div>
 
-          <div className="flex gap-4 pt-4">
-            <button type="button" onClick={() => router.back()} className="flex-1 py-3 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
-            <Button type="submit" isLoading={loading} className="flex-1 py-3 text-lg shadow-md">
-                {precioFinal === 0 ? "Confirmar Cortesía" : "Generar Nota de Venta"}
+          {/* --- INICIO ZONA NUEVA: TABLA Y BOTONES --- */}
+          
+          {/* 1. Tabla Visual del Carrito */}
+          {carrito.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 animate-fade-in my-6">
+                <h3 className="text-sm font-bold text-blue-800 uppercase mb-2 flex justify-between items-center">
+                    <span>🛒 Lista de Movimientos ({carrito.length})</span>
+                    <span className="bg-white px-2 py-1 rounded text-blue-900 border border-blue-100 font-bold">
+                        Total: ${carrito.reduce((acc, item) => acc + item.precioFinal, 0).toFixed(2)}
+                    </span>
+                </h3>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {carrito.map((item) => (
+                        <div key={item.uniqueId} className="flex justify-between items-center bg-white p-3 rounded-md border border-blue-100 shadow-sm text-sm">
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-slate-700">{item.servicioNombre}</span>
+                                    {item.tipo === 'Servicio' && <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 rounded">Cita</span>}
+                                    {item.tipo === 'Producto' && <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 rounded">Stock</span>}
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    {item.medicoId ? `👨‍⚕️ ${item.doctorNombre}` : '🏢 Venta Mostrador'} 
+                                    {item.fechaCita ? ` • 📅 ${item.fechaCita} ${item.horaCita}` : ''}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-4 pl-4 border-l ml-4">
+                                <span className="font-bold text-slate-800">${item.precioFinal.toFixed(2)}</span>
+                                <button 
+                                    type="button" 
+                                    onClick={() => eliminarDelCarrito(item.uniqueId)}
+                                    className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded font-bold"
+                                    title="Quitar"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+          )}
+
+          {/* 2. Botonera de Acción Nueva */}
+          <div className="flex flex-col gap-3 pt-6 border-t border-slate-100">
+            {/* Botón A: Agregar a la lista */}
+            <Button 
+                type="button" 
+                onClick={agregarAlCarrito} 
+                className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 shadow-sm flex justify-center items-center gap-2"
+                disabled={!servicioSku}
+            >
+                <span>➕</span> Agregar a la Lista
             </Button>
+
+            {/* Botón B: Finalizar Todo */}
+            <div className="flex gap-4 mt-2">
+                <button 
+                    type="button" 
+                    onClick={() => router.back()} 
+                    className="flex-1 py-3 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                >
+                    Cancelar
+                </button>
+                
+                <Button 
+                    type="button" 
+                    onClick={procesarVentaGlobal} 
+                    isLoading={loading} 
+                    disabled={carrito.length === 0}
+                    className={`flex-1 py-3 text-lg shadow-md transition-all ${
+                        carrito.length > 0 
+                        ? 'bg-green-600 hover:bg-green-700 text-white' 
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
+                >
+                    {carrito.length > 0 
+                        ? `✅ Finalizar (${carrito.length} items)` 
+                        : "Lista vacía"}
+                </Button>
+            </div>
           </div>
+          {/* --- FIN ZONA NUEVA --- */}
 
         </form>
       </div>

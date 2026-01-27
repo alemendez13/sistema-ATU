@@ -3,11 +3,20 @@ import { getMensajesWhatsApp } from "@/lib/googleSheets";
 import DirectoryClient from "@/components/pacientes/DirectoryClient";
 import ProtectedRoute from "@/components/ProtectedRoute"; 
 import Link from "next/link"; // ✅ ADICIÓN: Faltaba esta importación
+import { Suspense } from "react";
 
 export const dynamic = 'force-dynamic'; 
 
 export default async function Page() {
-  const mensajes = await getMensajesWhatsApp();
+  // 🛡️ PROTECCIÓN CONTRA CAÍDAS DE GOOGLE SHEETS
+  let mensajes: any[] = [];
+  try {
+    mensajes = await getMensajesWhatsApp();
+  } catch (error) {
+    console.error("⚠️ Fallo al cargar mensajes de Sheets:", error);
+    // Fallback silencioso para no romper la página
+    mensajes = []; 
+  }
 
   return (
     <ProtectedRoute>
