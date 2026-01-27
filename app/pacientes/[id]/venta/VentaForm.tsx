@@ -59,32 +59,43 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
   const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
 
   // 🧠 LÓGICA DE FILTRADO (CASCADA) - NUEVO BLOQUE
-  // 1. Áreas Disponibles
+  // 1. Áreas Disponibles (Con Inyección de Laboratorio)
   const areasDisponibles = useMemo(() => {
     const areas = new Set<string>();
     servicios.forEach(s => s.area && areas.add(s.area));
     medicos.forEach(m => m.especialidad && areas.add(m.especialidad));
+    
+    // 💉 INYECCIÓN QUIRÚRGICA: Si hay laboratorios cargados, agregamos la opción
+    if (servicios.some(s => s.tipo === "Laboratorio")) {
+        areas.add("Laboratorio");
+    }
+    
     return Array.from(areas).sort();
   }, [servicios, medicos]);
 
   // 2. Médicos Filtrados
   const medicosFiltrados = useMemo(() => {
-  if (!selectedArea) return [];
-  // Si seleccionamos Laboratorio, permitimos elegir a CUALQUIER médico para el seguimiento
-  if (selectedArea === "Laboratorio") return medicos;
-    // Para otras áreas, filtramos por especialidad o Medicina General
-  return medicos.filter(m => 
-    m.especialidad === selectedArea || 
-    m.especialidad === "Medicina General" || 
-    m.especialidad === "General"
-  );
+    if (!selectedArea) return [];
+    // Si es Lab, permitimos elegir cualquier médico (el solicitante)
+    if (selectedArea === "Laboratorio") return medicos;
+    
+    return medicos.filter(m => 
+      m.especialidad === selectedArea || 
+      m.especialidad === "Medicina General" || 
+      m.especialidad === "General"
+    );
   }, [selectedArea, medicos]);
 
-  // 3. Tipos de Servicio
+  // 3. Tipos de Servicio (Adaptado para detectar Labs)
   const tiposDisponibles = useMemo(() => {
     if (!selectedArea) return [];
+    
+    // Si eligió Especialidad "Laboratorio", solo mostramos esa opción
+    if (selectedArea === "Laboratorio") return ["Estudios de Laboratorio"];
+
     const servsDelArea = servicios.filter(s => s.area === selectedArea);
     const tipos = new Set<string>();
+    
     servsDelArea.forEach(s => {
         if (s.tipo === "Laboratorio") tipos.add("Estudios de Laboratorio");
         else if (s.tipo === "Producto") tipos.add("Farmacia / Productos");
