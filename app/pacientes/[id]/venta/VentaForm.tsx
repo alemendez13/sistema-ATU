@@ -307,11 +307,19 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
           if ((itemEsProducto || itemEsLab) && item.requiereStock) {
             try {
                 const folioRastreo = generateFolio("FIN-FR-09", docRef.id); 
+                
+                // 📍 CONFIGURACIÓN DE ORIGEN DE STOCK
+                // null = Busca en cualquier lado (Comportamiento General)
+                // "Satelite" = Fuerza la búsqueda solo en inventario satélite
+                // Puedes cambiar esto dinámicamente según el usuario o tipo de producto
+                const ubicacionSalida = null; 
+
                 await descontarStockPEPS(
                     item.servicioSku, 
                     item.servicioNombre, 
                     1, 
-                    `${folioRastreo} - ${pNombre}` 
+                    `${folioRastreo} - ${pNombre}`,
+                    ubicacionSalida // 👈 5to Argumento: La Señal de Ubicación
                 );
             } catch (err) { 
                 console.warn(`Error stock ${item.servicioSku}`, err); 

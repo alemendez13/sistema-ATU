@@ -1,4 +1,3 @@
-/* app/layout.tsx */
 import { Inter } from "next/font/google";
 import "./globals.css"; 
 import { Toaster } from 'sonner';
@@ -13,15 +12,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es">
       <body className={`${inter.className} bg-slate-50 text-slate-900`}>
         <ResourceMonitorProvider>
-        <Navbar />
-        <Sidebar /> {/* 👈 Inyectamos la barra lateral */}
-        
-        {/* 2. Modificamos el 'main' para agregar el padding-left (with-sidebar) */}
-        <main className="min-h-screen pt-20 pb-10 px-4 md:px-8 with-sidebar">
-          {children}
-        </main>
-        
-        <Toaster position="top-center" richColors />
+          <Navbar />
+          <Sidebar /> 
+          
+          <main className="min-h-screen pt-20 pb-10 px-4 md:px-8 with-sidebar">
+            {children}
+          </main>
+          
+          <Toaster position="top-center" richColors />
         </ResourceMonitorProvider>
       </body>
     </html>

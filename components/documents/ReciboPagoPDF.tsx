@@ -1,6 +1,6 @@
 "use client";
 import React from 'react';
-import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
+import { Page, Text, View, Document, StyleSheet, Image } from '@react-pdf/renderer';
 
 // Estilos corregidos (sin errores de border)
 const styles = StyleSheet.create({
@@ -19,6 +19,11 @@ const styles = StyleSheet.create({
     borderBottomColor: '#111827', // Gris muy oscuro
     borderBottomStyle: 'solid',
     paddingBottom: 10,
+  },
+  logo: {
+    width: 120, // Ajustable según el tamaño de tu logo
+    height: 'auto',
+    marginBottom: 5,
   },
   companyInfo: {
     flexDirection: 'column',
@@ -109,8 +114,13 @@ export default function ReciboPagoPDF({ folio, fecha, paciente, servicio, monto,
         {/* Encabezado */}
         <View style={styles.header}>
           <View style={styles.companyInfo}>
-            <Text style={styles.companyName}>SANSCE</Text>
-            <Text style={styles.companySub}>Salud y Nutrición Especializada</Text>
+            {/* Asegúrate que el archivo logo-sansce.png esté en tu carpeta public */}
+            <Image style={styles.logo} src="/logo-sansce.png" />
+            <Text style={styles.companySub}>Sanae en Escencia</Text>
+            <Text style={{ fontSize: 8, color: 'gray', maxWidth: 200 }}>
+              Av. Magdalena #439, Col del Valle Centro,
+              Benito Juárez, CDMX, CP 03100
+            </Text>
           </View>
           <View>
             <Text style={{ fontSize: 10, color: 'gray' }}>Folio: {folio}</Text>
@@ -150,7 +160,7 @@ export default function ReciboPagoPDF({ folio, fecha, paciente, servicio, monto,
         {/* Pie de página */}
         <View style={styles.footer}>
           <Text>Este documento es un comprobante de pago interno. Si requiere factura fiscal, favor de solicitarla el mismo mes de su consulta.</Text>
-          <Text style={{ marginTop: 4 }}>SANSCE - Dirección Física de la Clínica - Teléfono</Text>
+          <Text style={{ marginTop: 4 }}>SANSCE Teléfono 55 1512 6008</Text>
         </View>
 
       </Page>
