@@ -9,6 +9,7 @@ interface BotonProps {
     fecha: string;
     paciente: string;
     servicio: string;
+    especialidad?: string; 
     monto: string;
     metodo?: string;
   }

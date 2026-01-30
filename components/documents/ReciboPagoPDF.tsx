@@ -102,11 +102,12 @@ interface ReciboProps {
   fecha: string;
   paciente: string;
   servicio: string;
+  especialidad?: string;
   monto: string;
   metodo?: string;
 }
 
-export default function ReciboPagoPDF({ folio, fecha, paciente, servicio, monto, metodo }: ReciboProps) {
+export default function ReciboPagoPDF({ folio, fecha, paciente, servicio, especialidad, monto, metodo }: ReciboProps) {
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
@@ -142,7 +143,10 @@ export default function ReciboPagoPDF({ folio, fecha, paciente, servicio, monto,
           
           <View style={styles.row}>
             <Text style={styles.label}>Por concepto de:</Text>
-            <Text style={styles.value}>{servicio}</Text>
+            {/* 👈 2. Lógica de Prioridad: Si hay especialidad, úsala. Si no, usa el servicio. */}
+            <Text style={styles.value}>
+              {especialidad ? especialidad.toUpperCase() : servicio}
+            </Text>
           </View>
 
           <View style={styles.row}>

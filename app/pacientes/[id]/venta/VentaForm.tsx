@@ -24,6 +24,7 @@ interface ItemCarrito {
   servicioSku: string;
   servicioNombre: string;
   tipo: string;
+  especialidad?: string;
   precioOriginal: number;
   precioFinal: number;
   descuento: { id: string, nombre: string, monto: number } | null;
@@ -171,9 +172,12 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
                   // Si el paciente tiene un convenio guardado...
                   if (pData.convenioId) {
                       setDescuentoId(pData.convenioId);
-                      // Buscamos el nombre para avisar al usuario
-                      const nombreDesc = descuentos.find(d => d.id === pData.convenioId)?.nombre;
-                      toast.info(`Convenio aplicado: ${nombreDesc}`);
+                      
+                      // 🧠 FIX CRÍTICO: Actualizamos también el OBJETO lógico, no solo el ID visual
+                      const descuentoObj = descuentos.find(d => d.id === pData.convenioId);
+                      setDescuentoSeleccionado(descuentoObj || null);
+
+                      if (descuentoObj) toast.info(`Convenio aplicado: ${descuentoObj.nombre}`);
                   }
               }
           } catch (error) {
@@ -215,6 +219,7 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
         servicioSku,
         servicioNombre: servicioDetalle?.nombre || "Desconocido",
         tipo: servicioDetalle?.tipo || "Servicio",
+        especialidad: servicioDetalle?.area || "General",
         precioOriginal: montoOriginalItem,
         precioFinal: precioFinalItem,
         descuento: descuentoSeleccionado ? {
@@ -268,6 +273,7 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
             requiereFactura, // Checkbox global aplica al lote
             servicioSku: item.servicioSku,
             servicioNombre: item.servicioNombre,
+            especialidad: item.especialidad || null,
             elaboradoPor: user?.email || "Usuario Desconocido",
             
             montoOriginal: item.precioOriginal,

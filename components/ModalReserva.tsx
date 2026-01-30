@@ -433,8 +433,34 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
                     <input type="text" className="w-full border rounded p-3 uppercase" placeholder="Nombre del paciente..." value={busqueda} onChange={e => {setBusqueda(e.target.value); setPacienteSeleccionado(null);}} />
                     {resultados.length > 0 && !pacienteSeleccionado && (
                         <ul className="absolute z-10 w-full bg-white border rounded shadow-xl mt-1 max-h-40 overflow-y-auto">
-                            {resultados.map(p => <li key={p.id} className="p-3 hover:bg-blue-50 cursor-pointer border-b text-sm font-bold" onClick={() => {setPacienteSeleccionado(p); setBusqueda(p.nombreCompleto); setResultados([]); if(p.convenioId) setDescuentoId(p.convenioId);const tieneRFC = !!(p.datosFiscales?.rfc || p.rfc);
-                            setRequiereFactura(tieneRFC);}}>{p.nombreCompleto}</li>)}
+                            {resultados.map(p => (
+                                <li 
+                                    key={p.id} 
+                                    className="p-3 hover:bg-blue-50 cursor-pointer border-b text-sm font-bold" 
+                                    onClick={() => {
+                                        setPacienteSeleccionado(p); 
+                                        setBusqueda(p.nombreCompleto); 
+                                        setResultados([]); 
+                                        
+                                        // 🧠 FIX CRÍTICO: Sincronización completa del descuento
+                                        const tieneRFC = !!(p.datosFiscales?.rfc || p.rfc);
+                                        setRequiereFactura(tieneRFC);
+
+                                        if(p.convenioId) {
+                                            setDescuentoId(p.convenioId);
+                                            // Buscamos y seteamos el objeto completo para que el cálculo matemático funcione
+                                            const descObj = descuentos.find(d => d.id === p.convenioId);
+                                            setDescuentoSeleccionado(descObj || null);
+                                        } else {
+                                            // Limpiamos si el paciente no tiene convenio
+                                            setDescuentoId("");
+                                            setDescuentoSeleccionado(null);
+                                        }
+                                    }}
+                                >
+                                    {p.nombreCompleto}
+                                </li>
+                            ))}
                         </ul>
                     )}
                 </div>
