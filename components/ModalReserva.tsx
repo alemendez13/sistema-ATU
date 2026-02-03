@@ -266,7 +266,8 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
                   duracionMinutos: duracionMinutos,
                   esTodoElDia: servicioDetalle?.tipo === 'Laboratorio'
               });
-              googleEventIdFinal = resGoogle.googleEventId || ""; 
+              // ✅ CORRECCIÓN: Usamos el nuevo nombre estándar 'eventId'
+              googleEventIdFinal = resGoogle.eventId || "";
           }
 
       } else {
@@ -281,7 +282,7 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
               duracionMinutos: duracionMinutos,
               esTodoElDia: servicioDetalle?.tipo === 'Laboratorio'
           });
-          googleEventIdFinal = resGoogle.googleEventId || "";
+          googleEventIdFinal = resGoogle.eventId || "";
       }
 
       // 2. REGISTRO DE PACIENTE (Si es nuevo) - Lógica Original mantenida
