@@ -48,8 +48,9 @@ export async function agendarCitaGoogle(cita: {
             calendarId: calendarId,
             requestBody: evento,
         });
-        return { success: true, googleEventId: respuesta.data.id };
-    } catch (error: any) { 
+        // ✅ CORRECCIÓN: Estandarizamos el nombre a 'eventId' para que VentaForm lo reconozca
+        return { success: true, eventId: respuesta.data.id };
+    } catch (error: any) {
         console.error("Error creando evento en Google:", error);
         return { success: false, error: error.message };
     }
