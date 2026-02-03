@@ -72,15 +72,10 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
     return Array.from(areas).sort();
   }, [servicios, medicos]);
 
+  //Permitimos seleccionar cualquier médico siempre (Igual que en VentaForm)
   const medicosFiltrados = useMemo(() => {
-    if (!selectedArea) return [];
-    // Si es Lab, permitimos elegir cualquier médico (el solicitante)
-    if (selectedArea === "Laboratorio") return medicos;
-    
-    return medicos.filter(m => 
-      m.especialidad === selectedArea || m.especialidad === "Medicina General" || m.especialidad === "General"
-    );
-  }, [selectedArea, medicos]);
+      return medicos; 
+  }, [medicos]);
 
   const tiposDisponibles = useMemo(() => {
     if (!selectedArea) return [];
@@ -233,8 +228,9 @@ const onSubmit = async (data: any) => {
       );
     }
 
-    // 5. AGENDA (Google + Firebase) - RECUPERADO: 'esTodoElDia'
-    if (esServicioMedico && selectedMedicoId) {
+    // 5. AGENDA (Google + Firebase)
+    // ✅ CAMBIO 3: Agendamos si el usuario eligió un médico y puso fecha, sea lo que sea que venda.
+    if (selectedMedicoId && data.fechaCita) {
         const medicoObj = medicos.find(m => m.id === selectedMedicoId);
         const resGoogle = await agendarCitaGoogle({
             calendarId: medicoObj.calendarId,
@@ -350,12 +346,30 @@ const onSubmit = async (data: any) => {
              </div>
           )}
 
-          {esServicioMedico && (
-             <div className="mt-4 pt-4 border-t border-blue-200 grid grid-cols-2 gap-4">
-                <div><label className={labelStyle}>Fecha Cita</label><input type="date" className={inputStyle} {...register("fechaCita", { required: true })} /></div>
-                <div><label className={labelStyle}>Hora Cita</label><input type="time" className={inputStyle} {...register("horaCita", { required: !esLaboratorio })} /></div>
+          {/* Bloque de Agenda siempre visible y opcional para productos */}
+          <div className="mt-4 pt-4 border-t border-blue-200 bg-blue-50/50 p-2 rounded">
+             <h3 className="text-xs font-bold text-blue-800 mb-2 uppercase">
+                {esServicioMedico ? "📅 Datos de Cita (Requerido)" : "📅 Agendar Cita (Opcional)"}
+             </h3>
+             <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className={labelStyle}>Fecha</label>
+                    <input 
+                        type="date" 
+                        className={inputStyle} 
+                        {...register("fechaCita", { required: esServicioMedico })} // Solo obligatorio si es Servicio
+                    />
+                </div>
+                <div>
+                    <label className={labelStyle}>Hora</label>
+                    <input 
+                        type="time" 
+                        className={inputStyle} 
+                        {...register("horaCita", { required: esServicioMedico && !esLaboratorio })} 
+                    />
+                </div>
              </div>
-          )}
+          </div>
         </section>
 
         {/* FORMULARIO BASE HOMOLOGADO */}
