@@ -55,7 +55,7 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
   // Estados para Agenda
   const [esServicio, setEsServicio] = useState(false);
   const [medicoId, setMedicoId] = useState("");
-  const [fechaCita, setFechaCita] = useState("");
+  const [fechaCita, setFechaCita] = useState(new Date().toISOString().split('T')[0]);
   const [horaCita, setHoraCita] = useState("");
   const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
 
@@ -152,10 +152,8 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
     }
   }, [servicioSku, servicioSeleccionado]);
 
-  // Filtrar médicos
-  const medicosDisponibles = medicos.filter(m => 
-    !servicioSeleccionado?.area || m.especialidad === servicioSeleccionado.area || m.especialidad === "General"
-  );
+  // Esto permite asignar la venta de un producto (ej. Shampoo) a un Dermatólogo específico.
+  const medicosDisponibles = medicos;
 
   useEffect(() => {
       const aplicarConvenioAutomatico = async () => {
@@ -333,11 +331,10 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
           }
 
           // 5. Agenda (Google + Local)
-          const esAgenda = (item.tipo === 'Servicio' || item.tipo === 'Laboratorio');
-          if (esAgenda && item.medicoId) {
+          if (item.medicoId && item.fechaCita) {
             
-            // Firebase Local
-            await addDoc(collection(db, "citas"), {
+            // A. Firebase Local: Creamos la cita y GUARDAMOS LA REFERENCIA (citaRef)
+            const citaRef = await addDoc(collection(db, "citas"), {
                 doctorId: item.medicoId,
                 doctorNombre: item.doctorNombre,
                 paciente: pNombre,
@@ -345,16 +342,20 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
                 fecha: item.fechaCita,
                 hora: item.horaCita,
                 creadoEn: new Date(),
-                elaboradoPor: user?.email || "Usuario Desconocido"
+                elaboradoPor: user?.email || "Usuario Desconocido",
+                // Inicializamos como pendiente de sincronizar
+                googleEventId: null 
             });
 
-            // Google Calendar API
+            // B. Google Calendar API
             const medicoReal = medicos.find(m => m.id === item.medicoId);
             const servicioReal = servicios.find(s => s.sku === item.servicioSku);
             const duracion = parseInt(servicioReal?.duracion || "30");
             
             if (medicoReal) {
-                await agendarCitaGoogle({
+                // ⚠️ FIX DE TIPADO: Usamos 'as any' para calmar a VS Code
+                // mientras actualizamos el archivo actions.ts en el siguiente paso.
+                const respGoogle = await agendarCitaGoogle({
                     doctorId: item.medicoId,
                     doctorNombre: medicoReal.nombre,
                     calendarId: medicoReal.calendarId,
@@ -363,9 +364,19 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
                     fecha: item.fechaCita,
                     hora: item.horaCita || "00:00", 
                     duracionMinutos: duracion,
-                    // Lógica original: es todo el día si es Lab y no tiene hora
                     esTodoElDia: item.esLaboratorio && !item.horaCita
-                });
+                }) as any; 
+
+                // 🧠 EL ESLABÓN PERDIDO: Si Google nos dio un ID, actualizamos la cita en Firebase
+                // (Nota: Verificamos respGoogle.id o respGoogle.eventId según cómo retorne tu actions.ts)
+                const idEvento = respGoogle?.eventId || respGoogle?.id;
+
+                if (idEvento) {
+                    await setDoc(doc(db, "citas", citaRef.id), { 
+                        googleEventId: idEvento 
+                    }, { merge: true });
+                    console.log("✅ Cita vinculada con Google ID:", idEvento);
+                }
             }
           }
       } // Fin del Loop
@@ -492,10 +503,22 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
              </div>
           )}
 
-          {esServicio && (
-            <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 animate-fade-in">
+          <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">📅 Fecha de Venta / Cita</label>
+            <input 
+                type="date" 
+                className="w-full border p-2 rounded font-bold text-slate-700" 
+                value={fechaCita} 
+                onChange={e => setFechaCita(e.target.value)} 
+                required 
+            />
+          </div>
+
+          {/* ✅ ACTUALIZACIÓN: Bloque siempre visible (Democratización de la Agenda) */}
+          <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 animate-fade-in">
                 <h3 className="font-bold text-blue-900 mb-4">
-                    {esLaboratorio ? "📋 Responsable de Seguimiento" : "📅 Agendar Cita"}
+                    {/* Título dinámico: Se adapta según si es una Cita real o una asignación opcional */}
+                    {esLaboratorio ? "📋 Responsable de Seguimiento" : (esServicio ? "📅 Agendar Cita" : "👤 Profesional Asignado (Opcional)")}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
@@ -504,7 +527,8 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
                             className="w-full border p-2 rounded"
                             value={medicoId}
                             onChange={e => setMedicoId(e.target.value)}
-                            required
+                            // ⚠️ Solo forzamos selección si es un Servicio Médico real
+                            required={esServicio}
                         >
                             <option value="">-- Elegir Doctor --</option>
                             {medicosDisponibles.map(m => (
@@ -512,10 +536,7 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
                             ))}
                         </select>
                     </div>
-                    <div>
-                        <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Fecha</label>
-                        <input type="date" className="w-full border p-2 rounded" value={fechaCita} onChange={e => setFechaCita(e.target.value)} required />
-                    </div>
+
                     <div>
                         <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Hora</label>
                         <input 
@@ -523,7 +544,8 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
                             className="w-full border p-2 rounded" 
                             value={horaCita} 
                             onChange={e => setHoraCita(e.target.value)} 
-                            required={!esLaboratorio} // Solo es obligatorio si NO es laboratorio
+                            // ⚠️ Hora obligatoria solo para Citas Médicas (No Labs, No Productos)
+                            required={esServicio && !esLaboratorio} 
                         />
                         {esLaboratorio && (
                             <p className="text-[10px] text-slate-400 mt-1 italic">
@@ -533,7 +555,6 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
                     </div>
                 </div>
             </div>
-          )}
 
           {/* ✅ BLOQUE DE DOBLE CHECK PARA FACTURA */}
           <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 flex items-center justify-between">
