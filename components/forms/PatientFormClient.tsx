@@ -255,7 +255,8 @@ const onSubmit = async (data: any) => {
             fecha: data.fechaCita,
             hora: data.horaCita,
             creadoEn: new Date(),
-            googleEventId: resGoogle.googleEventId || null,
+            // ✅ CORRECCIÓN FINAL: Usamos 'eventId' (estándar unificado)
+            googleEventId: resGoogle.eventId || null,
             confirmada: true 
         });
     }
