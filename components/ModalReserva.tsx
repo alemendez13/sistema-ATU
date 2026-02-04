@@ -266,12 +266,12 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
                   duracionMinutos: duracionMinutos,
                   esTodoElDia: servicioDetalle?.tipo === 'Laboratorio'
               });
-              // ✅ CORRECCIÓN: Usamos el nuevo nombre estándar 'eventId'
+              // ✅ CORRECCIÓN 1: Usamos 'eventId' (el nuevo estándar)
               googleEventIdFinal = resGoogle.eventId || "";
           }
 
       } else {
-          // >>> CASO B: CITA TOTALMENTE NUEVA <<<
+              // >>> CASO B: CITA TOTALMENTE NUEVA <<<
           const resGoogle = await agendarCitaGoogle({
               calendarId: data!.doctor.calendarId,
               doctorNombre: data!.doctor.nombre,
@@ -282,6 +282,7 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
               duracionMinutos: duracionMinutos,
               esTodoElDia: servicioDetalle?.tipo === 'Laboratorio'
           });
+          // ✅ CORRECCIÓN 2: Usamos 'eventId' aquí también
           googleEventIdFinal = resGoogle.eventId || "";
       }
 

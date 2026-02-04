@@ -6,10 +6,9 @@ import nodemailer from 'nodemailer';
 import { v4 as uuidv4 } from 'uuid';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase'; 
-import { getMedicos } from "./googleSheets";
-import { getMensajesWhatsApp } from "./googleSheets"; 
+// Unificamos las importaciones de googleSheets y agregamos el motor de OKRs
+import { getMedicos, getMensajesWhatsApp, getCatalogos, getOkrDashboardData } from "./googleSheets";
 import { addMinutesToTime } from './utils';
-import { getCatalogos } from "./googleSheets";
 
 // --- ACCIÓN 1: AGENDAR (Mantiene lógica original) ---
 export async function agendarCitaGoogle(cita: { 
@@ -300,5 +299,23 @@ export async function getDescuentosAction() {
   } catch (error) {
     console.error("Error en getDescuentosAction:", error);
     return [];
+  }
+}
+
+// --- ACCIÓN 6: MOTOR DE OKRs (Puente Seguro) ---
+export async function fetchOkrDataAction(email: string) {
+  try {
+    if (!email) return [];
+    
+    // 1. Invocamos al motor de cálculo en el servidor
+    const data = await getOkrDashboardData(email);
+    
+    // 2. Serializamos (Deep Copy) para evitar errores de "Server to Client passing" en Next.js
+    // Esto limpia cualquier referencia circular o tipo de dato no compatible (como Date puro)
+    return JSON.parse(JSON.stringify(data));
+    
+  } catch (error) {
+    console.error("❌ Error en fetchOkrDataAction:", error);
+    return []; // Retornamos array vacío para no romper la UI
   }
 }
