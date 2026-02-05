@@ -143,21 +143,34 @@ export default function ReporteIngresosPage() {
         };
       }));
 
-      // 2. SEPARAR PRODUCCIÓN VS RECUPERACIÓN
+      // 2. SEPARAR PRODUCCIÓN VS RECUPERACIÓN (Lógica Blindada)
       const produccionDia: any[] = [];
       const recuperacionCartera: any[] = [];
 
       datosCrudos.forEach(item => {
-          // Convertimos la fecha de la cita a YYYY-MM-DD para comparar con fechaSeleccionada
-          // Nota: item.fechaCita es Timestamp de Firebase
-          const fechaCitaDate = item.fechaCita ? item.fechaCita.toDate() : new Date();
-          // Ajuste simple de zona horaria local para la comparación de string
-          const fechaCitaStr = fechaCitaDate.toLocaleDateString('en-CA'); // Formato YYYY-MM-DD local
+          // ESTRATEGIA DE DOBLE VERIFICACIÓN (Igual que en Cartera Vencida)
+          let fechaCitaReal = "";
 
-          if (fechaCitaStr === fechaSeleccionada) {
-              produccionDia.push(item);
+          // Prioridad 1: Busamos el campo de texto exacto en la BD (Ej: "2026-02-04")
+          // En su BD este campo se llama 'fechaCita' cuando es string, o 'fecha' cuando es Timestamp.
+          // Aquí validamos si el objeto traído tiene la propiedad como string.
+          if (item.fechaCita && typeof item.fechaCita === 'string' && item.fechaCita.length === 10) {
+              fechaCitaReal = item.fechaCita;
+          } 
+          // Prioridad 2: Si es un Timestamp (formato antiguo), lo convertimos con cuidado
+          else if (item.fechaCita && item.fechaCita.toDate) {
+              fechaCitaReal = item.fechaCita.toDate().toLocaleDateString('en-CA');
+          } 
+          // Fallback: Si no hay fecha, asumimos que es de hoy para no perder el dato financiero
+          else {
+              fechaCitaReal = fechaSeleccionada; 
+          }
+
+          // CLASIFICACIÓN FINAL
+          if (fechaCitaReal === fechaSeleccionada) {
+              produccionDia.push(item); // Cita de HOY, pagada HOY
           } else {
-              recuperacionCartera.push(item);
+              recuperacionCartera.push(item); // Cita de OTRO DÍA, pagada HOY
           }
       });
 
@@ -188,16 +201,38 @@ export default function ReporteIngresosPage() {
         // ... (Procesamiento de pendientes idéntico al anterior) ...
         const datosPendientes = snapshotPendientes.docs.map((docSnap) => {
              const data = docSnap.data();
+             
+             // Extracción segura del nombre del profesional
              let nombrePS = data.profesionalNombre || data.doctorNombre || "SANSCE (General)";
              if (nombrePS === "SANSCE (General)" && data.servicioNombre?.includes("Consulta con")) {
                  nombrePS = data.servicioNombre.replace("Consulta con", "").trim();
              }
+             
              return {
-                 id: docSnap.id, ...data, monto: data.monto ? cleanPrice(data.monto) : 0,
-                 nombrePS, concepto: data.servicioNombre || "Atención",
-                 hora: data.fecha ? (formatDate(data.fecha).split(' ')[1] || "00:00") : "--:--"
+                 id: docSnap.id, 
+                 ...data, 
+                 monto: data.monto ? cleanPrice(data.monto) : 0,
+                 nombrePS, 
+                 concepto: data.servicioNombre || "Atención",
+                 hora: data.fecha ? (formatDate(data.fecha).split(' ')[1] || "00:00") : "--:--",
+                 
+                 // CORRECCIÓN CLAVE: Extraemos explícitamente la cadena "YYYY-MM-DD" de la cita
+                 fechaCitaString: data.fechaCita || "" 
              };
+        })
+        // 🔒 FILTRO DE SEGURIDAD (FECHA REAL DE CITA):
+        .filter(item => {
+            // Si el registro tiene el campo 'fechaCita' (String exacto "2026-03-04"), usamos ese.
+            // Esto discrimina citas futuras creadas hoy.
+            if (item.fechaCitaString && item.fechaCitaString.length === 10) {
+                return item.fechaCitaString === fechaSeleccionada;
+            }
+
+            // Fallback para registros legacy: Si no tiene fechaCita string, confiamos en el timestamp original
+            // (Solo si es estrictamente necesario, pero priorizamos el string)
+            return true; 
         });
+
         setPendientes(datosPendientes);
       } catch (error) { console.error("Error pendientes:", error); }
 
