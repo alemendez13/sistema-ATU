@@ -82,10 +82,18 @@ export default function AgendaBoard({ medicos, servicios, descuentos }: AgendaBo
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [pacienteEnEspera, setPacienteEnEspera] = useState<{nombre: string, id: string} | null>(null);
-  
+  // 🔔 Estado para almacenar los pacientes en espera del día seleccionado
+  const [esperaHoy, setEsperaHoy] = useState<any[]>([]);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [citaDetalle, setCitaDetalle] = useState<any>(null);
   const [citaParaEditar, setCitaParaEditar] = useState<any>(null);
+  // Estado para controlar qué médico tiene su "burbuja" de disponibilidad abierta
+  const [medicoExpandido, setMedicoExpandido] = useState<string | null>(null);
+
+  // Función para alternar la visualización (Cerrar si está abierto, abrir si está cerrado)
+  const toggleMedico = (id: string) => {
+    setMedicoExpandido(medicoExpandido === id ? null : id);
+  };
   
 
   const medicosHash = medicos.map(m => m.id).join(",");
@@ -120,21 +128,29 @@ export default function AgendaBoard({ medicos, servicios, descuentos }: AgendaBo
     });
   };
 
-  useEffect(() => {
+ useEffect(() => {
     setLoading(true);
-    // console.log("🔥 LECTURA EJECUTADA..."); // (Ya limpiamos esto)
 
+    // 1. Escucha de Citas
     const qCitas = query(collection(db, "citas"), where("fecha", "==", selectedDate));
     const unsubCitas = onSnapshot(qCitas, (snapshot) => {
         setCitas(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Cita[]);
     });
 
+    // 2. Escucha de Mensajes
     const hoyLegible = new Date().toLocaleDateString('es-MX');
     const qMensajes = query(collection(db, "historial_mensajes"), where("fechaLegible", "==", hoyLegible));
     const unsubMensajes = onSnapshot(qMensajes, (snap) => {
         setMensajesHoy(snap.docs.map(d => d.data())); 
     });
 
+    // 3. Escucha de Lista de Espera (🔔 NOTIFICACIONES)
+    const qEspera = query(collection(db, "lista_espera"), where("fechaDeseada", "==", selectedDate));
+    const unsubEspera = onSnapshot(qEspera, (snap) => {
+        setEsperaHoy(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // 4. Carga de Bloqueos de Google (Acción asíncrona única)
     const cargarBloqueos = async () => {
         try {
             if (medicos.length > 0) {
@@ -142,16 +158,18 @@ export default function AgendaBoard({ medicos, servicios, descuentos }: AgendaBo
                 setBloqueos(bloqueosGoogle || []);
             }
         } catch (error) {
-            console.error(error);
+            console.error("Error cargando bloqueos:", error);
         } finally {
             setLoading(false);
         }
     };
     cargarBloqueos();
 
+    // Limpieza de todos los listeners al desmontar o cambiar fecha
     return () => {
         unsubCitas();
         unsubMensajes();
+        unsubEspera();
     };
   }, [selectedDate, medicosHash]);
 
@@ -269,70 +287,106 @@ export default function AgendaBoard({ medicos, servicios, descuentos }: AgendaBo
         {loading && <p className="text-center text-slate-400 py-4">Sincronizando calendarios...</p>}
 
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {medicos.map((medico) => (
-                <div key={medico.id} className="bg-white rounded-xl shadow-md overflow-hidden border-t-4 flex flex-col h-full" style={{ borderColor: medico.color || 'blue' }}>
-                    <div className="p-3 bg-slate-50 border-b border-slate-100 text-center">
-                        <h3 className="font-bold text-md text-slate-800 truncate">{medico.nombre}</h3>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-500 block w-fit mx-auto mt-1">
-                            {medico.especialidad}
+            {medicos.map((medico) => {
+                // 🔍 Filtramos localmente quiénes esperan a ESTE médico hoy
+                const enEsperaParaEsteMedico = esperaHoy.filter(p => p.medicoId === medico.id);
+                const tieneEspera = enEsperaParaEsteMedico.length > 0;
+
+                return (
+                <div key={medico.id} className={`relative transition-all duration-300 flex flex-col items-center ${medicoExpandido === medico.id ? 'z-50' : 'z-10'}`}>
+                    
+                    {/* 🔔 NOTIFICACIÓN FLOTANTE (Solo si hay gente esperando) */}
+                    {tieneEspera && (
+                        <div className="absolute -top-2 -right-2 z-[60] animate-bounce">
+                            <span className="relative flex h-6 w-6">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-6 w-6 bg-orange-600 border-2 border-white text-[10px] font-black text-white items-center justify-center shadow-lg">
+                                    {enEsperaParaEsteMedico.length}
+                                </span>
+                            </span>
+                        </div>
+                    )}
+
+                    {/* 🟢 BLOQUE CERRADO (ESTILO BURBUJA) */}
+                    <div 
+                        onClick={() => toggleMedico(medico.id)}
+                        className={`cursor-pointer p-4 rounded-3xl border-2 transition-all flex flex-col items-center text-center w-full max-w-[200px] shadow-sm hover:shadow-md ${
+                            medicoExpandido === medico.id 
+                            ? 'border-blue-500 bg-blue-50 scale-105' 
+                            : 'border-slate-100 bg-white hover:border-blue-200'
+                        }`}
+                        style={{ borderTopColor: medico.color, borderTopWidth: '6px' }}
+                    >
+                        <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-2xl mb-2 border border-slate-100">
+                            {medico.especialidad.toLowerCase().includes('psico') ? '🧠' : '🩺'}
+                        </div>
+                        <h3 className="font-bold text-slate-800 text-xs leading-tight h-8 flex items-center px-1">{medico.nombre}</h3>
+                        <span className={`text-[9px] font-bold px-3 py-1 rounded-full mt-2 uppercase tracking-tighter ${
+                            medicoExpandido === medico.id ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                            {medicoExpandido === medico.id ? 'Cerrar' : 'Disponibilidad'}
                         </span>
                     </div>
-                    
-                    <div className="p-2 space-y-1 flex-1 overflow-y-auto max-h-[600px]">
-                        {timeSlots.map(hora => {
-                            const trabaja = verificarHorarioMedico(medico, selectedDate, hora);
-                            if (!trabaja) {
-                                return (
-                                    <div key={hora} className="flex justify-between items-center text-xs p-1 opacity-40">
-                                        <span className="text-slate-400 font-mono w-10">{hora}</span>
-                                        <div className="flex-1 bg-slate-100 text-slate-400 px-2 py-1 rounded text-center text-[10px]">-</div>
-                                    </div>
-                                );
-                            }
 
-                            const ocupacion = getCitaOcupada(medico.id, hora);
-                            
-                            return (
-                                <div key={hora} className="flex justify-between items-center text-xs p-1">
-                                    <span className="text-slate-600 font-mono w-10 font-bold">{hora}</span>
-                                    
-                                    {ocupacion ? (
-                                                <button 
-                                                        onClick={() => ocupacion.tipo === 'local' && handleVerDetalle(ocupacion.data as Cita)}
-                                                        className={`flex-1 px-2 py-1 rounded text-xs border truncate ml-1 flex items-center justify-between text-left transition-all hover:opacity-80 ${
-                                                            ocupacion.tipo === 'local' 
-                                                            ? "bg-blue-50 text-blue-800 border-blue-200 cursor-pointer shadow-sm" 
-                                                            : "bg-gray-200 text-gray-600 border-gray-300 italic cursor-not-allowed"
-                                                        }`} 
-                                                        title={ocupacion.tipo === 'local' ? "Ver detalles / Gestionar" : "Evento de Google Calendar"}
-                                                    >
-                                                        <span className="truncate flex-1 font-bold text-[11px]">
-                                                            {ocupacion.tipo === 'local' ? ocupacion.data.paciente : `📅 Google`}
-                                                        </span>
-                                                        
-                                                        <div className="flex gap-1">
-                                                            {ocupacion.mensajeEnviado && <span>📩</span>}
-                                                            {ocupacion.confirmado && <span>✅</span>}
-                                                        </div>
-                                                    </button>
-                                    ) : (
-                                        <button 
-                                            onClick={() => handleSlotClick(medico, hora)}
-                                            className={`flex-1 px-2 py-1 rounded text-center ml-1 border transition-all ${
-                                                pacienteEnEspera 
-                                                ? "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 font-bold"
-                                                : "bg-white text-green-700 border-green-200 hover:bg-green-50 hover:border-green-400"
-                                            }`}
-                                        >
-                                            Libre
-                                        </button>
+                    {/* 🔵 BURBUJA DESPLEGABLE DE HORARIOS */}
+                    {medicoExpandido === medico.id && (
+                        <div className="absolute top-[105%] left-1/2 -translate-x-1/2 w-[280px] bg-white rounded-2xl shadow-2xl border border-blue-100 p-4 z-[60] animate-in fade-in zoom-in duration-200 origin-top">
+                            <div className="flex justify-between items-center mb-3 border-b border-slate-50 pb-2">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Disponibilidad</span>
+                                    {enEsperaParaEsteMedico.length > 0 && (
+                                        <span className="text-[9px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full mt-1 border border-orange-100">
+                                            ⚠️ {enEsperaParaEsteMedico.length} PACIENTE(S) EN ESPERA
+                                        </span>
                                     )}
                                 </div>
-                            );
-                        })}
-                    </div>
+                                <button onClick={(e) => { e.stopPropagation(); setMedicoExpandido(null); }} className="text-slate-300 hover:text-slate-600 text-xl">&times;</button>
+                            </div>
+                            
+                            <div className="space-y-1 overflow-y-auto max-h-[400px] pr-1 custom-scrollbar">
+                                {timeSlots.map(hora => {
+                                    const trabaja = verificarHorarioMedico(medico, selectedDate, hora);
+                                    if (!trabaja) return null; // Limpieza visual: no mostrar lo que no trabaja
+
+                                    const ocupacion = getCitaOcupada(medico.id, hora);
+                                    
+                                    return (
+                                        <div key={hora} className="flex justify-between items-center text-xs p-1 hover:bg-slate-50 rounded-lg transition-colors">
+                                            <span className="text-slate-500 font-mono w-10 font-medium">{hora}</span>
+                                            {ocupacion ? (
+                                                <button 
+                                                    onClick={() => ocupacion.tipo === 'local' && handleVerDetalle(ocupacion.data as Cita)}
+                                                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs border truncate ml-2 flex items-center justify-between text-left ${
+                                                        ocupacion.tipo === 'local' 
+                                                        ? "bg-blue-50 text-blue-800 border-blue-100 shadow-sm" 
+                                                        : "bg-slate-100 text-slate-400 border-slate-200 italic cursor-not-allowed"
+                                                    }`}
+                                                >
+                                                    <span className="truncate flex-1 font-semibold text-[11px]">
+                                                        {ocupacion.tipo === 'local' ? ocupacion.data.paciente : `📅 Google`}
+                                                    </span>
+                                                    <div className="flex gap-1 ml-1">
+                                                        {ocupacion.mensajeEnviado && <span>📩</span>}
+                                                        {ocupacion.confirmado && <span>✅</span>}
+                                                    </div>
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => handleSlotClick(medico, hora)}
+                                                    className="flex-1 px-3 py-1.5 rounded-lg text-center ml-2 border border-green-200 bg-white text-green-700 font-bold hover:bg-green-600 hover:text-white transition-all shadow-sm"
+                                                >
+                                                    Agendar
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
-            ))}
+            );
+            })}
         </div>
 
         {/* 👇 MODIFICACIÓN CRÍTICA: Pasamos 'bloqueos' al modal para que sepa qué está ocupado en Google */}
@@ -355,7 +409,14 @@ export default function AgendaBoard({ medicos, servicios, descuentos }: AgendaBo
             cita={citaDetalle}
             onEditar={handleEditarCita} // 🆕 Conectamos el botón
         />
-        <WaitingList onAsignar={(p: any) => { setPacienteEnEspera({ nombre: p.paciente, id: p.id }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}/>
+        {/* ✅ Corrección VSC: Pasamos la prop 'medicos' y el estado de carga */}
+<WaitingList 
+    medicos={medicos}
+    onAsignar={(p: any) => { 
+        setPacienteEnEspera({ nombre: p.paciente, id: p.id }); 
+        window.scrollTo({ top: 0, behavior: 'smooth' }); 
+    }}
+/>
       </div>
     </div>
   );

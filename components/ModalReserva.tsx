@@ -1,11 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, deleteDoc, doc } from "@/lib/firebase-guard";
 import { db, storage } from "../lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { agendarCitaGoogle, cancelarCitaGoogle, actualizarCitaGoogle } from "../lib/actions"; 
 import { toast } from "sonner";
-import { addMinutesToTime, cleanPrice, generateSearchTags, superNormalize } from "../lib/utils";
+import { addMinutesToTime, cleanPrice, generateSearchTags, superNormalize, formatCurrency } from "../lib/utils";
 import { useAuth } from "../hooks/useAuth";
 import { useForm } from "react-hook-form";
 
@@ -70,6 +70,40 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
   const actualizarTelefono = (i: number, v: string) => { const n = [...listaTelefonos]; n[i] = v; setListaTelefonos(n); };
   const eliminarTelefono = (i: number) => { if (listaTelefonos.length > 1) setListaTelefonos(listaTelefonos.filter((_, idx) => idx !== i)); };
 
+  // 🔍 Estado para el término de búsqueda
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // 🛡️ Filtro Quirúrgico: Consultas del Médico + Productos + Laboratorio + Servicios Generales
+  const serviciosFiltrados = useMemo(() => {
+    if (!catalogoServicios || catalogoServicios.length === 0) return [];
+
+    const especialidadMedico = superNormalize(data?.doctor?.especialidad || "");
+    const busquedaNormalizada = superNormalize(searchTerm);
+
+    return catalogoServicios.filter(item => {
+      // 1. Extraemos los valores con soporte para múltiples nombres de columna (Flexibilidad de Excel)
+      const nombre = item['Nombre Servicio/Producto'] || item.Estudio || item.nombre || "";
+      const especialidad = item.Especialidad || item.especialidad || "";
+      
+      const nombreNorm = superNormalize(nombre);
+      const especialidadNorm = superNormalize(especialidad);
+
+      // 2. Lógica de Compatibilidad "Inteligente"
+      // Permite si la especialidad coincide PARCIALMENTE (ej: "MEDICINA GENERAL" incluye "GENERAL")
+      const esMismaEspecialidad = especialidadNorm !== "" && (
+        especialidadMedico.includes(especialidadNorm) || 
+        especialidadNorm.includes(especialidadMedico)
+      );
+
+      const esGeneral = ["GENERAL", "LABORATORIO", "PRODUCTO", ""].includes(especialidadNorm);
+
+      if (!esMismaEspecialidad && !esGeneral) return false;
+
+      // 3. Si no hay búsqueda, mostramos todo lo compatible. Si hay, filtramos por nombre.
+      return busquedaNormalizada === "" || nombreNorm.includes(busquedaNormalizada);
+    });
+  }, [catalogoServicios, data?.doctor?.especialidad, searchTerm]);
+
   useEffect(() => {
     if (isOpen) {
         setServicioSku(""); setPrecioFinal(""); setNotaInterna(""); setHistorialCitas(0);
@@ -83,10 +117,14 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
   useEffect(() => {
     const calcularDatosInteligentes = async () => {
         if (!servicioSku) return;
-        const servicio = catalogoServicios.find(s => s.sku === servicioSku);
+        
+        // Buscamos el servicio comparando contra todos los posibles nombres de ID/SKU
+        const servicio = catalogoServicios.find(s => (s.sku || s['SKU (ID)'] || s.ID) === servicioSku);
+        
         if (servicio) {
-            // 1. Calcular precio servicio principal
-            let precioBase = cleanPrice(servicio.precio);
+            // 1. Calcular precio detectando automáticamente la columna correcta
+            const precioBruto = servicio.precio || servicio['Precio Público'] || servicio.Precio_Publico || 0;
+            let precioBase = cleanPrice(precioBruto);
             const desc = descuentos.find((d: any) => d.id === (descuentoSeleccionado?.id || descuentoId));
             
             // Aplicar descuento SOLO al servicio principal (Regla de Negocio más segura)
@@ -487,11 +525,79 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
 
             {/* SECTOR SERVICIO Y COSTO */}
             <div className="space-y-4 border-t pt-4">
-                <div><label className="text-xs font-bold text-slate-500 uppercase">Servicio o Paquete</label>
-                <select className="w-full border p-3 rounded-lg font-bold" value={servicioSku} onChange={e => setServicioSku(e.target.value)} required>
-                    <option value="">-- Seleccionar --</option>
-                    {catalogoServicios.map(s => <option key={s.sku} value={s.sku}>{s.nombre} ({s.duracion} min)</option>)}
-                </select></div>
+                <div className="relative">
+                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Buscar Consulta, Producto o Estudio</label>
+                    <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span className="text-slate-400">🔍</span>
+                        </div>
+                        <input 
+                            type="text"
+                            placeholder="Escribe para buscar (ej: Psicología, Biometría, Vacuna...)"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-700 font-bold shadow-sm"
+                        />
+                        
+                        {/* Lista de Resultados Filtrados */}
+                        {searchTerm.length > 0 && (
+                            <div className="absolute z-[100] w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-[250px] overflow-y-auto custom-scrollbar">
+                                {serviciosFiltrados.length > 0 ? (
+                                    serviciosFiltrados.map((s: any) => (
+                                        <div 
+                                            key={s.sku || s.ID}
+                                            onClick={() => {
+                                                setServicioSku(s.sku || s.ID);
+                                                setSearchTerm(""); // Limpiar búsqueda al seleccionar
+                                            }}
+                                            className="p-3 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-none transition-all flex flex-col"
+                                        >
+                                            <div className="flex justify-between items-center gap-2">
+                                                <span className="text-sm font-bold text-slate-800">
+                                                    {s.nombre || s['Nombre Servicio/Producto'] || s.Estudio}
+                                                </span>
+                                                <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
+                                                    {formatCurrency(cleanPrice(s.precio || s['Precio Público'] || s.Precio_Publico))}
+                                                </span>
+                                            </div>
+                                            <div className="flex gap-2 items-center mt-1">
+                                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{s.Especialidad || 'General'}</span>
+                                                {s.duracion && (
+                                                    <span className="text-[9px] text-indigo-500 font-bold italic">⏱️ {s.duracion} min</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="p-6 text-center">
+                                        <p className="text-sm text-slate-400">Sin resultados compatibles.</p>
+                                        <p className="text-[10px] text-slate-300 uppercase mt-1">Filtro activo: {data?.doctor?.especialidad}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Badge de Selección: Muestra lo seleccionado y permite borrarlo */}
+                    {servicioSku && (
+                        <div className="mt-3 p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex justify-between items-center animate-in fade-in slide-in-from-top-1">
+                            <div className="flex flex-col">
+                                <span className="text-[9px] text-indigo-400 font-bold uppercase">Seleccionado:</span>
+                                <span className="text-xs font-bold text-indigo-700">
+                                    {catalogoServicios.find(s => (s.sku || s.ID) === servicioSku)?.nombre || 
+                                     catalogoServicios.find(s => (s.sku || s.ID) === servicioSku)?.['Nombre Servicio/Producto']}
+                                </span>
+                            </div>
+                            <button 
+                                type="button"
+                                onClick={() => setServicioSku("")} 
+                                className="w-8 h-8 flex items-center justify-center bg-white text-indigo-400 hover:text-red-500 rounded-full shadow-sm transition-colors"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    )}
+                </div>
 
                 {servicioSku && (
                     <div className="bg-slate-50 p-4 rounded-lg border flex justify-between items-center">

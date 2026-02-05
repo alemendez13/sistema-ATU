@@ -14,11 +14,15 @@ interface WaitItem {
   fecha: any;
 }
 
-export default function WaitingList({ onAsignar }: { onAsignar?: (paciente: any) => void }) {
+// 1. Agregamos médicos a las props para poder seleccionarlos
+export default function WaitingList({ onAsignar, medicos }: { onAsignar?: (paciente: any) => void, medicos: any[] }) {
   const [items, setItems] = useState<WaitItem[]>([]);
   const [nuevoPaciente, setNuevoPaciente] = useState("");
   const [telefono, setTelefono] = useState("");
   const [notas, setNotas] = useState("");
+  // 🆕 Nuevos estados para la trazabilidad
+  const [medicoId, setMedicoId] = useState("");
+  const [fechaDeseada, setFechaDeseada] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Escuchar la lista en tiempo real
@@ -54,12 +58,16 @@ export default function WaitingList({ onAsignar }: { onAsignar?: (paciente: any)
         paciente: nuevoPaciente.toUpperCase(),
         telefono,
         notas,
-        fecha: serverTimestamp()
+        medicoId: medicoId || null, // Guardamos el ID del médico o vacío
+        fechaDeseada: fechaDeseada || null, // Guardamos la fecha solicitada
+        fecha: serverTimestamp() // Fecha de registro (Auditoría)
       });
       toast.success("Paciente agregado a espera");
       setNuevoPaciente("");
       setTelefono("");
       setNotas("");
+      setMedicoId(""); // Limpiamos para el siguiente registro
+      setFechaDeseada(""); // Limpiamos para el siguiente registro
     } catch (error) {
       toast.error("Error al guardar");
     } finally {
@@ -105,15 +113,40 @@ export default function WaitingList({ onAsignar }: { onAsignar?: (paciente: any)
                 required
             />
         </div>
+        <div className="w-full md:w-48">
+            <label className="text-xs font-bold text-slate-500 uppercase">Médico Solicitado</label>
+            <select 
+                className="w-full border p-2 rounded text-sm bg-white" 
+                value={medicoId} 
+                onChange={e => setMedicoId(e.target.value)}
+            >
+                <option value="">Cualquier médico</option>
+                {medicos?.map(m => (
+                    <option key={m.id} value={m.id}>{m.nombre}</option>
+                ))}
+            </select>
+        </div>
+
+        <div className="w-full md:w-40">
+            <label className="text-xs font-bold text-slate-500 uppercase">Fecha Tentativa</label>
+            <input 
+                type="date"
+                className="w-full border p-2 rounded text-sm" 
+                value={fechaDeseada} 
+                onChange={e => setFechaDeseada(e.target.value)} 
+            />
+        </div>
+
         <div className="flex-1 w-full">
             <label className="text-xs font-bold text-slate-500 uppercase">Notas</label>
             <input 
                 className="w-full border p-2 rounded text-sm" 
                 value={notas} 
                 onChange={e => setNotas(e.target.value)} 
-                placeholder="Ej. Quiere cita el Martes PM" 
+                placeholder="Ej. Urgente" 
             />
         </div>
+
         <Button type="submit" variant="secondary" isLoading={loading} className="w-full md:w-auto">
             + Agregar
         </Button>
