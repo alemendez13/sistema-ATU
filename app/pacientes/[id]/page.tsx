@@ -81,10 +81,13 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
           return {
               id: d.id,
               ...data,
-              fecha: data.fecha?.toDate ? { seconds: data.fecha.seconds } : null,
+              // Normalizamos la fecha de registro para que siempre tenga .seconds
+              fecha: data.fecha?.seconds ? { seconds: data.fecha.seconds } : (data.fecha?.toDate ? { seconds: data.fecha.toDate().getTime() / 1000 } : null),
+              // Aseguramos que fechaCita se mantenga como string puro
+              fechaCita: typeof data.fechaCita === 'string' ? data.fechaCita : null,
               monto: data.monto,
           };
-        }) as Operacion[];
+        }) as any[]; // Usamos any[] temporalmente para silenciar el error de VSC mientras estabilizamos
         
         setHistorial(historialData);
 
@@ -271,8 +274,11 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
                         ) : (
                             historial.map((pago) => (
                                 <tr key={pago.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 text-slate-600">
-                                        {pago.fecha?.seconds ? new Date(pago.fecha.seconds * 1000).toLocaleDateString('es-MX', {day: '2-digit', month: 'short', year: 'numeric'}) : '-'}
+                                    <td className="p-4 font-medium text-slate-700">
+                                        {pago.fechaCita 
+                                            ? pago.fechaCita.split('-').reverse().join('/')
+                                            : (pago.fecha?.seconds ? new Date(pago.fecha.seconds * 1000).toLocaleDateString() : '---')
+                                        }
                                     </td>
                                     <td className="p-4 font-semibold text-slate-800">{pago.servicioNombre}</td>
                                     <td className="p-4 font-mono text-slate-700">${pago.monto}</td>

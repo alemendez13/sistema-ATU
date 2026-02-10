@@ -139,7 +139,8 @@ export default function ReporteIngresosPage() {
           requiereFactura,
           concepto: data.servicioNombre || "Atención",
           hora: data.fecha ? (formatDate(data.fecha).split(' ')[1] || "00:00") : "--:--",
-          fechaCita: data.fecha // Guardamos el objeto fecha original para comparar
+          // Mantenemos fechaCita si ya es un texto, de lo contrario usamos la fecha de registro como respaldo
+          fechaCita: data.fechaCita || data.fecha 
         };
       }));
 

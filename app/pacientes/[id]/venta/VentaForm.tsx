@@ -281,15 +281,16 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
             folioInterno: generateFolio("FIN-FR-09", ""), 
             fecha: serverTimestamp(),
             
-            // Lógica de Estatus Financiero
-            estatus: Number(item.precioFinal) === 0 ? "Pagado (Cortesía)" : "Pendiente de Pago",
+            // Lógica de Estatus Financiero (VALE PS y Cortesías se marcan como Pagado)
+            estatus: (Number(item.precioFinal) === 0 || item.descuento?.nombre?.includes("VALE")) ? "Pagado" : "Pendiente de Pago",
 
-            // Lógica Temporal de Pago
-            fechaPago: Number(item.precioFinal) === 0 
+            // Lógica Temporal de Pago (Si es VALE o $0, el pago queda registrado hoy)
+            fechaPago: (Number(item.precioFinal) === 0 || item.descuento?.nombre?.includes("VALE"))
                 ? (item.fechaCita && item.horaCita ? new Date(`${item.fechaCita}T${item.horaCita}:00`) : serverTimestamp()) 
                 : null,
 
-            metodoPago: Number(item.precioFinal) === 0 ? "Cortesía" : null,     
+            // Asignación de Método de Pago Inteligente
+            metodoPago: item.descuento?.nombre?.includes("VALE") ? "VALE PS" : (Number(item.precioFinal) === 0 ? "Cortesía" : null),     
             
             esCita: item.tipo === 'Servicio' || item.tipo === 'Laboratorio',
             doctorId: item.medicoId || null,
