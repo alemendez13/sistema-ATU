@@ -31,8 +31,12 @@ export default function ReporteIngresosMedicos() {
     cobrado: 0, 
     comisionSansce: 0, 
     aPagarMedico: 0,
+    efectivo: 0,
+    transferencia: 0,
     tpvMP: 0,  
-    tpvBAN: 0  
+    tpvBAN: 0,
+    debito: 0,  // 💳 NUEVO: Almacén para tarjetas de débito
+    credito: 0  // 💳 NUEVO: Almacén para tarjetas de crédito
 });
 
   // 1. Cargar médicos
@@ -73,7 +77,12 @@ export default function ReporteIngresosMedicos() {
     
     setLoading(true);
     setMovimientos([]);
-    setResumen({ cobrado: 0, comisionSansce: 0, aPagarMedico: 0, tpvMP: 0, tpvBAN: 0 });
+    // 🧹 LIMPIEZA TOTAL (Sincronizada con el Estado de 9 campos)
+    setResumen({ 
+        cobrado: 0, comisionSansce: 0, aPagarMedico: 0, 
+        efectivo: 0, transferencia: 0, tpvMP: 0, tpvBAN: 0,
+        debito: 0, credito: 0 
+    });
 
     try {
       const medicoSelected = medicos.find(m => m.id === medicoId);
@@ -145,9 +154,13 @@ export default function ReporteIngresosMedicos() {
       // 🟢 3. CÁLCULO MATEMÁTICO BLINDADO
       const totalCobradoReal = resultadosFiltrados.reduce((acc, curr) => acc + curr.monto, 0);
       
-      // ✅ CÁLCULO CORREGIDO: Usamos keywords cortas para atrapar todo (Cred, Deb, etc.)
-      const totalMP = sumarFlex(resultadosFiltrados, "MP");   // Atrapa: "TPV Cred MP", "TPV Deb MP"
-      const totalBAN = sumarFlex(resultadosFiltrados, "BAN"); // Atrapa: "TPV Cred BAN", "TPV Deb BAN"
+      // ✅ CÁLCULO DE 360 GRADOS: Desglose por método exacto
+      const totalMP = sumarFlex(resultadosFiltrados, "MP");
+      const totalBAN = sumarFlex(resultadosFiltrados, "BAN");
+      const totalEfec = sumarFlex(resultadosFiltrados, "Efectivo");
+      const totalTransf = sumarFlex(resultadosFiltrados, "Transferencia");
+      const totalDeb = sumarFlex(resultadosFiltrados, "Débito");  // 💳 Nuevo cálculo
+      const totalCred = sumarFlex(resultadosFiltrados, "Crédito"); // 💳 Nuevo cálculo
       
       const comision = totalCobradoReal * porcentaje;
       const aPagar = totalCobradoReal - comision;
@@ -158,8 +171,12 @@ export default function ReporteIngresosMedicos() {
           cobrado: totalCobradoReal,
           comisionSansce: comision,
           aPagarMedico: aPagar,
+          efectivo: totalEfec,
+          transferencia: totalTransf,
           tpvMP: totalMP,
-          tpvBAN: totalBAN
+          tpvBAN: totalBAN,
+          debito: totalDeb,  // ✅ Dato inyectado
+          credito: totalCred // ✅ Dato inyectado
       });
 
       if (resultadosFiltrados.length === 0) {
@@ -278,14 +295,42 @@ export default function ReporteIngresosMedicos() {
                       <p className="text-4xl font-extrabold text-indigo-700 mt-2">${resumen.aPagarMedico.toLocaleString()}</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="bg-sky-50 border border-sky-100 p-3 rounded-lg flex justify-between items-center">
-                          <span className="text-[10px] font-black text-sky-600 uppercase">Total TPV MP</span>
+                  {/* RADIOGRAFÍA DE MÉTODOS DE PAGO (4 VÍAS) */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      {/* 1. EFECTIVO (Caja Física + PS) */}
+                      <div className="bg-green-50 border border-green-100 p-3 rounded-lg flex flex-col justify-center items-center shadow-sm">
+                          <span className="text-[9px] font-black text-green-600 uppercase tracking-wider">💵 Efectivo Total</span>
+                          <span className="text-lg font-bold text-green-700">${resumen.efectivo.toLocaleString()}</span>
+                      </div>
+                      
+                      {/* 2. TRANSFERENCIAS (Banco Directo) */}
+                      <div className="bg-purple-50 border border-purple-100 p-3 rounded-lg flex flex-col justify-center items-center shadow-sm">
+                          <span className="text-[9px] font-black text-purple-600 uppercase tracking-wider">🏦 Transferencias</span>
+                          <span className="text-lg font-bold text-purple-700">${resumen.transferencia.toLocaleString()}</span>
+                      </div>
+
+                      {/* 3. MERCADO PAGO */}
+                      <div className="bg-sky-50 border border-sky-100 p-3 rounded-lg flex flex-col justify-center items-center shadow-sm">
+                          <span className="text-[9px] font-black text-sky-600 uppercase tracking-wider">🧲 TPV MP</span>
                           <span className="text-lg font-bold text-sky-700">${resumen.tpvMP.toLocaleString()}</span>
                       </div>
-                      <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-lg flex justify-between items-center">
-                          <span className="text-[10px] font-black text-emerald-600 uppercase">Total TPV BAN</span>
+
+                      {/* 4. BANORTE */}
+                      <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-lg flex flex-col justify-center items-center shadow-sm">
+                          <span className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">📟 TPV BAN</span>
                           <span className="text-lg font-bold text-emerald-700">${resumen.tpvBAN.toLocaleString()}</span>
+                      </div>
+
+                      {/* 5. TARJETA DÉBITO (Genérica) */}
+                      <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg flex flex-col justify-center items-center shadow-sm">
+                          <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">💳 T. Débito</span>
+                          <span className="text-lg font-bold text-slate-700">${resumen.debito.toLocaleString()}</span>
+                      </div>
+
+                      {/* 6. TARJETA CRÉDITO (Genérica) */}
+                      <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg flex flex-col justify-center items-center shadow-sm">
+                          <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">💳 T. Crédito</span>
+                          <span className="text-lg font-bold text-slate-700">${resumen.credito.toLocaleString()}</span>
                       </div>
                   </div>
 

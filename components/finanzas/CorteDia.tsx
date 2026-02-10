@@ -63,10 +63,14 @@ export default function CorteDia() {
     return arr.reduce((acc, curr) => {
         let montoItem = 0;
         
-        // 1. Determinar el monto real de este ítem (Priorizamos 'montoPagado')
-        const valorBase = (curr.montoPagado !== undefined && curr.montoPagado !== null) 
-            ? Number(curr.montoPagado) 
-            : Number(curr.monto);
+        // 1. Determinar el monto real (Vales y Cortesías siempre computan como $0 en flujo de caja)
+        const esGastoCero = curr.metodoPago?.includes("Cortesía") || curr.metodoPago?.includes("Vale PS");
+        
+        const valorBase = esGastoCero ? 0 : (
+            (curr.montoPagado !== undefined && curr.montoPagado !== null) 
+                ? Number(curr.montoPagado) 
+                : Number(curr.monto)
+        );
         
         // 2. Lógica de filtrado
         if (!filtro) {
@@ -93,10 +97,21 @@ export default function CorteDia() {
   
   // Filtros flexibles: "Efectivo" suma tanto Recepción como PS
   const efectivo = calcularTotal(ingresos, "Efectivo");
-  const tpvMP = calcularTotal(ingresos, "MP");   // Atrapa Cred y Deb MP
-  const tpvBAN = calcularTotal(ingresos, "BAN"); // Atrapa Cred y Deb BAN
   
+  // 🔍 VALIDACIÓN: Desglosamos explícitamente Transferencias (Normal y PS)
+  const transferencia = calcularTotal(ingresos, "Transferencia"); 
+  
+  const tpvMP = calcularTotal(ingresos, "MP");   // Atrapa Cred y Deb MP / AMEX (si tiene tag MP)
+  const tpvBAN = calcularTotal(ingresos, "BAN"); // Atrapa Cred y Deb BAN / AMEX (si tiene tag BAN)
+  
+  // El dinero en banco es la suma de todo lo digital (Validación cruzada)
   const dineroBanco = totalVendido - efectivo;
+  
+  // 🛡️ Auditoría para Director: Si sobran centavos, es un método no etiquetado (ej. Cheque)
+  const diferenciaAuditoria = dineroBanco - (transferencia + tpvMP + tpvBAN);
+  if (esAdmin && Math.abs(diferenciaAuditoria) > 1) {
+    console.warn("⚠️ ALERTA SANSCE: Hay montos en banco sin método específico (¿Cheque?): $", diferenciaAuditoria);
+  }
   const balanceCaja = efectivo - totalGastos;
 
   if (loading) return <div className="p-4 text-center text-slate-400">Calculando corte...</div>;

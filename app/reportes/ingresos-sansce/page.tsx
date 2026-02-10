@@ -71,23 +71,42 @@ export default function ReporteIngresosPage() {
       }
   };
 
-  // 1. Definición de la función de suma técnica para pagos mixtos
-  const sumarPorMetodo = (arr: any[], metodoDeseado: string) => 
+  // 1. Definición de la función de suma técnica para pagos mixtos (Refactorizada V2)
+  const sumarPorMetodo = (arr: any[], filtro: string) => 
     arr.reduce((acc, curr) => {
-        // Caso A: Si la operación es un Pago Mixto
-        if (curr.desglosePagos && Array.isArray(curr.desglosePagos)) {
-            const parcial = curr.desglosePagos
-                .filter((p: any) => p.metodo === metodoDeseado)
-                .reduce((a: number, c: any) => a + c.monto, 0);
-            return acc + parcial;
+        let montoItem = 0;
+        const montoTotal = Number(curr.monto) || 0;
+
+        // ESTRATEGIA: Normalizamos la búsqueda
+        // Si tiene desglose, buscamos adentro. Si no, evaluamos el método principal.
+        
+        if (curr.desglosePagos && Array.isArray(curr.desglosePagos) && curr.desglosePagos.length > 0) {
+            // CASO A: PAGO MIXTO (Búsqueda granular)
+            montoItem = curr.desglosePagos
+                .filter((p: any) => p.metodo && p.metodo.includes(filtro))
+                .reduce((a: number, c: any) => a + (Number(c.monto) || 0), 0);
+        
+        } else {
+            // CASO B: PAGO SIMPLE (Búsqueda global)
+            const metodoMain = curr.metodoPago || "";
+            
+            if (filtro === "Tarjeta") {
+                // Lógica especial para agrupar todo lo que sea plástico/digital en "Tarjeta"
+                // Incluye: Débito, Crédito, AMEX, TPV MP, TPV BAN
+                const esTarjeta = metodoMain.includes("Tarjeta") || 
+                                  metodoMain.includes("TPV") || 
+                                  metodoMain.includes("AMEX");
+                if (esTarjeta) montoItem = montoTotal;
+            
+            } else {
+                // Búsqueda estándar (ej. "Transferencia" atrapa "Transferencia" y "Transferencia PS")
+                if (metodoMain.includes(filtro)) {
+                    montoItem = montoTotal;
+                }
+            }
         }
-        // Caso B: Si es un pago tradicional
-        const metodoOperacion = curr.metodoPago || "";
-        // Soporte para Tarjetas (agrupa MP y BAN en el total de tarjeta)
-        if (metodoDeseado === "Tarjeta") {
-            return acc + (metodoOperacion.includes("Tarjeta") || metodoOperacion.includes("TPV") ? (curr.monto || 0) : 0);
-        }
-        return acc + (metodoOperacion === metodoDeseado ? (curr.monto || 0) : 0);
+        
+        return acc + montoItem;
     }, 0);
 
   // Función para cargar datos (MEJORADA)

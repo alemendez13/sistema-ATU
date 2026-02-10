@@ -21,7 +21,17 @@ export default function FinanzasPage() {
   const [verCarteraVencida, setVerCarteraVencida] = useState(false);
   const [opParaTarjeta, setOpParaTarjeta] = useState<Operacion | null>(null);
   const [opParaPagoMixto, setOpParaPagoMixto] = useState<Operacion | null>(null);
-  const [montosMixtos, setMontosMixtos] = useState({ efectivo: 0, mp: 0, ban: 0, transf: 0 });
+  const [montosMixtos, setMontosMixtos] = useState({ 
+    efectivo: 0, 
+    efectivoPS: 0, 
+    transf: 0, 
+    transfPS: 0, 
+    mp: 0, 
+    ban: 0, 
+    debito: 0, 
+    credito: 0, 
+    amex: 0 
+  });
 
   // Reacciona al cambio de botones
   useEffect(() => {
@@ -62,7 +72,8 @@ export default function FinanzasPage() {
     // 1. REGLA DE NEGOCIO: Definimos el monto real a cobrar (Cortesía = $0.00)
     // Extraído de tu lógica original en VSC
     const montoBase = Number(cleanPrice(op.monto));
-    const montoAFacturar = metodo === 'Cortesía' ? 0 : montoBase; 
+    // El Vale PS y la Cortesía no suman dinero real a la caja ($0)
+    const montoAFacturar = (metodo === 'Cortesía' || metodo === 'Vale PS') ? 0 : montoBase; 
 
     // 2. VALIDACIÓN MATEMÁTICA (Exclusiva para Pago Mixto)
     if (metodo === 'Mixto') {
@@ -91,9 +102,14 @@ export default function FinanzasPage() {
         if (metodo === 'Mixto') {
             datosCobro.desglosePagos = [
                 { metodo: 'Efectivo', monto: montosMixtos.efectivo },
-                { metodo: 'Tarjeta (TPV MP)', monto: montosMixtos.mp },
-                { metodo: 'Tarjeta (TPV BAN)', monto: montosMixtos.ban },
-                { metodo: 'Transferencia', monto: montosMixtos.transf }
+                { metodo: 'Efectivo PS', monto: montosMixtos.efectivoPS },
+                { metodo: 'Transferencia', monto: montosMixtos.transf },
+                { metodo: 'Transferencia PS', monto: montosMixtos.transfPS },
+                { metodo: 'TPV Mercado Pago', monto: montosMixtos.mp },
+                { metodo: 'TPV Banorte', monto: montosMixtos.ban },
+                { metodo: 'Tarjeta Débito', monto: montosMixtos.debito },
+                { metodo: 'Tarjeta Crédito', monto: montosMixtos.credito },
+                { metodo: 'AMEX', monto: montosMixtos.amex }
             ].filter(p => p.monto > 0); 
         }
 
@@ -103,7 +119,17 @@ export default function FinanzasPage() {
         // 6. LIMPIEZA DE ESTADOS DE INTERFAZ (Vital para evitar bugs visuales)
         setOpParaPagoMixto(null);
         setOpParaTarjeta(null); // Cerramos también el modal de tarjetas por si acaso
-        setMontosMixtos({ efectivo: 0, mp: 0, ban: 0, transf: 0 });
+        setMontosMixtos({ 
+            efectivo: 0, 
+            efectivoPS: 0, 
+            transf: 0, 
+            transfPS: 0, 
+            mp: 0, 
+            ban: 0, 
+            debito: 0, 
+            credito: 0, 
+            amex: 0 
+        });
         
         cargarPendientes();
         toast.success(`Pago ${metodo} registrado con éxito.`);
@@ -279,9 +305,19 @@ const totalListaActual = pendientes.reduce((acc, op) => {
                                                   <button onClick={() => handleCobrar(op.id!, 'Efectivo', op)} className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-green-200 transition">EFECTIVO</button>
                                                   <button onClick={() => handleCobrar(op.id!, 'Efectivo PS', op)} className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-indigo-200 transition border border-indigo-200"title="Cobrado directamente por el Profesional">EFECTIVO PS</button>
                                                   <button onClick={() => setOpParaTarjeta(op)} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200 transition">TARJETA</button>
-                                                  <button onClick={() => { setOpParaPagoMixto(op); setMontosMixtos({efectivo:0, mp:0, ban:0, transf:0}); }} className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-amber-200 transition">🔀 MIXTO</button>
+                                                  <button onClick={() => { setOpParaPagoMixto(op); setMontosMixtos({ 
+                                                        efectivo: 0, 
+                                                        efectivoPS: 0, 
+                                                        transf: 0, 
+                                                        transfPS: 0, 
+                                                        mp: 0, 
+                                                        ban: 0, 
+                                                        debito: 0, 
+                                                        credito: 0, 
+                                                        amex: 0 
+                                                    }); }} className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-amber-200 transition">🔀 MIXTO</button>
                                                   <button onClick={() => handleCobrar(op.id!, 'Transferencia', op)} className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-purple-200 transition">TRANSF</button>
-                                                  <button onClick={() => handleCobrar(op.id!, 'Vale', op)} className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-orange-200 transition">🎟️ VALE</button>
+                                                  <button onClick={() => handleCobrar(op.id!, 'Vale PS', op)} className="bg-orange-50 text-orange-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-orange-100 transition border border-orange-200" title="Vale de Seguro (Sin cobro en caja)">🎟️ VALE PS</button>
                                                   <button onClick={() => {
                                                       if(confirm("¿Aplicar CORTESÍA? El ingreso se registrará en $0.00")) {
                                                           handleCobrar(op.id!, 'Cortesía', op);
@@ -392,12 +428,17 @@ const totalListaActual = pendientes.reduce((acc, op) => {
         </div>
 
         {/* Campos de Entrada de Montos */}
-        <div className="space-y-3">
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
           {[
-            { id: 'efectivo', label: '💵 Efectivo', key: 'efectivo' },
+            { id: 'efectivo', label: '💵 Efectivo (Recepción)', key: 'efectivo' },
+            { id: 'efectivoPS', label: '👩🏻‍⚕️ Efectivo PS (Directo Doc)', key: 'efectivoPS' },
+            { id: 'transf', label: '🏦 Transferencia SANSCE', key: 'transf' },
+            { id: 'transfPS', label: '📲 Transferencia PS', key: 'transfPS' },
             { id: 'mp', label: '🧲 TPV Mercado Pago', key: 'mp' },
             { id: 'ban', label: '📟 TPV Banorte', key: 'ban' },
-            { id: 'transf', label: '🏦 Transferencia', key: 'transf' }
+            { id: 'debito', label: '💳 Tarjeta Débito (Genérica)', key: 'debito' },
+            { id: 'credito', label: '💳 Tarjeta Crédito (Genérica)', key: 'credito' },
+            { id: 'amex', label: '💙 AMEX', key: 'amex' }
           ].map((input) => (
             <div key={input.id} className="relative">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">
@@ -459,7 +500,17 @@ const totalListaActual = pendientes.reduce((acc, op) => {
           <button 
             onClick={() => {
                 setOpParaPagoMixto(null);
-                setMontosMixtos({ efectivo: 0, mp: 0, ban: 0, transf: 0 });
+                setMontosMixtos({ 
+                  efectivo: 0, 
+                  efectivoPS: 0, 
+                  transf: 0, 
+                  transfPS: 0, 
+                  mp: 0, 
+                  ban: 0, 
+                  debito: 0, 
+                  credito: 0, 
+                  amex: 0 
+              });
             }}
             className="flex-1 py-3 text-slate-400 font-bold text-xs uppercase hover:bg-slate-50 rounded-xl transition-all"
           >

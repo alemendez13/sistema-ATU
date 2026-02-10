@@ -140,8 +140,12 @@ export async function enviarCorteMedicoAction(datos: {
         cobrado: number; 
         comision: number; 
         pagar: number;
-        tpvMP?: number;   // 🎯 Opcional para retrocompatibilidad
-        tpvBAN?: number;  // 🎯 Opcional
+        efectivo?: number;
+        transferencia?: number;
+        tpvMP?: number;   
+        tpvBAN?: number;
+        debito?: number;  // 💳 NUEVO: Soporte para tarjetas de débito
+        credito?: number; // 💳 NUEVO: Soporte para tarjetas de crédito
     };
     movimientos: any[];
 }) {
@@ -151,6 +155,7 @@ export async function enviarCorteMedicoAction(datos: {
 
     try {
         const tokenValidacion = uuidv4();
+        // Guardamos el token en Firebase para que el médico pueda validar con un clic
         await addDoc(collection(db, "validaciones_medicos"), {
             medico: datos.medicoNombre,
             email: datos.medicoEmail,
@@ -178,6 +183,8 @@ export async function enviarCorteMedicoAction(datos: {
 
         // Ajusta esta URL a tu dominio real cuando hagas deploy
         const enlaceValidacion = `https://sistema-atu.netlify.app/validar-corte/${tokenValidacion}`;
+        
+        // 🎨 TEMPLATE HTML ACTUALIZADO: Desglose de 4 Vías
         const htmlContent = `
         <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
             <div style="background-color: #2563eb; padding: 20px; text-align: center; color: white;">
@@ -188,16 +195,35 @@ export async function enviarCorteMedicoAction(datos: {
             <div style="padding: 20px;">
                 <p>Adjuntamos el desglose de movimientos del periodo solicitado.</p>
                 <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                    <p style="margin: 5px 0;"><strong>Total Cobrado:</strong> $${datos.resumen.cobrado.toLocaleString()}</p>
+                    <p style="margin: 5px 0; font-size: 16px;"><strong>Total Cobrado:</strong> $${datos.resumen.cobrado.toLocaleString()}</p>
                     
-                    <div style="margin: 10px 0; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 13px;">
-                        <p style="margin: 2px 0; color: #0284c7;"><strong>En TPV Mercado Pago:</strong> $${(datos.resumen.tpvMP || 0).toLocaleString()}</p>
-                        <p style="margin: 2px 0; color: #059669;"><strong>En TPV Banorte:</strong> $${(datos.resumen.tpvBAN || 0).toLocaleString()}</p>
+                    <div style="margin: 15px 0; padding: 10px; border: 1px solid #e2e8f0; background-color: white; border-radius: 6px; font-size: 13px;">
+                        <p style="margin: 4px 0; color: #15803d; border-bottom: 1px dashed #eee; padding-bottom: 4px;">
+                            <strong>💵 Efectivo Total:</strong> $${(datos.resumen.efectivo || 0).toLocaleString()}
+                        </p>
+                        <p style="margin: 4px 0; color: #7e22ce; border-bottom: 1px dashed #eee; padding-bottom: 4px;">
+                            <strong>🏦 Transferencias:</strong> $${(datos.resumen.transferencia || 0).toLocaleString()}
+                        </p>
+                        <p style="margin: 4px 0; color: #0284c7; border-bottom: 1px dashed #eee; padding-bottom: 4px;">
+                            <strong>🧲 TPV Mercado Pago:</strong> $${(datos.resumen.tpvMP || 0).toLocaleString()}
+                        </p>
+                        <p style="margin: 4px 0; color: #059669; border-bottom: 1px dashed #eee; padding-bottom: 4px;">
+                            <strong>📟 TPV Banorte:</strong> $${(datos.resumen.tpvBAN || 0).toLocaleString()}
+                        </p>
+                        <p style="margin: 4px 0; color: #475569; border-bottom: 1px dashed #eee; padding-bottom: 4px;">
+                            <strong>💳 Tarjeta Débito:</strong> $${(datos.resumen.debito || 0).toLocaleString()}
+                        </p>
+                        <p style="margin: 4px 0; color: #475569;">
+                            <strong>💳 Tarjeta Crédito:</strong> $${(datos.resumen.credito || 0).toLocaleString()}
+                        </p>
                     </div>
 
-                    <p style="margin: 5px 0;"><strong>Retención Clínica:</strong> -$${datos.resumen.comision.toLocaleString()}</p>
-                    <h3 style="margin: 10px 0; color: #2563eb;">Total a Liquidar: $${datos.resumen.pagar.toLocaleString()}</h3>
+                    <p style="margin: 5px 0; color: #64748b;"><strong>Retención Clínica:</strong> -$${datos.resumen.comision.toLocaleString()}</p>
+                    <div style="margin-top: 15px; padding-top: 10px; border-top: 2px solid #2563eb;">
+                        <h3 style="margin: 0; color: #2563eb; font-size: 20px;">Total a Liquidar: $${datos.resumen.pagar.toLocaleString()}</h3>
+                    </div>
                 </div>
+
                     <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
                         <thead style="background-color: #f1f5f9;">
                             <tr>
@@ -207,10 +233,11 @@ export async function enviarCorteMedicoAction(datos: {
                         <tbody>${filasTabla}</tbody>
                     </table>
                     <div style="text-align: center; margin-top: 30px;">
-                        <a href="${enlaceValidacion}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">
+                        <a href="${enlaceValidacion}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
                             ✅ VALIDAR Y ACEPTAR CORTE
                         </a>
                     </div>
+                    <p style="font-size: 10px; color: #94a3b8; text-align: center; margin-top: 20px;">Este es un mensaje automático del sistema SANSCE OS.</p>
                 </div>
             </div>
         `;
