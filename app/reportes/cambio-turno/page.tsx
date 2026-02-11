@@ -20,11 +20,12 @@ export default function CambioTurnoPage() {
   const [citasHoy, setCitasHoy] = useState<any[]>([]);
   const [statsPacientes, setStatsPacientes] = useState({ total: 0, sansce: 0, renta: 0 });
 
-  // 2. Financiero (Arqueo Ciego) - Del Código Nuevo + Desglose Original
+  // 2. Financiero (Arqueo Ciego) - Sincronizado con Caja Chica e Inyecciones
   const [ingresosTotal, setIngresosTotal] = useState(0);
-  const [ingresosEfectivo, setIngresosEfectivo] = useState(0); // El sistema sabe cuánto debe haber
-  const [gastosTotal, setGastosTotal] = useState(0);
-  const [desgloseMetodos, setDesgloseMetodos] = useState<any>({}); // Para ver cuánto fue tarjeta vs transf
+  const [ingresosEfectivo, setIngresosEfectivo] = useState(0); // Suma de TODO el dinero físico (Recepción + PS)
+  const [gastosTotal, setGastosTotal] = useState(0); // Solo salidas reales de dinero
+  const [inyeccionesTotal, setInyeccionesTotal] = useState(0); // Dinero inyectado para fondo fijo
+  const [desgloseMetodos, setDesgloseMetodos] = useState<any>({});
 
   // 3. Productividad (WhatsApp) - Automatizado 🤖
   const [msgsConfirmacion, setMsgsConfirmacion] = useState(0);
@@ -37,8 +38,8 @@ export default function CambioTurnoPage() {
   const [asistenteEntrega, setAsistenteEntrega] = useState("");
   const [asistenteRecibe, setAsistenteRecibe] = useState("");
 
-  // --- CÁLCULOS EN TIEMPO REAL ---
-  const efectivoEsperado = ingresosEfectivo - gastosTotal;
+  // --- CÁLCULOS EN TIEMPO REAL (Alineados con Caja Chica) ---
+  const efectivoEsperado = ingresosEfectivo + inyeccionesTotal - gastosTotal;
   const diferencia = (parseFloat(efectivoReportado) || 0) - efectivoEsperado;
 
   useEffect(() => {
@@ -65,10 +66,10 @@ export default function CambioTurnoPage() {
           renta: listaCitas.filter(c => !c.doctorNombre?.toUpperCase().includes("SANSCE") && !c.doctorNombre?.includes("Clínica")).length
       });
 
-      // B. INGRESOS Y DESGLOSE (Híbrido)
+      // B. INGRESOS Y DESGLOSE (Sincronizado con Efectivo PS)
       const qIngresos = query(
         collection(db, "operaciones"),
-        where("estatus", "==", "Pagado"),
+        where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]),
         where("fechaPago", ">=", inicioDia),
         where("fechaPago", "<=", finDia)
       );
@@ -84,12 +85,10 @@ export default function CambioTurnoPage() {
         const metodo = data.metodoPago || "No especificado";
 
         total += monto;
-        
-        // Sumamos al desglose general
         desglose[metodo] = (desglose[metodo] || 0) + monto;
 
-        // Separamos efectivo para el arqueo
-        if (metodo === "Efectivo") {
+        // ✅ CORRECCIÓN: Detectamos tanto Efectivo de Recepción como de PS
+        if (metodo && metodo.includes("Efectivo")) {
             efectivo += monto;
         }
       });
@@ -98,15 +97,30 @@ export default function CambioTurnoPage() {
       setIngresosEfectivo(efectivo);
       setDesgloseMetodos(desglose);
 
-      // C. GASTOS
+      // C. GASTOS E INYECCIONES (Diferenciación Quirúrgica)
       const qGastos = query(
         collection(db, "gastos"),
         where("fecha", ">=", inicioDia),
         where("fecha", "<=", finDia)
       );
       const snapGastos = await getDocs(qGastos);
-      const totalGastosCalc = snapGastos.docs.reduce((acc, curr) => acc + (parseFloat(curr.data().monto) || 0), 0);
-      setGastosTotal(totalGastosCalc);
+      
+      let totalG = 0;
+      let totalI = 0;
+
+      snapGastos.forEach(doc => {
+          const data = doc.data();
+          const monto = parseFloat(data.monto) || 0;
+          // ✅ Separamos: ¿Es dinero que entró para fondo o dinero que salió para gasto?
+          if (data.tipo === "Ingreso") {
+              totalI += monto;
+          } else {
+              totalG += monto;
+          }
+      });
+
+      setGastosTotal(totalG);
+      setInyeccionesTotal(totalI);
 
       // D. WHATSAPP AUTOMÁTICO (Del Nuevo)
       const qMsgs = query(
@@ -149,14 +163,15 @@ export default function CambioTurnoPage() {
             fecha: serverTimestamp(),
             fechaLegible: new Date().toLocaleString(),
             
-            // Finanzas
+            // Finanzas (Sincronizado con Inyecciones)
             ingresosTotal,
             ingresosEfectivo,
-            gastosTotal,
-            efectivoEsperado,
+            inyeccionesTotal, // ✅ Guardamos cuánto dinero se inyectó en este turno
+            gastosTotal,      // Salidas reales
+            efectivoEsperado, // (Ingresos + Inyecciones - Gastos)
             efectivoReportado: parseFloat(efectivoReportado),
             diferencia,
-            desgloseMetodos, // Guardamos detalle Tarjeta vs Efectivo
+            desgloseMetodos,
             
             // Operativo
             totalPacientes: statsPacientes.total,
@@ -253,20 +268,28 @@ export default function CambioTurnoPage() {
                         <div className="absolute top-0 right-0 bg-green-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">FINANZAS</div>
                         <h3 className="font-bold text-slate-800 mb-6 border-b pb-2">2. Arqueo de Caja (Ciego)</h3>
 
-                        {/* Calculadora Visual */}
+                        {/* Calculadora Visual Sincronizada */}
                         <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6 space-y-2">
+                            <div className="flex justify-between text-[11px] uppercase font-bold text-slate-400">
+                                <span>Concepto</span>
+                                <span>Monto</span>
+                            </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">Ingresos Efectivo (Sistema):</span>
+                                <span className="text-slate-500">Ventas en Efectivo (Recep + PS):</span>
                                 <span className="font-mono font-bold text-slate-700">+ ${ingresosEfectivo.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">Gastos / Salidas:</span>
+                                <span className="text-emerald-600 font-medium">Inyecciones a Caja Chica:</span>
+                                <span className="font-mono font-bold text-emerald-600">+ ${inyeccionesTotal.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-red-500 font-medium">Gastos / Salidas Operativas:</span>
                                 <span className="font-mono font-bold text-red-500">- ${gastosTotal.toFixed(2)}</span>
                             </div>
                             <div className="border-t border-slate-300 my-2"></div>
                             <div className="flex justify-between items-center">
-                                <span className="font-bold text-slate-800 text-sm uppercase">Debe haber en cajón:</span>
-                                <span className="text-xl font-extrabold text-slate-900">${efectivoEsperado.toFixed(2)}</span>
+                                <span className="font-black text-slate-800 text-xs uppercase tracking-tighter">Arqueo Esperado (Físico):</span>
+                                <span className="text-2xl font-black text-slate-900 tracking-tighter">${efectivoEsperado.toFixed(2)}</span>
                             </div>
                         </div>
 

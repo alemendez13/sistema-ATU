@@ -379,7 +379,9 @@ export default function ReporteIngresosMedicos() {
                         <tbody className="divide-y divide-slate-100">
                             {movimientos.map((mov) => (
                                 <tr key={mov.id} className="hover:bg-slate-50">
-                                    <td className="px-4 py-3 font-mono text-xs text-slate-500">{/* Muestra la fecha de pago real formateada */}{new Date(mov.fechaPago?.seconds * 1000 || Date.now()).toLocaleDateString('es-MX')}</td>
+                                    <td className="px-4 py-3 font-mono text-xs text-slate-700 font-bold">
+                                        {mov.fecha}
+                                    </td>
                                     <td className="px-4 py-3 font-bold text-slate-700">{mov.paciente}</td>
                                     <td className="px-4 py-3 text-slate-600 text-xs">{mov.concepto}</td>
                                     <td className="px-4 py-3">{mov.formaPago}</td>

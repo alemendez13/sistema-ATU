@@ -108,12 +108,17 @@ export default function GastosManager() {
   };
 
   // Calcular total (Nota: Ajustaremos la matemática en el siguiente paso)
-  // 🧮 Lógica de Balance: Ingresos suman (+), Salidas restan (-)
-  const balanceDia = gastos.reduce((acc, g) => {
-    const valor = Number(g.monto);
-    // Si es tipo 'Ingreso' suma, si es 'Salida' (o datos viejos) resta
-    return (g.tipo === "Ingreso") ? acc + valor : acc - valor;
-  }, 0);
+  // 🧮 Lógica de Balance Desglosado (SANSCE OS Standard)
+  const totalIngresos = gastos
+    .filter(g => g.tipo === "Ingreso")
+    .reduce((acc, g) => acc + Number(g.monto), 0);
+
+  const totalGastos = gastos
+    .filter(g => g.tipo !== "Ingreso") // Todo lo que no sea ingreso es Gasto (Salida o Legacy)
+    .reduce((acc, g) => acc + Number(g.monto), 0);
+
+  // El Balance Neto sigue siendo la resta de ambos
+  const balanceDia = totalIngresos - totalGastos;
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -193,8 +198,8 @@ export default function GastosManager() {
 
         {/* Lista de Movimientos */}
         <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-          {/* Cabecera del Balance con Validación */}
-          <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+          {/* Cabecera del Balance con Validación (Actualizado SANSCE OS) */}
+          <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div>
                 <h3 className="font-bold text-slate-700">Movimientos del Día</h3>
                 <button 
@@ -204,11 +209,23 @@ export default function GastosManager() {
                   🛡️ Validar Corte
                 </button>
             </div>
-            <div className={`text-right px-3 py-1 rounded-lg border ${balanceDia >= 0 ? 'bg-blue-50 border-blue-100' : 'bg-red-50 border-red-100'}`}>
-              <span className="text-[10px] text-slate-500 uppercase block font-bold">Balance Actual</span>
-              <span className={`text-xl font-black font-mono ${balanceDia >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                {balanceDia >= 0 ? '+' : ''}{balanceDia.toFixed(2)}
-              </span>
+            
+            {/* Desglose Financiero: Inyecciones | Gastos | Total */}
+            <div className="flex items-center gap-4 text-right">
+                <div className="hidden md:block">
+                    <span className="text-[10px] text-slate-400 uppercase block font-bold">Inyecciones</span>
+                    <span className="text-sm font-bold text-green-600 font-mono">+${totalIngresos.toFixed(2)}</span>
+                </div>
+                <div className="hidden md:block">
+                    <span className="text-[10px] text-slate-400 uppercase block font-bold">Gastos</span>
+                    <span className="text-sm font-bold text-red-600 font-mono">-${totalGastos.toFixed(2)}</span>
+                </div>
+                <div className={`px-3 py-1 rounded-lg border shadow-sm ${balanceDia >= 0 ? 'bg-blue-50 border-blue-100' : 'bg-red-50 border-red-100'}`}>
+                    <span className="text-[10px] text-slate-500 uppercase block font-bold">En Caja (Neto)</span>
+                    <span className={`text-xl font-black font-mono ${balanceDia >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                        ${balanceDia.toFixed(2)}
+                    </span>
+                </div>
             </div>
           </div>
           
