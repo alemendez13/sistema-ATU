@@ -7,13 +7,30 @@ import {
   LayoutDashboard, Calendar, FolderOpen, FileText 
 } from "lucide-react";
 
+import { useState, useEffect } from "react"; // Importamos la herramienta faltante
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // 🔒 Regla de seguridad: Ocultar en Login o Portales externos
+  // 🧠 EFECTO QUIRÚRGICO: Notifica al Layout el ancho actual
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isCollapsed) {
+      root.style.setProperty('--sidebar-width', '80px');
+    } else {
+      root.style.setProperty('--sidebar-width', '256px');
+    }
+  }, [isCollapsed]);
+
+  // 🔒 Regla de seguridad
   if (pathname === "/login" || pathname.startsWith("/portal")) return null;
 
-  // Lista maestra de módulos extraída de tu Dashboard (page.tsx)
+  // Función para alternar el sidebar
+  const toggleSidebar = () => setIsCollapsed(!isCollapsed);
+
+  // Lista maestra de módulos (se mantiene igual...)
   const menuItems = [
     { id: 0, name: "Inicio (Dashboard)", icon: <LayoutDashboard size={20} />, href: "/", color: "text-slate-500" },
     { id: 1, name: "Configuración", icon: <Settings size={20} />, href: "/configuracion/conocimiento", color: "text-slate-600" },   
@@ -30,31 +47,60 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-[260px] bg-white border-r border-slate-200 z-40 hidden md:flex flex-col shadow-sm">
-      {/* Espaciador para no tapar el logo del Navbar superior si se mantiene */}
-      <div className="h-16 flex items-center px-6 border-b border-slate-50">
-         <span className="text-xs font-black text-blue-600 tracking-widest uppercase">Menú Principal</span>
+    <aside 
+      className={`fixed left-0 top-0 h-full bg-white border-r border-slate-200 z-40 flex flex-col transition-all duration-300 ease-in-out ${
+        isCollapsed ? "w-20" : "w-64"
+      }`}
+    >
+      {/* Botón de Toggle (El "Gatillo" para ocultar) */}
+      <button 
+        onClick={toggleSidebar}
+        className="absolute -right-3 top-20 bg-white border border-slate-200 rounded-full p-1 shadow-sm hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all z-50"
+      >
+        {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
+
+      {/* Título o Logo - Se oculta si está colapsado para verse fino */}
+      <div className="h-16 flex items-center px-6 border-b border-slate-50 overflow-hidden">
+         {!isCollapsed && (
+           <span className="text-xs font-bold text-slate-400 tracking-widest uppercase animate-in fade-in">
+             SANSCE OS
+           </span>
+         )}
+         {isCollapsed && <div className="mx-auto h-2 w-2 rounded-full bg-blue-500" />}
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
-          // Lógica de estado activo (tomada de tu Navbar.tsx)
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
           
           return (
             <Link
               key={item.id}
               href={item.href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all group ${
+              title={isCollapsed ? item.name : ""} // Muestra el nombre al pasar el mouse si está cerrado
+              className={`flex items-center rounded-lg transition-all duration-200 group relative ${
+                isCollapsed ? "justify-center px-0 py-3 mx-2" : "gap-3 px-4 py-2.5"
+              } ${
                 isActive 
-                  ? "bg-blue-50 text-blue-700 shadow-sm border border-blue-100" 
+                  ? "bg-blue-50 text-blue-600 border border-blue-100/40 shadow-sm" 
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
-              <div className={`transition-transform group-hover:scale-110 ${isActive ? "text-blue-600" : item.color}`}>
+              {/* Indicador visual lateral (Línea azul fina) */}
+              {isActive && (
+                <div className="absolute left-0 w-1 h-5 bg-blue-600 rounded-r-full" />
+              )}
+
+              <div className={`flex-shrink-0 transition-colors ${isActive ? "text-blue-600" : "text-slate-400 group-hover:text-blue-500"}`}>
                 {item.icon}
               </div>
-              <span>{item.name}</span>
+              
+              {!isCollapsed && (
+                <span className="text-sm font-medium whitespace-nowrap overflow-hidden animate-in fade-in slide-in-from-left-2 duration-300">
+                  {item.name}
+                </span>
+              )}
             </Link>
           );
         })}

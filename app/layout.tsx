@@ -15,7 +15,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Navbar />
           <Sidebar /> 
           
-          <main className="min-h-screen pt-20 pb-10 px-4 md:px-8 with-sidebar">
+         <main 
+            className="min-h-screen pt-20 pb-10 px-4 md:px-8 transition-all duration-300 ease-in-out"
+            style={{ paddingLeft: 'var(--sidebar-width, 256px)' }}
+          >
             {children}
           </main>
           
