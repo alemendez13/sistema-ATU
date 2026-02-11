@@ -119,14 +119,14 @@ export default function ReporteIngresosMedicos() {
       const start = new Date(fechaInicio + 'T00:00:00');
       const end = new Date(fechaFin + 'T23:59:59.999');
 
-      // B. Consulta corregida: Buscamos por NOMBRE en lugar de ID
+      // B. Consulta Actualizada: Filtramos y ordenamos por la FECHA PROGRAMADA de la cita
       const q = query(
         collection(db, "operaciones"),
-        where("doctorNombre", "==", medicoSelected.nombre), // <--- ESTA ES LA CLAVE
+        where("doctorNombre", "==", medicoSelected.nombre),
         where("estatus", "in", ["Pagado", "Pagado (Cortesía)"]),
-        where("fechaPago", ">=", start),
-        where("fechaPago", "<=", end),
-        orderBy("fechaPago", "desc")
+        where("fechaCita", ">=", start),
+        where("fechaCita", "<=", end),
+        orderBy("fechaCita", "desc")
       );
 
       const snapshot = await getDocs(q);
