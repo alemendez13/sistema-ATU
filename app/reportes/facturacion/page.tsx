@@ -1,7 +1,7 @@
 /* app/reportes/facturacion/page.tsx */
 "use client";
 import { useState } from "react";
-import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from "@/lib/firebase-guard";
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, updateDoc } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
@@ -69,7 +69,8 @@ export default function ReporteFacturacionPage() {
             rfc: datosFiscales?.rfc || "SIN RFC REGISTRADO",
             razonSocial: datosFiscales?.razonSocial || dataOp.pacienteNombre,
             usoCFDI: datosFiscales?.usoCFDI || "G03",
-            email: datosFiscales?.emailFacturacion || "No registrado"
+            email: datosFiscales?.emailFacturacion || "No registrado",
+            folioExterno: dataOp.folioExterno || "" // 👈 Recuperamos el folio si ya existe
         };
       }));
 
@@ -85,6 +86,17 @@ export default function ReporteFacturacionPage() {
       toast.error("Error al buscar datos.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const guardarFolioReal = async (idOperacion: string, folio: string) => {
+    try {
+      const docRef = doc(db, "operaciones", idOperacion);
+      await updateDoc(docRef, { folioExterno: folio });
+      toast.success("Folio registrado y vinculado al historial.");
+    } catch (error) {
+      console.error("Error al guardar folio:", error);
+      toast.error("No se pudo guardar el folio. Revisa tu conexión.");
     }
   };
 
@@ -157,6 +169,7 @@ export default function ReporteFacturacionPage() {
                                 <th className="p-4">RFC / Uso CFDI</th>
                                 <th className="p-4">Concepto</th>
                                 <th className="p-4 text-right">Monto</th>
+                                <th className="p-4 text-center text-blue-600">Folio Software</th>
                                 <th className="p-4 text-center">Acción</th>
                             </tr>
                         </thead>
@@ -174,6 +187,20 @@ export default function ReporteFacturacionPage() {
                                     </td>
                                     <td className="p-4 text-slate-600">{item.concepto}</td>
                                     <td className="p-4 text-right font-bold text-slate-800">${item.monto}</td>
+                                    <td className="p-4">
+                                        <input 
+                                            type="text" 
+                                            defaultValue={item.folioExterno}
+                                            placeholder="Folio..."
+                                            className="w-28 border border-blue-200 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500 outline-none bg-blue-50/30 font-bold"
+                                            onBlur={(e) => {
+                                                const valor = e.target.value.trim();
+                                                if(valor !== item.folioExterno) {
+                                                    guardarFolioReal(item.id, valor);
+                                                }
+                                            }}
+                                        />
+                                    </td>
                                     <td className="p-4 text-center">
                                         <button 
                                             onClick={() => {

@@ -13,16 +13,19 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // 1. Iniciamos siempre en modo contraído (Enfoque Clínico)
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
-  // 🧠 EFECTO QUIRÚRGICO: Notifica al Layout el ancho actual
+  // 2. 🧠 EFECTO DE NAVEGACIÓN: Detecta cambio de módulo y contrae el sidebar automáticamente
+  useEffect(() => {
+    setIsCollapsed(true);
+  }, [pathname]);
+
+  // 3. 🧠 EFECTO DE ARQUITECTURA: Sincroniza el ancho con el resto del sistema
   useEffect(() => {
     const root = document.documentElement;
-    if (isCollapsed) {
-      root.style.setProperty('--sidebar-width', '80px');
-    } else {
-      root.style.setProperty('--sidebar-width', '256px');
-    }
+    const width = isCollapsed ? "80px" : "256px";
+    root.style.setProperty('--sidebar-width', width);
   }, [isCollapsed]);
 
   // 🔒 Regla de seguridad
