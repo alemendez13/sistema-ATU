@@ -5,7 +5,7 @@ import { collection, query, orderBy, limit, getDocs, startAfter, where } from "@
 import { db } from "../../lib/firebase";
 import Link from "next/link";
 import WhatsAppButton from "../ui/WhatsAppButton";
-import { MENSAJES } from "../../lib/whatsappTemplates";
+import { procesarMensajeDinamico } from "../../lib/whatsappTemplates";
 import { toast } from "sonner";
 
 interface Paciente {
@@ -275,7 +275,9 @@ const realizarBusqueda = async (e: React.FormEvent) => {
 function PacienteCard({ paciente, opcionesMensajes }: { paciente: Paciente, opcionesMensajes: MensajeConfig[] }) {
   const [mensajeSeleccionado, setMensajeSeleccionado] = useState("");
   const [fechaCitaReal, setFechaCitaReal] = useState<string | null>(null);
-  const mensajeFinal = mensajeSeleccionado || MENSAJES.UBICACION();
+  const mensajeFinal = mensajeSeleccionado || procesarMensajeDinamico(opcionesMensajes, "Ubicación", {
+    pacienteNombre: paciente.nombreCompleto
+});
   const avatarClass = paciente.genero === 'Femenino' ? 'bg-pink-50 text-pink-600' : 'bg-blue-50 text-blue-600';
   const telefono = paciente.telefonoCelular || paciente.celular || "";
 

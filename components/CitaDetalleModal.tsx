@@ -5,7 +5,7 @@ import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatc
 import { db } from "../lib/firebase";
 import { toast } from "sonner";
 import WhatsAppButton from "./ui/WhatsAppButton";
-import { MENSAJES } from "../lib/whatsappTemplates";
+import { procesarMensajeDinamico } from "../lib/whatsappTemplates"; // 👈 El nuevo motor dinámico
 import { cancelarCitaGoogle } from "../lib/actions";
 
 interface ModalProps {
@@ -13,10 +13,10 @@ interface ModalProps {
   onClose: () => void;
   cita: any; 
   onEditar?: (cita: any) => void;
+  plantillas: any[]; // 👈 Recibimos las plantillas de Google Sheets
 }
 
-// 👇 CORRECCIÓN 1: Agregamos 'onEditar' aquí para poder usarlo
-export default function CitaDetalleModal({ isOpen, onClose, cita, onEditar }: ModalProps) {
+export default function CitaDetalleModal({ isOpen, onClose, cita, onEditar, plantillas }: ModalProps) {
   const [loading, setLoading] = useState(false);
 
   if (!isOpen || !cita) return null;
@@ -181,7 +181,12 @@ export default function CitaDetalleModal({ isOpen, onClose, cita, onEditar }: Mo
                 {cita.telefonos?.[0] || cita.telefonoCelular || cita.telefono ? (
                     <WhatsAppButton 
                         telefono={cita.telefonos?.[0] || cita.telefonoCelular || cita.telefono}
-                        mensaje={MENSAJES.RECORDATORIO(cita.paciente, cita.fecha, cita.hora)}
+                        mensaje={procesarMensajeDinamico(plantillas, "Confirmación", {
+                            pacienteNombre: cita.paciente,
+                            fecha: cita.fecha,
+                            hora: cita.hora,
+                            doctorNombre: cita.doctorNombre
+                        })}
                         label="Enviar Recordatorio"
                         pacienteNombre={cita.paciente}
                         tipo="Confirmación"

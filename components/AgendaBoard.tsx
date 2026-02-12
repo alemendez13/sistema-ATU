@@ -36,6 +36,7 @@ interface AgendaBoardProps {
   medicos: Medico[];
   servicios: any[]; 
   descuentos: any[];
+  plantillas: any[];
 }
 
 // ... (Las funciones auxiliares parsearReglas y generarBloques se quedan IGUAL) ...
@@ -72,7 +73,7 @@ const generarBloques = (inicio: string, fin: string) => {
 };
 
 // 👇 RECIBIMOS SERVICIOS AQUÍ
-export default function AgendaBoard({ medicos, servicios, descuentos }: AgendaBoardProps) {
+export default function AgendaBoard({ medicos, servicios, descuentos, plantillas }: AgendaBoardProps) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [citas, setCitas] = useState<Cita[]>([]);
   const [bloqueos, setBloqueos] = useState<any[]>([]); 
@@ -408,6 +409,7 @@ export default function AgendaBoard({ medicos, servicios, descuentos }: AgendaBo
             onClose={() => setIsDetailOpen(false)}
             cita={citaDetalle}
             onEditar={handleEditarCita} // 🆕 Conectamos el botón
+            plantillas={plantillas}
         />
         {/* ✅ Corrección VSC: Pasamos la prop 'medicos' y el estado de carga */}
 <WaitingList 

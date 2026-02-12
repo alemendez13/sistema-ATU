@@ -262,6 +262,7 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
                     <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs tracking-wider">
                         <tr>
                             <th className="p-4 border-b">Fecha</th>
+                            <th className="p-4 border-b text-blue-600">Folio Factura</th>
                             <th className="p-4 border-b">Servicio / Producto</th>
                             <th className="p-4 border-b">Monto</th>
                             <th className="p-4 border-b">Estatus</th>
@@ -270,7 +271,7 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {historial.length === 0 ? (
-                            <tr><td colSpan={5} className="p-12 text-center text-slate-400 italic">No hay historial de servicios para este paciente.</td></tr>
+                            <tr><td colSpan={6} className="p-12 text-center text-slate-400 italic">No hay historial de servicios para este paciente.</td></tr>
                         ) : (
                             historial.map((pago) => (
                                 <tr key={pago.id} className="hover:bg-slate-50 transition-colors">
@@ -279,6 +280,11 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
                                             ? pago.fechaCita.split('-').reverse().join('/')
                                             : (pago.fecha?.seconds ? new Date(pago.fecha.seconds * 1000).toLocaleDateString() : '---')
                                         }
+                                    </td>
+                                    <td className="p-4">
+                                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold text-xs border border-blue-100">
+                                            {(pago as any).folioExterno || "SIN FOLIO"}
+                                        </span>
                                     </td>
                                     <td className="p-4 font-semibold text-slate-800">{pago.servicioNombre}</td>
                                     <td className="p-4 font-mono text-slate-700">${pago.monto}</td>

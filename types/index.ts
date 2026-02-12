@@ -66,6 +66,7 @@ export interface Operacion {
   metodoPago?: string; // Se mantiene como referencia principal (ej. "Mixto")
   desglosePagos?: { metodo: string; monto: number }[]; // <-- AGREGADO: Nueva lista de montos
   requiereFactura?: boolean;
+  folioExterno?: string;
   fecha: any;
   fechaPago?: any;
   fechaCita?: string;

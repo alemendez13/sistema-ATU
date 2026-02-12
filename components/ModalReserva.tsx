@@ -233,6 +233,14 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
       
       if (!hayEspacio) { toast.error("El horario ya no está disponible."); setLoading(false); return; }
 
+
+      // Prioridad 1: Teléfono del buscador | Prioridad 2: Primer teléfono de la lista | Prioridad 3: Teléfono que ya tenía la cita
+      let telFinal = pacienteSeleccionado?.telefonoCelular || 
+                     pacienteSeleccionado?.telefonos?.[0] || 
+                     citaExistente?.telefonoCelular || "";
+
+      let idFinal = pacienteSeleccionado?.id || citaExistente?.pacienteId || null;
+
       // -----------------------------------------------------------------------
       // 🧠 LÓGICA CORE: GESTIÓN DE ID DE GOOGLE (Corrección Fase 8)
       // -----------------------------------------------------------------------
@@ -323,10 +331,6 @@ export default function ModalReserva({ isOpen, onClose, data, catalogoServicios,
           // ✅ CORRECCIÓN 2: Usamos 'eventId' aquí también
           googleEventIdFinal = resGoogle.eventId || "";
       }
-
-      // 2. REGISTRO DE PACIENTE (Si es nuevo) - Lógica Original mantenida
-      let idFinal = pacienteSeleccionado?.id;
-      let telFinal = pacienteSeleccionado?.telefonoCelular;
 
       if (modo === 'nuevo') {
           let fotoUrl = null;

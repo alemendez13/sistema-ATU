@@ -3,8 +3,16 @@ import { getCatalogos } from "@/lib/googleSheets";
 import AgendaBoard from "@/components/AgendaBoard";
 import Link from "next/link";
 
+import { getMensajesWhatsApp } from "@/lib/googleSheets"; // 👈 Importamos el lector de mensajes
+
 export default async function AgendaPage() {
-  const { medicos, servicios, descuentos } = await getCatalogos(); // ✅ Ahora traemos los descuentos
+  // Pedimos todo a la nube en un solo viaje
+  const [catalogos, mensajes] = await Promise.all([
+    getCatalogos(),
+    getMensajesWhatsApp()
+  ]);
+
+  const { medicos, servicios, descuentos } = catalogos;
 
   return (
     <main className="max-w-full mx-auto px-4 md:px-8 pt-4">
@@ -29,7 +37,12 @@ export default async function AgendaPage() {
           <Link href="/pacientes/express-wa" className="text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 px-4 py-2 rounded-xl text-xs font-medium transition-all">📲 Autollenado WA</Link>
         </div>
 
-        <AgendaBoard medicos={medicos} servicios={servicios} descuentos={descuentos} /> {/* ✅ Se pasan como prop */}
+        <AgendaBoard 
+  medicos={medicos} 
+  servicios={servicios} 
+  descuentos={descuentos} 
+  plantillas={mensajes} 
+/> {/* ✅ Se pasan como prop */}
     </main>
   );
 }
