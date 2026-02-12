@@ -25,37 +25,15 @@ export default function Navbar() {
     return null;
   }
 
-  // Definimos los enlaces del sistema (Igual al original)
-  const menuItems = [
-  { name: "Dashboard", href: "/" },
-  { name: "Configuración", href: "/configuracion/conocimiento" }, // El Cerebro
-  { name: "Agenda Médica", href: "/agenda" },
-  { name: "Directorio", href: "/pacientes" },
-  { name: "Expediente Clínico", href: "/expedientes" },
-  { name: "Metas / Kpis", href: "/planeacion" },
-  { name: "Sistema de gestión", href: "/procesos" },
-  { name: "Control Diario de Pacientes", href: "/pacientes" }, // Directorio y Agenda
-  { name: "Recursos humanos", href: "/personal" },
-  { name: "Solicitudes de materiales y mantenimiento", href: "/inventarios" }, // Almacén y Stock
-  { name: "Minuta", href: "/mantenimiento" },
-  { name: "Reportes", href: "/finanzas" }, // Caja y Reportes
-];
+  // 🧠 LIMPIEZA SANSCE: Eliminamos menuItems y variables no usadas para evitar errores de VS Code
 
   // Función de Cerrar Sesión MEJORADA
   const handleLogout = async () => {
     try {
-      // 1. Borramos la cookie explícitamente con las mismas opciones que se creó
       document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
-      
-      // 2. Limpieza de seguridad local (Opcional pero recomendado)
       window.localStorage.clear(); 
-
-      // 3. Desconexión de Firebase
       await signOut(auth);
-
-      // 4. Redirección forzada
-      window.location.href = "/login"; // Usamos window.location en vez de router.push para forzar recarga limpia
-      
+      window.location.href = "/login"; 
       toast.success("Sesión cerrada correctamente");
     } catch (error) {
       console.error("Error al salir:", error);
@@ -64,24 +42,12 @@ export default function Navbar() {
   };
 
   return (
-    // 1. Agregamos md:pl-[260px] para que los iconos de perfil no choquen con el sidebar
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 shadow-sm h-16 px-4 md:px-8 md:pl-[280px] flex items-center justify-between">
+    <nav 
+      className="fixed top-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm h-20 px-4 md:px-8 transition-all duration-300 ease-in-out flex items-center justify-end"
+      style={{ left: 'var(--sidebar-width, 256px)' }}
+    >
       
-      {/* 2. LOGO (Izquierda) */}
-      <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-        <Image 
-            src="/logo-sansce.png" 
-            alt="SANSCE" 
-            width={100} 
-            height={35} 
-            className="object-contain"
-            priority
-        />
-      </Link>
-
-      {/* ❌ EL BLOQUE DE ENLACES CENTRALES (menuItems.map) SE ELIMINA ❌ */}
-
-      {/* 3. USUARIO / PERFIL + SALIR (Derecha) */}
+      {/* SECCIÓN DERECHA: USUARIO Y SALIR */}
       <div className="flex items-center gap-4">
         <div className="hidden md:flex items-center gap-3">
             <div className="flex flex-col items-end">
@@ -97,7 +63,7 @@ export default function Navbar() {
 
         <button
           onClick={handleLogout}
-          className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-red-600 transition-colors"
+          className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-red-600 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 007.5-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
@@ -105,9 +71,6 @@ export default function Navbar() {
           Salir
         </button>
       </div>
-
-      {/* 📱 MENÚ MÓVIL (Se mantiene igual por si entran desde celular) */}
-      {/* ... (Aquí dejas el bloque del botón hamburguesa e isMenuOpen del original) ... */}
     </nav>
   );
 }

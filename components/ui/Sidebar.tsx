@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image"; // ✅ Agregado para el Logo
 import { usePathname } from "next/navigation";
 import { 
   Settings, Target, GitBranch, HeartPulse, 
@@ -7,7 +8,7 @@ import {
   LayoutDashboard, Calendar, FolderOpen, FileText 
 } from "lucide-react";
 
-import { useState, useEffect } from "react"; // Importamos la herramienta faltante
+import { useState, useEffect } from "react"; 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function Sidebar() {
@@ -48,7 +49,7 @@ export default function Sidebar() {
 
   return (
     <aside 
-      className={`fixed left-0 top-0 h-full bg-white border-r border-slate-200 z-40 flex flex-col transition-all duration-300 ease-in-out ${
+      className={`fixed left-0 top-0 h-full bg-white border-r border-slate-200 z-50 flex flex-col shadow-xl transition-all duration-300 ease-in-out ${
         isCollapsed ? "w-20" : "w-64"
       }`}
     >
@@ -60,14 +61,18 @@ export default function Sidebar() {
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
-      {/* Título o Logo - Se oculta si está colapsado para verse fino */}
-      <div className="h-16 flex items-center px-6 border-b border-slate-50 overflow-hidden">
-         {!isCollapsed && (
-           <span className="text-xs font-bold text-slate-400 tracking-widest uppercase animate-in fade-in">
-             SANSCE OS
-           </span>
-         )}
-         {isCollapsed && <div className="mx-auto h-2 w-2 rounded-full bg-blue-500" />}
+      {/* LOGO SANSCE: Isotipo maximizado para impacto visual */}
+      <div className="h-24 flex items-center justify-center border-b border-slate-50 overflow-hidden bg-white">
+         <Link href="/" className="transition-transform hover:scale-105 active:scale-95 duration-200">
+            <Image 
+              src="/logo-sansce.png" 
+              alt="SANSCE Logo" 
+              width={68} 
+              height={68} 
+              className="object-contain"
+              priority
+            />
+         </Link>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
@@ -106,11 +111,17 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer del Sidebar */}
-      <div className="p-4 border-t border-slate-100">
-          <div className="bg-slate-50 p-3 rounded-lg text-center">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">SANSCE OS v2.0</p>
-          </div>
+      {/* Footer del Sidebar: Limpieza dinámica en modo colapsado */}
+      <div className="p-4 border-t border-slate-50">
+          {!isCollapsed ? (
+            <div className="bg-slate-50/50 p-3 rounded-xl text-center animate-in fade-in zoom-in duration-300">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SANSCE APP</p>
+            </div>
+          ) : (
+            <div className="flex justify-center py-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-slate-200" />
+            </div>
+          )}
       </div>
     </aside>
   );
