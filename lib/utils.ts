@@ -164,3 +164,11 @@ export const generateSearchTags = (nombre: string): string[] => {
     const palabras = nombreLimpio.split(/\s+/);
     return Array.from(new Set(palabras));
 };
+
+/**
+ * 10. GENERADOR DE ID PARA TAREAS OPERATIVAS
+ * Crea un ID rastreable (DNI de tarea) basado en tiempo.
+ */
+export const generateTaskId = (): string => {
+    return `T-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+};

@@ -8,7 +8,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase'; 
 // Unificamos las importaciones de googleSheets y agregamos el motor de OKRs
 import { getMedicos, getMensajesWhatsApp, getCatalogos, getOkrDashboardData } from "./googleSheets";
-import { addMinutesToTime } from './utils';
+import { addMinutesToTime, generateTaskId } from './utils';
 
 // --- ACCIÓN 1: AGENDAR (Mantiene lógica original) ---
 export async function agendarCitaGoogle(cita: { 
@@ -345,4 +345,107 @@ export async function fetchOkrDataAction(email: string) {
     console.error("❌ Error en fetchOkrDataAction:", error);
     return []; // Retornamos array vacío para no romper la UI
   }
+}
+
+// --- MÓDULO 7: ESCRITURA OPERATIVA (Minutas y Tareas con Trazabilidad) ---
+
+export async function saveMinutaCompletaAction(datosMinuta: {
+    fecha: string,
+    moderador: string,
+    temas: string,
+    asistentes: string,
+    conclusiones: string,
+    compromisos: Array<{
+        descripcion: string,
+        responsable: string,
+        fechaInicio: string,    // 📅 NUEVO: Trazabilidad de inicio
+        fechaEntrega: string,   // 📅 NUEVO: Trazabilidad de fin
+        area: string,
+        proyecto: string,
+        idHito: string
+    }>
+}) {
+    try {
+        const { GoogleSpreadsheet } = await import('google-spreadsheet');
+        const { JWT } = await import('google-auth-library');
+
+        const auth = new JWT({
+            email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+            key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        });
+
+        const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+        await doc.loadInfo();
+
+        // 1. Guardar el Acta en OPERACION_MINUTAS
+        const sheetMinutas = doc.sheetsByTitle['OPERACION_MINUTAS'];
+        await sheetMinutas.addRow({
+            Fecha: datosMinuta.fecha,
+            Moderador: datosMinuta.moderador,
+            Temas: datosMinuta.temas,
+            Asistentes: datosMinuta.asistentes,
+            Conclusiones: datosMinuta.conclusiones
+        });
+
+        // 2. Desglosar Tareas en OPERACION_TAREAS
+        const sheetTareas = doc.sheetsByTitle['OPERACION_TAREAS'];
+        for (const tarea of datosMinuta.compromisos) {
+            await sheetTareas.addRow({
+                // Si la tarea ya trae un ID de la interfaz, lo usamos; si no, creamos uno nuevo con nuestra utilería.
+                ID_Tarea: (tarea as any).idTarea || generateTaskId(),
+                Descripcion: tarea.descripcion,
+                EmailAsignado: tarea.responsable,
+                FechaInicio: tarea.fechaInicio,     // ✅ Trazabilidad Activa
+                FechaEntrega: tarea.fechaEntrega,   // ✅ Trazabilidad Activa
+                Estado: 'Pendiente',
+                ID_Hito: tarea.idHito || 'Gral',
+                Area: tarea.area,
+                Proyecto: tarea.proyecto,
+                AsignadoPor: datosMinuta.moderador
+            });
+        }
+
+        return { success: true, message: "Minuta y Tareas vinculadas correctamente" };
+    } catch (error: any) {
+        console.error("❌ Error en Trazabilidad de Minuta:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function updateTaskStatusAction(idTarea: string, nuevoEstado: string) {
+    try {
+        const { GoogleSpreadsheet } = await import('google-spreadsheet');
+        const { JWT } = await import('google-auth-library');
+        const { revalidateTag } = await import('next/cache');
+
+        const auth = new JWT({
+            email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+            key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        });
+
+        const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+        await doc.loadInfo();
+
+        const sheet = doc.sheetsByTitle['OPERACION_TAREAS'];
+        const rows = await sheet.getRows();
+        
+        // 🔍 Búsqueda Quirúrgica: Localizamos la fila por su ID único
+        const row = rows.find(r => r.get('ID_Tarea') === idTarea);
+
+        if (!row) throw new Error("No se encontró la tarea en el sistema.");
+
+        // ✅ Actualización de Estado
+        row.set('Estado', nuevoEstado);
+        await row.save();
+
+        // ⚡ Limpieza de Memoria: Forzamos al sistema a leer el dato nuevo
+        revalidateTag('op-tareas-v1');
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("❌ Error actualizando estado de tarea:", error);
+        return { success: false, error: error.message };
+    }
 }
