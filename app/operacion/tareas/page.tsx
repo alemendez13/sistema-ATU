@@ -1,12 +1,14 @@
-import { getOperacionTareas, getOperacionCronograma } from "@/lib/googleSheets";
+import { getOperacionTareas, getOperacionCronograma, getMedicos } from "@/lib/googleSheets";
 import { fetchOkrDataAction } from "@/lib/actions";
 import TaskBoardClient from "../../../components/operacion/TaskBoardClient";
 
 export default async function TareasPage() {
   // 1. Carga de datos desde el Servidor (Alta Velocidad)
-  const [tareas, hitos] = await Promise.all([
+  // Añadimos getMedicos() para que el formulario de Minuta tenga la lista de personal lista para el modal
+  const [tareas, hitos, personal] = await Promise.all([
     getOperacionTareas(),
-    getOperacionCronograma()
+    getOperacionCronograma(),
+    getMedicos()
   ]);
 
   return (
@@ -26,7 +28,8 @@ export default async function TareasPage() {
         </header>
 
         {/* El "Cerebro" del Tablero (Lógica de Filtros y Lista) */}
-        <TaskBoardClient initialTasks={tareas} initialHitos={hitos} />
+        <TaskBoardClient initialTasks={tareas} initialHitos={hitos} personal={personal} />
+        
       </div>
     </main>
   );

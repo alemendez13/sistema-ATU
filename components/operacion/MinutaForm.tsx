@@ -10,7 +10,8 @@ interface Personal {
   email: string;
 }
 
-export default function MinutaForm({ personal }: { personal: Personal[] }) {
+// Añadimos 'hitos' a las herramientas que recibe el formulario
+export default function MinutaForm({ personal, hitos = [] }: { personal: Personal[], hitos?: any[] }) {
   // 1. Estados Maestros
   const [datos, setDatos] = useState({
     fecha: new Date().toISOString().split('T')[0],
@@ -194,6 +195,22 @@ export default function MinutaForm({ personal }: { personal: Personal[] }) {
                   >
                     <option value="">Asignar a...</option>
                     {personal.map(p => <option key={p.id} value={p.email}>{p.nombre}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Vincular a Hito / Proyecto</label>
+                  <select
+                    className="w-full bg-transparent text-sm outline-none text-blue-700 font-medium"
+                    value={tarea.idHito}
+                    onChange={(e) => handleTareaChange(index, 'idHito', e.target.value)}
+                  >
+                    <option value="">Opcional: Vincular a...</option>
+                    {hitos.map(h => (
+                      <option key={h.ID_Hito} value={h.ID_Hito}>
+                        [{h.Proyecto}] {h['Nombre del Hito']}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
