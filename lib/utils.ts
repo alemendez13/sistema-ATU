@@ -172,3 +172,11 @@ export const generateSearchTags = (nombre: string): string[] => {
 export const generateTaskId = (): string => {
     return `T-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 };
+
+/**
+ * 11. GENERADOR DE ID DE FECHA (Checklist)
+ * Devuelve la fecha actual en formato YYYY-MM-DD para índices de Google Sheets.
+ */
+export const getDateId = (): string => {
+    return new Date().toISOString().split('T')[0];
+};

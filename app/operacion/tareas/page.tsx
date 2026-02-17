@@ -1,6 +1,8 @@
-import { getOperacionTareas, getOperacionCronograma, getMedicos } from "@/lib/googleSheets";
+import { getOperacionTareas, getOperacionCronograma, getPersonalTodo } from "@/lib/googleSheets";
 import { fetchOkrDataAction } from "@/lib/actions";
 import TaskBoardClient from "../../../components/operacion/TaskBoardClient";
+import Link from 'next/link'; // 🆕 Para navegación instantánea
+import { ClipboardCheck } from 'lucide-react'; // 🆕 Icono de Checklist
 
 export default async function TareasPage() {
   // 1. Carga de datos desde el Servidor (Alta Velocidad)
@@ -8,7 +10,7 @@ export default async function TareasPage() {
   const [tareas, hitos, personal] = await Promise.all([
     getOperacionTareas(),
     getOperacionCronograma(),
-    getMedicos()
+    getPersonalTodo() // 🆕 Carga unificada: Especialistas + Equipo Operativo
   ]);
 
   return (
@@ -20,7 +22,16 @@ export default async function TareasPage() {
             <h1 className="text-3xl font-bold text-slate-800">Seguimiento de Tareas</h1>
             <p className="text-slate-500">Gestión operativa y compromisos estratégicos</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
+            {/* 🆕 BOTÓN DE ACCESO AL CHECKLIST */}
+            <Link 
+              href="/operacion/checklist"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-bold shadow-sm hover:bg-slate-50 hover:border-blue-300 transition-all"
+            >
+              <ClipboardCheck size={18} className="text-blue-600" />
+              Checklist Diario
+            </Link>
+
             <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-600">
               {tareas.length} Tareas Activas
             </span>
@@ -29,7 +40,7 @@ export default async function TareasPage() {
 
         {/* El "Cerebro" del Tablero (Lógica de Filtros y Lista) */}
         <TaskBoardClient initialTasks={tareas} initialHitos={hitos} personal={personal} />
-        
+
       </div>
     </main>
   );

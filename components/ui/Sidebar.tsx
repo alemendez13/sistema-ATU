@@ -46,7 +46,7 @@ export default function Sidebar() {
     { id: 12, name: "Expediente Clínico", icon: <FileText size={20} />, href: "/expedientes", color: "text-indigo-600" }, // 🩺 Preparación Módulo
     { id: 5, name: "Recursos humanos", icon: <Users size={20} />, href: "/personal", color: "text-orange-600" },
     { id: 6, name: "Solicitud de Insumos y Mantenimiento", icon: <Package size={20} />, href: "/inventarios", color: "text-amber-600" },
-    { id: 7, name: "Operación y Minutas", icon: <ClipboardList size={20} />, href: "/operacion/tareas", color: "text-emerald-600" },
+    { id: 7, name: "Cronograma de actividades", icon: <ClipboardList size={20} />, href: "/operacion/tareas", color: "text-emerald-600" },
     { id: 8, name: "Reportes", icon: <BarChart3 size={20} />, href: "/finanzas", color: "text-indigo-600" }, // ✅ Icono corregido
   ];
 

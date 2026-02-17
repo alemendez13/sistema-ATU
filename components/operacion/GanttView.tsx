@@ -24,61 +24,66 @@ export default function GanttView({ hitos }: GanttViewProps) {
           ))}
         </div>
 
-        {/* CUERPO DEL GANTT */}
-        <div className="divide-y divide-slate-100 border-x border-b border-slate-200">
-          {hitos.map((hito) => {
-            // Lógica de Alta Precisión (Día del Año)
-            const getDayOfYear = (dateStr: string) => {
-              const date = new Date(dateStr);
-              if (isNaN(date.getTime())) return null;
-              const start = new Date(date.getFullYear(), 0, 0);
-              const diff = date.getTime() - start.getTime();
-              const oneDay = 1000 * 60 * 60 * 24;
-              return Math.floor(diff / oneDay);
-            };
-
-            const diaInicio = getDayOfYear(hito['Fecha Inicio']) || 1;
-            const diaFin = getDayOfYear(hito['Fecha Fin']) || diaInicio + 7;
-            
-            // Calculamos posición porcentual sobre los 365 días del año
-            const posicionIzquierda = ((diaInicio - 1) / 365) * 100;
-            const anchoBarra = ((diaFin - diaInicio + 1) / 365) * 100;
-
-            return (
-              <div key={hito.ID_Hito} className="grid grid-cols-[280px_repeat(12,1fr)] items-center group hover:bg-slate-50 transition-colors">
-                {/* Info del Proyecto */}
-                <div className="p-3 border-r border-slate-100 bg-slate-50/30">
-                  <p className="text-xs font-bold text-slate-700 truncate">{hito['Nombre del Hito']}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[9px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-400 font-semibold uppercase">
-                      {hito.Proyecto || 'General'}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Carril de Tiempo (Barra dinámica) */}
-                <div className="relative col-span-12 h-12 flex items-center px-1">
-                  <div 
-                    className="absolute h-7 rounded-md shadow-sm flex items-center px-3 text-[9px] font-bold text-white transition-all hover:brightness-110 cursor-help"
-                    style={{
-                      left: `${posicionIzquierda}%`,
-                      width: `${anchoBarra}%`,
-                      backgroundColor: hito.Estado === 'Cumplida' ? '#10b981' : '#3b82f6',
-                      zIndex: 10
-                    }}
-                    title={`Hito: ${hito['Nombre del Hito']} | Inicio: ${hito['Fecha Inicio']} - Fin: ${hito['Fecha Fin']}`}
-                  >
-                    <span className="truncate">{hito.Estado === 'Cumplida' ? '✓ CUMPLIDO' : hito.Estado}</span>
-                  </div>
-                  
-                  {/* Guías de fondo (Líneas verticales de meses) */}
-                  {Array.from({length: 12}).map((_, i) => (
-                    <div key={i} className="flex-1 h-full border-r border-slate-50 last:border-0" />
-                  ))}
-                </div>
+        {/* CUERPO DEL GANTT AGRUPADO POR PROYECTO */}
+        <div className="divide-y divide-slate-200 border-x border-b border-slate-200">
+          {(Object.entries(
+            hitos.reduce((acc, hito) => {
+              const proy = hito.Proyecto || 'General';
+              if (!acc[proy]) acc[proy] = [];
+              acc[proy].push(hito);
+              return acc;
+            }, {} as Record<string, any[]>)
+          ) as [string, any[]][]).map(([proyecto, hitosDelProyecto]) => (
+            <div key={proyecto} className="bg-slate-50/50">
+              {/* Encabezado de Proyecto (PC Impactado) */}
+              <div className="bg-slate-100/80 px-4 py-2 border-y border-slate-200">
+                <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest">
+                  📂 PROYECTO: {proyecto}
+                </span>
               </div>
-            );
-          })}
+
+              {hitosDelProyecto.map((hito: any) => {
+                const getDayOfYear = (dateStr: string) => {
+                  const date = new Date(dateStr);
+                  if (isNaN(date.getTime())) return null;
+                  const start = new Date(date.getFullYear(), 0, 0);
+                  const diff = date.getTime() - start.getTime();
+                  return Math.floor(diff / (1000 * 60 * 60 * 24));
+                };
+
+                const diaInicio = getDayOfYear(hito['Fecha Inicio']) || 1;
+                const diaFin = getDayOfYear(hito['Fecha Fin']) || diaInicio + 7;
+                const posicionIzquierda = ((diaInicio - 1) / 365) * 100;
+                const anchoBarra = ((diaFin - diaInicio + 1) / 365) * 100;
+
+                return (
+                  <div key={hito.ID_Hito} className="grid grid-cols-[280px_repeat(12,1fr)] items-center group hover:bg-white transition-colors border-b border-slate-100 last:border-0">
+                    <div className="p-3 border-r border-slate-100">
+                      <p className="text-[11px] font-semibold text-slate-700 truncate">{hito['Nombre del Hito']}</p>
+                      <p className="text-[9px] text-slate-400 font-medium">{hito.Responsable}</p>
+                    </div>
+                    
+                    <div className="relative col-span-12 h-10 flex items-center px-1">
+                      <div 
+                        className="absolute h-6 rounded-md shadow-sm flex items-center px-3 text-[9px] font-bold text-white transition-all hover:scale-[1.02] cursor-help"
+                        style={{
+                          left: `${posicionIzquierda}%`,
+                          width: `${anchoBarra}%`,
+                          backgroundColor: hito.Estado === 'Cumplida' ? '#10b981' : '#3b82f6',
+                        }}
+                        title={`${hito['Nombre del Hito']} | Resp: ${hito.Responsable}`}
+                      >
+                        <span className="truncate">{hito.Estado === 'Cumplida' ? '✓' : hito.Estado}</span>
+                      </div>
+                      {Array.from({length: 12}).map((_, i) => (
+                        <div key={i} className="flex-1 h-full border-r border-slate-100/30 last:border-0" />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -449,3 +449,94 @@ export async function updateTaskStatusAction(idTarea: string, nuevoEstado: strin
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * 🚀 ACCIÓN: GUARDAR CHECKLIST DIARIO
+ * Registra o actualiza el cumplimiento de actividades en OPERACION_CHECKLIST_LOG.
+ */
+export async function saveChecklistAction(email: string, dateId: string, activityId: string, isCompleted: boolean) {
+    try {
+        const { GoogleSpreadsheet } = await import('google-spreadsheet');
+        const { JWT } = await import('google-auth-library');
+        const { revalidateTag } = await import('next/cache');
+
+        const auth = new JWT({
+            email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+            key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        });
+
+        const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+        await doc.loadInfo();
+
+        const sheet = doc.sheetsByTitle['OPERACION_CHECKLIST_LOG'];
+        const rows = await sheet.getRows();
+        
+        // 🔍 BUSCADOR: ¿Ya existe un registro para esta actividad hoy?
+        const existingRow = rows.find(r => 
+            r.get('DateID') === dateId && 
+            r.get('Email') === email && 
+            r.get('ActivityID') === activityId
+        );
+
+        if (existingRow) {
+            // Actualizamos el existente
+            existingRow.set('IsCompleted', isCompleted ? 'TRUE' : 'FALSE');
+            await existingRow.save();
+        } else {
+            // Creamos uno nuevo
+            await sheet.addRow({
+                DateID: dateId,
+                Email: email,
+                ActivityID: activityId,
+                IsPlanned: 'TRUE',
+                IsCompleted: isCompleted ? 'TRUE' : 'FALSE'
+            });
+        }
+
+        revalidateTag('op-checklist-v1'); // Limpiamos caché para ver el cambio
+        return { success: true };
+    } catch (error: any) {
+        console.error("❌ Error en Checklist:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function saveHitoAction(formData: FormData) {
+  try {
+    const { GoogleSpreadsheet } = await import('google-spreadsheet');
+    const { JWT } = await import('google-auth-library');
+    const { revalidateTag } = await import('next/cache');
+
+    const auth = new JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+    await doc.loadInfo();
+
+    const sheet = doc.sheetsByTitle['OPERACION_CRONOGRAMA'];
+    
+    // Captura de trazabilidad completa: Proyecto -> Hito -> Area -> Responsable
+    await sheet.addRow({
+      ID_Hito: `HITO-${Date.now()}`,
+      'Nombre del Hito': String(formData.get('nombre_hito') ?? ''),
+      'Responsable': String(formData.get('responsable') ?? ''),
+      'Fecha Inicio': String(formData.get('fecha_inicio') ?? ''),
+      'Fecha Fin': String(formData.get('fecha_fin') ?? ''),
+      'Estado': 'Pendiente',
+      'Area': String(formData.get('area_responsable') ?? 'General'), // ✅ Nueva vinculación estratégica
+      'Proyecto': String(formData.get('pc_impactado') ?? ''),
+    });
+
+    // 🛡️ REGLA DE ORO: Limpiamos la caché para que el Gantt se actualice al instante
+    revalidateTag('op-cronograma-v1');
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("❌ Error en saveHitoAction:", error);
+    return { success: false, error: error.message };
+  }
+}

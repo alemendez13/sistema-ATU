@@ -52,6 +52,16 @@ export default function MinutaForm({ personal, hitos = [] }: { personal: Persona
   const handleTareaChange = (index: number, campo: string, valor: string) => {
     const nuevosCompromisos = [...compromisos];
     nuevosCompromisos[index][campo] = valor;
+
+    // 🔗 HERENCIA AUTOMÁTICA: Si seleccionamos un Hito, heredamos su Proyecto y Área
+    if (campo === 'idHito' && valor !== "") {
+      const hitoEncontrado = hitos.find(h => h.ID_Hito === valor);
+      if (hitoEncontrado) {
+        nuevosCompromisos[index].proyecto = hitoEncontrado.Proyecto || 'General';
+        nuevosCompromisos[index].area = hitoEncontrado.Area || 'General';
+      }
+    }
+
     setCompromisos(nuevosCompromisos);
   };
 

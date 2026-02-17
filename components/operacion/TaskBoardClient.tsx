@@ -5,7 +5,8 @@ import { LayoutList, GanttChartSquare, Filter, Plus, X } from 'lucide-react'; //
 import { updateTaskStatusAction } from '@/lib/actions';
 import TaskListView from './TaskListView';
 import GanttView from './GanttView';
-import MinutaForm from './MinutaForm'; // 🆕 Importamos el formulario
+import MinutaForm from './MinutaForm'; 
+import HitoForm from './HitoForm';
 
 export default function TaskBoardClient({ 
   initialTasks, 
@@ -18,7 +19,8 @@ export default function TaskBoardClient({
 }) {
   const [view, setView] = useState<'lista' | 'cronograma'>('lista');
   const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false); // 🆕 Interruptor para la ventana
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'minuta' | 'hito'>('minuta');
 
   const handleToggleStatus = async (id: string, nextStatus: string) => {
     setLoadingId(id);
@@ -56,13 +58,23 @@ export default function TaskBoardClient({
 
           </div>
 
-        {/* 🆕 BOTÓN LLAMATIVO: NUEVA MINUTA */}
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95"
-        >
-          <Plus size={18} /> Nueva Minuta / Acuerdos
-        </button>
+        <div className="flex gap-2">
+          {/* Botón Hitos (Azul) */}
+          <button
+            onClick={() => { setModalMode('hito'); setIsModalOpen(true); }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-blue-700 transition-all active:scale-95"
+          >
+            <Plus size={18} /> Nuevo Proyecto / Hito
+          </button>
+
+          {/* Botón Minuta (Esmeralda) */}
+          <button
+            onClick={() => { setModalMode('minuta'); setIsModalOpen(true); }}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-emerald-700 transition-all active:scale-95"
+          >
+            <Plus size={18} /> Nueva Minuta
+          </button>
+        </div>
 
         <div className="hidden sm:flex items-center gap-2 text-slate-400 px-4">
         </div>
@@ -99,9 +111,16 @@ export default function TaskBoardClient({
             </button>
             
             <div className="p-2">
-               <h2 className="text-2xl font-bold text-slate-800 p-8 pb-0">Registrar Nuevos Acuerdos</h2>
-               {/* 🔗 Pasamos la lista de hitos que cargamos desde el servidor */}
-               <MinutaForm personal={personal} hitos={initialHitos} />
+              <h2 className="text-2xl font-bold text-slate-800 p-8 pb-0">
+                {modalMode === 'minuta' ? 'Registrar Nuevos Acuerdos' : 'Configurar Hito Estratégico'}
+              </h2>
+              
+              {modalMode === 'minuta' ? (
+                <MinutaForm personal={personal} hitos={initialHitos} />
+              ) : (
+                /* Aquí va tu formulario sencillo de 4 datos */
+                <HitoForm personal={personal} onSuccess={() => setIsModalOpen(false)} />
+              )}
             </div>
           </div>
         </div>
