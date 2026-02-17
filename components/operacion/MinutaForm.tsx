@@ -209,13 +209,13 @@ export default function MinutaForm({ personal, hitos = [] }: { personal: Persona
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Vincular a Hito / Proyecto</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Vincular a Tipo de Actividad / Proyecto</label>
                   <select
                     className="w-full bg-transparent text-sm outline-none text-blue-700 font-medium"
                     value={tarea.idHito}
                     onChange={(e) => handleTareaChange(index, 'idHito', e.target.value)}
                   >
-                    <option value="">Opcional: Vincular a...</option>
+                    <option value="">Opcional: Vincular a Actividad...</option>
                     {hitos.map(h => (
                       <option key={h.ID_Hito} value={h.ID_Hito}>
                         [{h.Proyecto}] {h['Nombre del Hito']}

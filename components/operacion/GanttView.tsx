@@ -10,13 +10,13 @@ export default function GanttView({ hitos }: GanttViewProps) {
   return (
     <div className="bg-white rounded-xl shadow-md p-6 border-t-4 border-green-500 overflow-x-auto">
       <h2 className="text-lg font-bold text-slate-800 mb-6 uppercase tracking-tight">
-        Cronograma Maestro de Proyectos
+        Cronograma Maestro de Actividades
       </h2>
       
       <div className="min-w-[850px]">
         {/* CABECERA DE MESES (13 Columnas: 1 Título + 12 Meses) */}
         <div className="grid grid-cols-[280px_repeat(12,1fr)] gap-px bg-slate-200 border-b border-slate-200 text-[10px] font-bold text-slate-500 text-center uppercase">
-          <div className="bg-slate-50 p-3 text-left border-r border-slate-200">Hito / Proyecto</div>
+          <div className="bg-slate-50 p-3 text-left border-r border-slate-200">Tipo de Actividad / Proyecto</div>
           {['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'].map(mes => (
             <div key={mes} className="bg-slate-50 p-3 flex items-center justify-center border-l border-slate-100">
               {mes}
@@ -59,7 +59,9 @@ export default function GanttView({ hitos }: GanttViewProps) {
                 return (
                   <div key={hito.ID_Hito} className="grid grid-cols-[280px_repeat(12,1fr)] items-center group hover:bg-white transition-colors border-b border-slate-100 last:border-0">
                     <div className="p-3 border-r border-slate-100">
-                      <p className="text-[11px] font-semibold text-slate-700 truncate">{hito['Nombre del Hito']}</p>
+                      <p className="text-[11px] font-semibold text-slate-700 truncate">
+                        {hito['Nombre de la Actividad'] || hito['Nombre del Hito']}
+                      </p>
                       <p className="text-[9px] text-slate-400 font-medium">{hito.Responsable}</p>
                     </div>
                     
@@ -71,7 +73,7 @@ export default function GanttView({ hitos }: GanttViewProps) {
                           width: `${anchoBarra}%`,
                           backgroundColor: hito.Estado === 'Cumplida' ? '#10b981' : '#3b82f6',
                         }}
-                        title={`${hito['Nombre del Hito']} | Resp: ${hito.Responsable}`}
+                        title={`Actividad: ${hito['Nombre de la Actividad'] || hito['Nombre del Hito']} | Resp: ${hito.Responsable}`}
                       >
                         <span className="truncate">{hito.Estado === 'Cumplida' ? '✓' : hito.Estado}</span>
                       </div>

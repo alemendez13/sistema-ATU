@@ -59,12 +59,12 @@ export default function TaskBoardClient({
           </div>
 
         <div className="flex gap-2">
-          {/* Botón Hitos (Azul) */}
+          {/* Botón Proyectos (Azul) */}
           <button
             onClick={() => { setModalMode('hito'); setIsModalOpen(true); }}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-blue-700 transition-all active:scale-95"
           >
-            <Plus size={18} /> Nuevo Proyecto / Hito
+            <Plus size={18} /> Nuevo Proyecto / Tipo de Actividad
           </button>
 
           {/* Botón Minuta (Esmeralda) */}
@@ -112,7 +112,7 @@ export default function TaskBoardClient({
             
             <div className="p-2">
               <h2 className="text-2xl font-bold text-slate-800 p-8 pb-0">
-                {modalMode === 'minuta' ? 'Registrar Nuevos Acuerdos' : 'Configurar Hito Estratégico'}
+                {modalMode === 'minuta' ? 'Registrar Nuevos Acuerdos' : 'Configurar Tipo de Actividad'}
               </h2>
               
               {modalMode === 'minuta' ? (

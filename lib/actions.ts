@@ -519,15 +519,15 @@ export async function saveHitoAction(formData: FormData) {
 
     const sheet = doc.sheetsByTitle['OPERACION_CRONOGRAMA'];
     
-    // Captura de trazabilidad completa: Proyecto -> Hito -> Area -> Responsable
+    // Captura de trazabilidad completa: Proyecto -> Actividad -> Area -> Responsable
     await sheet.addRow({
       ID_Hito: `HITO-${Date.now()}`,
-      'Nombre del Hito': String(formData.get('nombre_hito') ?? ''),
+      'Nombre de la Actividad': String(formData.get('nombre_hito') ?? ''), // 🚀 Sincronizado con Google Sheets
       'Responsable': String(formData.get('responsable') ?? ''),
       'Fecha Inicio': String(formData.get('fecha_inicio') ?? ''),
       'Fecha Fin': String(formData.get('fecha_fin') ?? ''),
       'Estado': 'Pendiente',
-      'Area': String(formData.get('area_responsable') ?? 'General'), // ✅ Nueva vinculación estratégica
+      'Area': String(formData.get('area_responsable') ?? 'General'),
       'Proyecto': String(formData.get('pc_impactado') ?? ''),
     });
 

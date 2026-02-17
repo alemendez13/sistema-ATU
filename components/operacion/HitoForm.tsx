@@ -47,14 +47,14 @@ export default function HitoForm({ personal, onSuccess }: HitoFormProps) {
           />
         </div>
 
-        {/* 2. NOMBRE DEL HITO (Acción Específica) */}
+        {/* 2. TIPO DE ACTIVIDAD (Acción Específica) */}
         <div className="md:col-span-2 space-y-2">
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-            <Briefcase size={14} className="text-slate-400" /> Nombre del Hito / Entregable
+            <Briefcase size={14} className="text-slate-400" /> Tipo de Actividad / Entregable
           </label>
           <input 
             name="nombre_hito"
-            placeholder="Ej: Compra de Instrumental Laparoscópico"
+            placeholder="Ej: Mantenimiento Preventivo o Capacitación"
             required
             className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
           />
@@ -130,12 +130,12 @@ export default function HitoForm({ personal, onSuccess }: HitoFormProps) {
           {loading ? (
             <>
               <Loader2 className="animate-spin" size={20} />
-              Guardando en Cronograma...
+              Registrando Actividad...
             </>
           ) : (
             <>
               <Save size={20} />
-              Registrar Hito Estratégico
+              Registrar Tipo de Actividad
             </>
           )}
         </button>
