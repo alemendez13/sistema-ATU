@@ -8,21 +8,12 @@ interface UserData {
   uid: string;
 }
 import { fetchOkrDataAction } from "@/lib/actions"; // El puente que creamos
-import { 
-  Chart as ChartJS, 
-  ArcElement, 
-  Tooltip, 
-  Legend, 
-  CategoryScale, 
-  LinearScale, 
-  BarElement 
-} from "chart.js";
+import Chart from 'chart.js/auto'; 
 import { Doughnut, Bar } from "react-chartjs-2";
 import { AlertCircle, ArrowUp, RefreshCw, Target, ChevronDown, ChevronUp, User, Layers, Activity, X, Filter } from "lucide-react";
 import { toast } from "sonner";
 
-// 1. REGISTRO DE GRÁFICAS (Obligatorio en React)
-ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
+// 1. REGISTRO DE GRÁFICAS: En la versión 'auto', Chart.js se registra automáticamente al importar.
 
 export default function TableroOkrPage() {
   // Le decimos a TS: "Confía en mí, esto devuelve un UserData"

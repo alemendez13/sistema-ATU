@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
-import { LayoutList, GanttChartSquare, Filter, Plus, X } from 'lucide-react'; // 🆕 Añadimos Plus y X
-import { updateTaskStatusAction } from '@/lib/actions';
+import { LayoutList, GanttChartSquare, Filter, Plus, X, Target, Zap, ChevronRight } from 'lucide-react'; 
+import { updateTaskStatusAction, fetchOkrDataAction } from '@/lib/actions'; // 🆕 Importamos fetchOkrDataAction
 import TaskListView from './TaskListView';
 import GanttView from './GanttView';
 import MinutaForm from './MinutaForm'; 
@@ -23,7 +23,28 @@ export default function TaskBoardClient({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'minuta' | 'hito' | 'tarea'>('minuta');
   const [prefilledProject, setPrefilledProject] = useState<string>("");
-  const [prefilledHitoId, setPrefilledHitoId] = useState<string>(""); // 🆕 ID para vincular la tarea
+  const [prefilledHitoId, setPrefilledHitoId] = useState<string>("");
+
+  // 📡 ESTADOS DEL RADAR ESTRATÉGICO (OKRs)
+  const [showOkrBubble, setShowOkrBubble] = useState(false);
+  const [okrData, setOkrData] = useState<any[]>([]);
+  const [loadingOkr, setLoadingOkr] = useState(false);
+
+  const toggleOkrRadar = async () => {
+    if (!showOkrBubble && okrData.length === 0) {
+      setLoadingOkr(true);
+      try {
+        // 🛡️ CORRECCIÓN: Usamos el email maestro de administración definido en su catálogo
+        const data = await fetchOkrDataAction("administracion@sansce.com"); 
+        setOkrData(data);
+      } catch (err) {
+        console.error("Error al cargar radar:", err);
+      } finally {
+        setLoadingOkr(false);
+      }
+    }
+    setShowOkrBubble(!showOkrBubble);
+  };
 
   const openHitoWithProject = (projectName: string) => {
     setPrefilledProject(projectName);
@@ -89,6 +110,16 @@ export default function TaskBoardClient({
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-emerald-700 transition-all active:scale-95"
           >
             <Plus size={18} /> Nueva Minuta
+          </button>
+
+          {/* 🆕 BOTÓN RADAR ESTRATÉGICO (Violeta) */}
+          <button
+            onClick={toggleOkrRadar}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-all active:scale-95 ${
+              showOkrBubble ? 'bg-purple-100 text-purple-700 ring-2 ring-purple-500' : 'bg-purple-600 text-white hover:bg-purple-700'
+            }`}
+          >
+            <Target size={18} /> {showOkrBubble ? 'Cerrar Radar' : 'Radar Estratégico'}
           </button>
         </div>
 
@@ -157,6 +188,52 @@ export default function TaskBoardClient({
                   defaultProject={prefilledProject} 
                 />
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 📡 PANEL FLOTANTE: RADAR DE OKRs (Alineación Estratégica) */}
+      {showOkrBubble && (
+        <div className="fixed right-6 bottom-6 w-80 md:w-96 z-[90] animate-in slide-in-from-right-10 fade-in duration-300">
+          <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-purple-100 overflow-hidden flex flex-col max-h-[70vh]">
+            <div className="bg-purple-600 p-4 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Target size={18} />
+                <span className="text-xs font-black uppercase tracking-widest">Estrategia SANSCE</span>
+              </div>
+              <button onClick={() => setShowOkrBubble(false)}><X size={18} /></button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto custom-scrollbar">
+              {loadingOkr ? (
+                <div className="py-10 text-center text-slate-400 text-xs font-bold animate-pulse">Sincronizando con el Norte Estratégico...</div>
+              ) : (
+                <div className="space-y-4">
+                  {okrData.map((obj: any) => (
+                    <div key={obj.Objective_ID} className="space-y-2">
+                      <h4 className="text-[10px] font-black text-purple-600 uppercase border-l-2 border-purple-500 pl-2">
+                        Obj: {obj.Nombre}
+                      </h4>
+                      <div className="space-y-1.5 pl-2">
+                        {obj.ResultadosClave.map((kr: any) => (
+                          <div key={kr.KR_ID} className="bg-slate-50 p-2 rounded-lg border border-slate-100 group">
+                            <div className="flex items-center gap-2">
+                              <Zap size={12} className="text-amber-500" />
+                              <p className="text-[9px] font-bold text-slate-700 leading-tight">{kr.Nombre_KR}</p>
+                            </div>
+                            <div className="mt-2 w-full bg-slate-200 h-1 rounded-full overflow-hidden">
+                              <div className="bg-purple-500 h-full" style={{ width: `${kr.KR_Average}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-3 bg-slate-50 border-t border-slate-100 text-center">
+              <p className="text-[8px] text-slate-400 font-bold uppercase italic">Alinea tus proyectos a estos resultados</p>
             </div>
           </div>
         </div>
