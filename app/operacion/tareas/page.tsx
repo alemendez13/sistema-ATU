@@ -1,3 +1,7 @@
+// 🛡️ PROTOCOLO DE SINCRONIZACIÓN SANSCE OS: Forzamos datos frescos en cada carga
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { getOperacionTareas, getOperacionCronograma, getPersonalTodo } from "@/lib/googleSheets";
 import { fetchOkrDataAction } from "@/lib/actions";
 import TaskBoardClient from "../../../components/operacion/TaskBoardClient";
