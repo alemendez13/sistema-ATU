@@ -7,9 +7,10 @@ import { saveHitoAction } from '@/lib/actions';
 interface HitoFormProps {
   personal: any[];
   onSuccess: () => void;
+  defaultProject?: string; // 🆕 Propiedad opcional para recibir el nombre del proyecto
 }
 
-export default function HitoForm({ personal, onSuccess }: HitoFormProps) {
+export default function HitoForm({ personal, onSuccess, defaultProject }: HitoFormProps) {
   const [loading, setLoading] = useState(false);
 
   async function clientAction(formData: FormData) {
@@ -43,6 +44,7 @@ export default function HitoForm({ personal, onSuccess }: HitoFormProps) {
             name="pc_impactado"
             placeholder="Ej: Optimización de Quirófanos"
             required
+            defaultValue={defaultProject} // 🆕 Aquí ocurre la magia: se auto-rellena
             className="w-full p-4 bg-blue-50/30 border border-blue-100 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-blue-900"
           />
         </div>

@@ -7,6 +7,7 @@ import TaskListView from './TaskListView';
 import GanttView from './GanttView';
 import MinutaForm from './MinutaForm'; 
 import HitoForm from './HitoForm';
+import TaskForm from './TaskForm';
 
 export default function TaskBoardClient({ 
   initialTasks, 
@@ -20,8 +21,23 @@ export default function TaskBoardClient({
   const [view, setView] = useState<'lista' | 'cronograma'>('lista');
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'minuta' | 'hito'>('minuta');
+  const [modalMode, setModalMode] = useState<'minuta' | 'hito' | 'tarea'>('minuta');
+  const [prefilledProject, setPrefilledProject] = useState<string>("");
+  const [prefilledHitoId, setPrefilledHitoId] = useState<string>(""); // 🆕 ID para vincular la tarea
 
+  const openHitoWithProject = (projectName: string) => {
+    setPrefilledProject(projectName);
+    setModalMode('hito');
+    setIsModalOpen(true);
+  };
+
+  // 🆕 Abre modal para crear tarea específica dentro de un Tipo de Actividad
+  const openTaskWithHito = (projectName: string, hitoId: string) => {
+    setPrefilledProject(projectName);
+    setPrefilledHitoId(hitoId);
+    setModalMode('tarea');
+    setIsModalOpen(true);
+  };
   const handleToggleStatus = async (id: string, nextStatus: string) => {
     setLoadingId(id);
     // Ahora enviamos el nuevo estado exacto (Pendiente, En Proceso o Cumplida)
@@ -95,7 +111,12 @@ export default function TaskBoardClient({
             />
           </div>
         ) : (
-          <GanttView hitos={initialHitos} />
+          <GanttView 
+            hitos={initialHitos} 
+            tasks={initialTasks}
+            onAddActivity={openHitoWithProject} 
+            onAddTask={openTaskWithHito} // 🆕 El "Radar" ya tiene a dónde enviar la señal
+          />
         )}
       </div>
       {/* 🆕 VENTANA EMERGENTE (MODAL) */}
@@ -112,14 +133,29 @@ export default function TaskBoardClient({
             
             <div className="p-2">
               <h2 className="text-2xl font-bold text-slate-800 p-8 pb-0">
-                {modalMode === 'minuta' ? 'Registrar Nuevos Acuerdos' : 'Configurar Tipo de Actividad'}
+                {modalMode === 'minuta' ? 'Registrar Nuevos Acuerdos' : 
+                 modalMode === 'tarea' ? 'Nueva Tarea Ejecutiva' : 'Configurar Tipo de Actividad'}
               </h2>
               
               {modalMode === 'minuta' ? (
-                <MinutaForm personal={personal} hitos={initialHitos} />
+                <MinutaForm personal={personal} hitos={initialHitos} tasks={initialTasks} />
+              ) : modalMode === 'tarea' ? (
+                <TaskForm 
+                  personal={personal} 
+                  onSuccess={() => {
+                    setIsModalOpen(false);
+                    setPrefilledProject("");
+                    setPrefilledHitoId(""); // Limpiamos rastro de hito
+                  }} 
+                  defaultProject={prefilledProject} 
+                  defaultHitoId={prefilledHitoId}
+                />
               ) : (
-                /* Aquí va tu formulario sencillo de 4 datos */
-                <HitoForm personal={personal} onSuccess={() => setIsModalOpen(false)} />
+                <HitoForm 
+                  personal={personal} 
+                  onSuccess={() => { setIsModalOpen(false); setPrefilledProject(""); }} 
+                  defaultProject={prefilledProject} 
+                />
               )}
             </div>
           </div>

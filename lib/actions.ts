@@ -540,3 +540,100 @@ export async function saveHitoAction(formData: FormData) {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * 🚀 ACCIÓN: REPROGRAMACIÓN SEGURA CON TRAZABILIDAD
+ * Actualiza la fecha de entrega manteniendo el registro de la fecha original.
+ */
+export async function rescheduleHitoAction(idHito: string, nuevaFecha: string, motivo: string) {
+  try {
+    const { GoogleSpreadsheet } = await import('google-spreadsheet');
+    const { JWT } = await import('google-auth-library');
+    const { revalidateTag } = await import('next/cache');
+
+    const auth = new JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+    await doc.loadInfo();
+
+    const sheet = doc.sheetsByTitle['OPERACION_CRONOGRAMA'];
+    const rows = await sheet.getRows();
+    const row = rows.find(r => r.get('ID_Hito') === idHito);
+
+    if (!row) throw new Error("No se encontró la actividad para reprogramar.");
+
+    // 🛡️ TRAZABILIDAD SAGRADA:
+    // Si no existe fecha original guardada, congelamos la que tiene actualmente el Gantt
+    if (!row.get('Fecha_Original')) {
+      row.set('Fecha_Original', row.get('Fecha Fin'));
+    }
+
+    // 📝 HISTORIAL DE CAMBIOS:
+    // Acumulamos el motivo de la reprogramación para auditoría
+    const historialPrevio = row.get('Observaciones') || '';
+    const fechaHoy = new Date().toLocaleDateString();
+    const nuevaNota = `[REPROG ${fechaHoy}]: Nueva fecha ${nuevaFecha} - Motivo: ${motivo}`;
+    
+    row.set('Fecha Fin', nuevaFecha);
+    row.set('Observaciones', `${historialPrevio} | ${nuevaNota}`.trim());
+
+    await row.save();
+
+    // ⚡ Actualización instantánea del Gantt
+    revalidateTag('op-cronograma-v1');
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("❌ Error en reprogramación:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🚀 ACCIÓN: GUARDAR TAREA INDIVIDUAL
+ * Registra una nueva tarea vinculada a un proyecto y tipo de actividad específico.
+ */
+export async function saveSingleTaskAction(formData: FormData) {
+  try {
+    const { GoogleSpreadsheet } = await import('google-spreadsheet');
+    const { JWT } = await import('google-auth-library');
+    const { revalidateTag } = await import('next/cache');
+
+    const auth = new JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+    await doc.loadInfo();
+
+    const sheet = doc.sheetsByTitle['OPERACION_TAREAS'];
+    
+    // Captura de datos con trazabilidad descendente
+    await sheet.addRow({
+      ID_Tarea: generateTaskId(),
+      Descripcion: String(formData.get('descripcion') ?? ''),
+      EmailAsignado: String(formData.get('responsable') ?? ''),
+      FechaInicio: String(formData.get('fecha_inicio') ?? ''),
+      FechaEntrega: String(formData.get('fecha_entrega') ?? ''),
+      Estado: 'Pendiente',
+      ID_Hito: String(formData.get('id_hito') ?? ''),
+      Area: String(formData.get('area') ?? 'General'),
+      Proyecto: String(formData.get('proyecto') ?? ''),
+      AsignadoPor: 'SANSCE OS (Gantt View)'
+    });
+
+    // 🛡️ Sincronización instantánea
+    revalidateTag('op-tareas-v1');
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("❌ Error en saveSingleTaskAction:", error);
+    return { success: false, error: error.message };
+  }
+}
