@@ -220,52 +220,43 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                       const tPosIzquierda = ((tDiaInicio - 1) / 365) * 100;
                       const tAnchoBarra = ((tDiaFin - tDiaInicio + 1) / 365) * 100;
 
+                      // 🚦 Lógica de Semáforo Único
+                      const isRealizada = tarea.Estado === 'Realizada';
+                      const isAtrasada = !isRealizada && new Date(tarea.FechaEntrega) < hoy;
+                      const statusColor = isRealizada ? '#10b981' : isAtrasada ? '#ef4444' : '#f59e0b';
+
                       return (
-                        <div key={tarea.ID_Tarea} className="grid grid-cols-[280px_repeat(12,1fr)] items-stretch bg-slate-50/30 border-b border-slate-50 group/task">
-                          <div className="p-3 pl-8 border-r border-slate-100 relative">
+                        <div key={tarea.ID_Tarea} className="grid grid-cols-[280px_repeat(12,1fr)] items-stretch bg-slate-50/30 border-b border-slate-50 group/task hover:bg-slate-100/50 transition-colors">
+                          {/* COLUMNA 1: DESCRIPCIÓN + SEMÁFORO INTERACTIVO */}
+                          <div className="p-3 pl-8 border-r border-slate-100 relative flex gap-3 items-start">
                             <div className="absolute left-4 top-0 bottom-0 w-px bg-slate-200"></div>
-                            <div className="absolute left-4 top-1/2 w-2 h-px bg-slate-200"></div>
                             
-                            <p className="text-[10px] text-slate-600 font-medium whitespace-normal break-words leading-tight">
-                              {tarea.Descripcion}
-                            </p>
-                            <p className="text-[8px] text-slate-400 italic mt-1">{tarea.EmailAsignado}</p>
-                          </div>
-                          <div className="relative col-span-12 h-10 flex items-center px-1">
-                            {/* 🚦 BOTONES SEMÁFORO DE GESTIÓN DIRECTA */}
-                            <div 
-                              className="absolute flex items-center gap-1 z-20"
-                              style={{ left: `${tPosIzquierda}%` }}
-                            >
-                              {(() => {
-                                const isRealizada = tarea.Estado === 'Realizada';
-                                const isAtrasada = !isRealizada && new Date(tarea.FechaEntrega) < hoy;
-                                const isProgramada = !isRealizada && !isAtrasada;
+                            {/* Círculo Semáforo Único */}
+                            <button 
+                              onClick={() => !isRealizada && updateTaskStatusAction(tarea.ID_Tarea, 'Realizada').then(() => window.location.reload())}
+                              className={`mt-1 w-3 h-3 rounded-full flex-shrink-0 border transition-transform hover:scale-125 shadow-sm`}
+                              style={{ backgroundColor: statusColor, borderColor: 'rgba(0,0,0,0.1)' }}
+                              title={isRealizada ? "Tarea Realizada" : isAtrasada ? "Tarea Atrasada - Clic para completar" : "Tarea Programada - Clic para completar"}
+                            />
 
-                                return (
-                                  <div className="flex bg-white/80 backdrop-blur-sm p-1 rounded-full border border-slate-200 shadow-sm gap-1">
-                                    <button 
-                                      title="Realizada"
-                                      onClick={() => updateTaskStatusAction(tarea.ID_Tarea, 'Realizada').then(() => window.location.reload())}
-                                      className={`w-3 h-3 rounded-full border ${isRealizada ? 'bg-emerald-500 border-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-200 border-slate-300'}`}
-                                    />
-                                    <button 
-                                      title="En Tiempo (Programada)"
-                                      className={`w-3 h-3 rounded-full border ${isProgramada ? 'bg-amber-400 border-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.5)]' : 'bg-slate-200 border-slate-300'}`}
-                                    />
-                                    <button 
-                                      title="Atrasada"
-                                      className={`w-3 h-3 rounded-full border ${isAtrasada ? 'bg-red-500 border-red-600 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-slate-200 border-slate-300'}`}
-                                    />
-                                  </div>
-                                );
-                              })()}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[10px] text-slate-600 font-medium whitespace-normal break-words leading-tight">
+                                {tarea.Descripcion}
+                              </p>
+                              <p className="text-[8px] text-slate-400 italic mt-1 uppercase tracking-tighter">👤 {tarea.EmailAsignado?.split('@')[0]}</p>
                             </div>
+                          </div>
 
-                            {/* Línea de tiempo de fondo para la tarea */}
+                          {/* COLUMNA 2-13: CRONOGRAMA CON BARRA DE COLOR */}
+                          <div className="relative col-span-12 h-10 flex items-center px-1">
+                            {/* Barra de Duración con Color de Estatus */}
                             <div 
-                              className="absolute h-1 rounded-full bg-slate-100"
-                              style={{ left: `${tPosIzquierda}%`, width: `${tAnchoBarra}%` }}
+                              className="absolute h-4 rounded-sm shadow-sm opacity-80 group-hover/task:opacity-100 transition-all border border-black/5"
+                              style={{ 
+                                left: `${tPosIzquierda}%`, 
+                                width: `${tAnchoBarra}%`, 
+                                backgroundColor: statusColor 
+                              }}
                             />
                             
                             {Array.from({length: 12}).map((_, i) => (
