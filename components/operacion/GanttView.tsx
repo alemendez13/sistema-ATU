@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Plus } from 'lucide-react'; // 🆕 Importamos el ícono de suma
-import { rescheduleHitoAction } from '@/lib/actions';
+import { rescheduleHitoAction, updateTaskStatusAction } from '@/lib/actions'; // 🆕 Importamos la actualización de tareas
 
 interface GanttViewProps {
   hitos: any[];
@@ -13,9 +13,12 @@ interface GanttViewProps {
 
 export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask }: GanttViewProps) {
   const [expandedProjects, setExpandedProjects] = React.useState<string[]>([]);
-  const [expandedHitos, setExpandedHitos] = React.useState<string[]>([]); // 🆕 Estado para expandir/colapsar el 2do nivel (Hitos)
+  const [expandedHitos, setExpandedHitos] = React.useState<string[]>([]); 
+  
+  // 🕒 RELOJ MAESTRO: Definimos la fecha actual para todos los cálculos de semáforos
+  const hoy = new Date();
 
-  const toggleHito = (id: string) => setExpandedHitos(prev => 
+  const toggleHito = (id: string) => setExpandedHitos(prev =>
     prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
   );
   // 🆕 Estados para la gestión de reprogramación
@@ -54,14 +57,36 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
             <div key={proyecto} className="bg-slate-50/50">
               {/* Encabezado de Proyecto Interactivo (Metadatos) */}
               {(() => {
-                // Calculamos metadatos del proyecto en tiempo real
+                // 🧠 MOTOR DE CÁLCULO DE ESTATUS SANSCE OS v2.1
+                const hoy = new Date();
+                const responsablePrincipal = hitosDelProyecto[0]?.Responsable || "No asignado";
+                const isExpanded = expandedProjects.includes(proyecto);
+                
+                // 1. Consolidación de Tareas del Proyecto
+                const idsHitosProy = hitosDelProyecto.map(h => h.ID_Hito);
+                const tareasProy = tasks.filter(t => idsHitosProy.includes(t.ID_Hito));
+                
+                // 2. Cálculos de Cumplimiento
+                const totalTareas = tareasProy.length;
+                const tareasHechas = tareasProy.filter(t => t.Estado === 'Realizada').length;
+                const hayAtrasadas = tareasProy.some(t => t.Estado !== 'Realizada' && new Date(t.FechaEntrega) < hoy);
+                
+                // 3. Determinación de Estado del Proyecto
+                let statusProy = "En Proceso";
+                let colorStatus = "text-blue-600 bg-blue-50";
+
+                if (totalTareas > 0 && tareasHechas === totalTareas) {
+                  statusProy = "Realizado";
+                  colorStatus = "text-emerald-700 bg-emerald-50";
+                } else if (hayAtrasadas) {
+                  statusProy = "Atrasado";
+                  colorStatus = "text-red-700 bg-red-50";
+                }
+
                 const fechasInicio = hitosDelProyecto.map(h => new Date(h['Fecha Inicio']).getTime()).filter(t => !isNaN(t));
                 const fechasFin = hitosDelProyecto.map(h => new Date(h['Fecha Fin']).getTime()).filter(t => !isNaN(t));
                 const minFecha = fechasInicio.length ? new Date(Math.min(...fechasInicio)).toLocaleDateString() : 'N/A';
                 const maxFecha = fechasFin.length ? new Date(Math.max(...fechasFin)).toLocaleDateString() : 'N/A';
-                const responsablePrincipal = hitosDelProyecto[0]?.Responsable || "No asignado";
-                
-                const isExpanded = expandedProjects.includes(proyecto);
 
                 return (
                   <div 
@@ -73,13 +98,19 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                         ▶
                       </div>
                       <div>
-                        <span className="text-[11px] font-black text-blue-800 uppercase tracking-tighter block">
-                          📂 PROYECTO: {proyecto}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[11px] font-black text-blue-800 uppercase tracking-tighter block">
+                            📂 PROYECTO: {proyecto}
+                          </span>
+                          {/* 🆕 ETIQUETA SEMÁFORO DE PROYECTO */}
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase shadow-sm border ${colorStatus}`}>
+                            ● {statusProy}
+                          </span>
+                        </div>
                         <div className="flex gap-4 mt-1">
                           <span className="text-[9px] text-slate-500 font-bold uppercase">👤 Resp: <span className="text-slate-700">{responsablePrincipal}</span></span>
                           <span className="text-[9px] text-slate-500 font-bold uppercase">📅 Periodo: <span className="text-slate-700">{minFecha} - {maxFecha}</span></span>
-                          <span className="text-[9px] text-blue-600 font-bold uppercase italic">📍 PC Impactado: {proyecto}</span>
+                          <span className="text-[9px] text-blue-600 font-bold uppercase italic">📊 Avance: {totalTareas > 0 ? Math.round((tareasHechas/totalTareas)*100) : 0}%</span>
                         </div>
                       </div>
                     </div>
@@ -118,9 +149,15 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                 const posicionIzquierda = ((diaInicio - 1) / 365) * 100;
                 const anchoBarra = ((diaFin - diaInicio + 1) / 365) * 100;
 
-               // 🔍 Buscamos las tareas que pertenecen a este Hito (Capa 3)
+               // 🔍 CÁLCULO DE AVANCE Y SEMÁFOROS (CAPA 2 Y 3)
                 const tareasDelHito = tasks.filter(t => t.ID_Hito === hito.ID_Hito);
                 const isHitoExpanded = expandedHitos.includes(hito.ID_Hito);
+                
+                // Cálculo matemático de porcentaje
+                const tRealizadas = tareasDelHito.filter(t => t.Estado === 'Realizada').length;
+                const porcentajeHito = tareasDelHito.length > 0 
+                  ? Math.round((tRealizadas / tareasDelHito.length) * 100) 
+                  : 0;
 
                 return (
                   <React.Fragment key={hito.ID_Hito}>
@@ -134,9 +171,15 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                           <Plus size={10} />
                         </span>
                         <div className="flex-1 min-w-0 py-1">
-                          <p className="text-[11px] font-bold text-slate-800 uppercase tracking-tight whitespace-normal break-words leading-tight">
-                            {hito['Nombre de la Actividad'] || hito['Nombre del Hito']}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-[11px] font-bold text-slate-800 uppercase tracking-tight whitespace-normal break-words leading-tight">
+                              {hito['Nombre de la Actividad'] || hito['Nombre del Hito']}
+                            </p>
+                            {/* 🆕 BADGE DE PORCENTAJE (CAPA 2) */}
+                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">
+                              {porcentajeHito}%
+                            </span>
+                          </div>
                           <div className="flex items-center justify-between mt-2">
                             <p className="text-[9px] text-slate-500 font-medium">👤 {hito.Responsable}</p>
                             <div className="flex items-center gap-2">
@@ -188,15 +231,43 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                             </p>
                             <p className="text-[8px] text-slate-400 italic mt-1">{tarea.EmailAsignado}</p>
                           </div>
-                          <div className="relative col-span-12 h-8 flex items-center px-1">
+                          <div className="relative col-span-12 h-10 flex items-center px-1">
+                            {/* 🚦 BOTONES SEMÁFORO DE GESTIÓN DIRECTA */}
                             <div 
-                              className="absolute h-1.5 rounded-full opacity-60 transition-opacity group-hover/task:opacity-100"
-                              style={{ 
-                                left: `${tPosIzquierda}%`, 
-                                width: `${tAnchoBarra}%`, 
-                                backgroundColor: tarea.Estado === 'Cumplida' ? '#10b981' : '#94a3b8' 
-                              }}
+                              className="absolute flex items-center gap-1 z-20"
+                              style={{ left: `${tPosIzquierda}%` }}
+                            >
+                              {(() => {
+                                const isRealizada = tarea.Estado === 'Realizada';
+                                const isAtrasada = !isRealizada && new Date(tarea.FechaEntrega) < hoy;
+                                const isProgramada = !isRealizada && !isAtrasada;
+
+                                return (
+                                  <div className="flex bg-white/80 backdrop-blur-sm p-1 rounded-full border border-slate-200 shadow-sm gap-1">
+                                    <button 
+                                      title="Realizada"
+                                      onClick={() => updateTaskStatusAction(tarea.ID_Tarea, 'Realizada').then(() => window.location.reload())}
+                                      className={`w-3 h-3 rounded-full border ${isRealizada ? 'bg-emerald-500 border-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-200 border-slate-300'}`}
+                                    />
+                                    <button 
+                                      title="En Tiempo (Programada)"
+                                      className={`w-3 h-3 rounded-full border ${isProgramada ? 'bg-amber-400 border-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.5)]' : 'bg-slate-200 border-slate-300'}`}
+                                    />
+                                    <button 
+                                      title="Atrasada"
+                                      className={`w-3 h-3 rounded-full border ${isAtrasada ? 'bg-red-500 border-red-600 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-slate-200 border-slate-300'}`}
+                                    />
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
+                            {/* Línea de tiempo de fondo para la tarea */}
+                            <div 
+                              className="absolute h-1 rounded-full bg-slate-100"
+                              style={{ left: `${tPosIzquierda}%`, width: `${tAnchoBarra}%` }}
                             />
+                            
                             {Array.from({length: 12}).map((_, i) => (
                               <div key={i} className="flex-1 h-full border-r border-slate-50/50 last:border-0" />
                             ))}
