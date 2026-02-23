@@ -97,17 +97,35 @@ const styles = StyleSheet.create({
   },
 });
 
+const DATA_ESPECIALISTAS: Record<string, { cedulas: string[], especialidadOficial: string }> = {
+  "Alejandra Méndez Pérez": { especialidadOficial: "Medicina Interna", cedulas: ["Cédula Profesional: 3838314 | Esp: Médico Cirujano", "Cédula Profesional: 5052492 | Esp: Medicina Interna"] },
+  "Lina Estrella Martínez Guevara": { especialidadOficial: "Ortopedia", cedulas: ["Cédula Profesional: 8007598 | Esp: Médico Cirujano", "Cédula Profesional: 10738876 | Esp: Ortopedia"] },
+  "Manuel Alejandro López Flores A la Torre": { especialidadOficial: "Médico Cirujano", cedulas: ["Cédula Profesional: 12026965 | Esp: Médico Cirujano"] },
+  "Marco Eduardo Ramírez Jiménez": { especialidadOficial: "Psiquiatría", cedulas: ["Cédula Profesional: 9148937 | Esp: Médico Cirujano", "Cédula Profesional: 11981080 | Esp: Psiquiatría"] },
+  "Antonio Jordan Ríos": { especialidadOficial: "Cardiología", cedulas: ["Cédula Profesional: 8562820 | Esp: Médico Cirujano", "Cédula Profesional: 11677778 | Esp: Cardiología"] },
+  "Gabriel Alejandro Pérez Ruíz": { especialidadOficial: "Psicología", cedulas: ["Cédula Profesional: 13649233 | Esp: Psicología"] },
+  "María Leticia Pérez Escamilla": { especialidadOficial: "Nutrición", cedulas: ["Cédula Profesional: 13506784 | Esp: Nutrición"] },
+  "José Javier Jiménez": { especialidadOficial: "Terapia Física", cedulas: ["Cédula Profesional: 13230515 | Esp: Terapia Física"] },
+  "Arturo Mayoral Zavala": { especialidadOficial: "Gastroenterología", cedulas: ["Cédula Profesional: 3309514 | Esp: Médico Cirujano", "Cédula Profesional: 5259196 | Esp: Gastroenterología"] },
+  "Verónica Marcela Muñoz Torrico": { especialidadOficial: "Neumología", cedulas: ["Cédula Profesional: 5088520 | Esp: Médico Cirujano", "Cédula Profesional: 5295381 | Esp: Medicina Interna", "Cédula Profesional: 6384371 | Esp: Neumología"] },
+};
+
 interface ReciboProps {
   folio: string;
   fecha: string;
   paciente: string;
   servicio: string;
   especialidad?: string;
+  especialista?: string; // <--- Nueva propiedad
   monto: string;
   metodo?: string;
 }
 
-export default function ReciboPagoPDF({ folio, fecha, paciente, servicio, especialidad, monto, metodo }: ReciboProps) {
+export default function ReciboPagoPDF({ folio, fecha, paciente, servicio, especialidad, especialista, monto, metodo }: ReciboProps) {
+  // Buscamos si el especialista tiene cédulas registradas
+  const infoEspecialista = especialista ? DATA_ESPECIALISTAS[especialista] : null;
+  const cedulas = infoEspecialista?.cedulas;
+  const especialidadDeSheet = infoEspecialista?.especialidadOficial;
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
@@ -143,9 +161,8 @@ export default function ReciboPagoPDF({ folio, fecha, paciente, servicio, especi
           
           <View style={styles.row}>
             <Text style={styles.label}>Por concepto de:</Text>
-            {/* 👈 2. Lógica de Prioridad: Si hay especialidad, úsala. Si no, usa el servicio. */}
             <Text style={styles.value}>
-              {especialidad ? especialidad.toUpperCase() : servicio}
+              {(especialidadDeSheet || especialidad || servicio).toUpperCase()}
             </Text>
           </View>
 
@@ -155,13 +172,27 @@ export default function ReciboPagoPDF({ folio, fecha, paciente, servicio, especi
           </View>
         </View>
 
-        {/* Total */}
+        {/* Total con Símbolo de Moneda */}
         <View style={styles.totalBlock}>
           <Text style={styles.totalLabel}>TOTAL:</Text>
-          <Text style={styles.totalValue}>{monto}</Text>
+          <Text style={styles.totalValue}>${monto}</Text>
         </View>
 
-        {/* Pie de página */}
+        {/* Sección Quirúrgica: Datos del Especialista */}
+        {cedulas && (
+          <View style={{ marginTop: 40, marginHorizontal: 20, borderTopWidth: 1, borderTopColor: '#111827', paddingTop: 10 }}>
+            <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#1e40af', marginBottom: 4 }}>
+              {especialista?.toUpperCase()}
+            </Text>
+            {cedulas.map((linea, index) => (
+              <Text key={index} style={{ fontSize: 8, color: '#374151', marginBottom: 2 }}>
+                {linea}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {/* Pie de página Legal */}
         <View style={styles.footer}>
           <Text>Este documento es un comprobante de pago interno. Si requiere factura fiscal, favor de solicitarla el mismo mes de su consulta.</Text>
           <Text style={{ marginTop: 4 }}>SANSCE Teléfono 55 1512 6008</Text>

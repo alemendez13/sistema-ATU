@@ -303,6 +303,7 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
                                                         fecha: pago.fecha?.seconds ? new Date(pago.fecha.seconds * 1000).toLocaleDateString() : new Date().toLocaleDateString(),
                                                         paciente: datos.nombreCompleto,
                                                         servicio: pago.servicioNombre,
+                                                        especialista: pago.doctorNombre || undefined,
                                                         monto: String(pago.monto),
                                                         metodo: pago.metodoPago || "Efectivo"
                                                     }} 

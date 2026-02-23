@@ -10,6 +10,7 @@ interface BotonProps {
     paciente: string;
     servicio: string;
     especialidad?: string; 
+    especialista?: string; // 👈 Conexión con la base de cédulas profesionales
     monto: string;
     metodo?: string;
   }
