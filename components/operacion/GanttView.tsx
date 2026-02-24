@@ -34,24 +34,27 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
 
   const toggleProject = (name: string) => setExpandedProjects(prev => prev.includes(name) ? prev.filter(p => p !== name) : [...prev, name]);
   return (
-    <div className="bg-white rounded-xl shadow-md p-6 border-t-4 border-green-500 overflow-x-auto">
-      <h2 className="text-lg font-bold text-slate-800 mb-6 uppercase tracking-tight">
-        Cronograma Maestro de Actividades
-      </h2>
+    <div className="bg-white rounded-xl shadow-md border-t-4 border-green-500">
+      <div className="p-6 pb-0">
+        <h2 className="text-lg font-bold text-slate-800 mb-6 uppercase tracking-tight">
+          Cronograma Maestro de Actividades
+        </h2>
+      </div>
       
-      <div className="min-w-[850px]">
-        {/* CABECERA DE MESES (13 Columnas: 1 Título + 12 Meses) */}
-        <div className="grid grid-cols-[280px_repeat(12,1fr)] gap-px bg-slate-200 border-b border-slate-200 text-[10px] font-bold text-slate-500 text-center uppercase">
-          <div className="bg-slate-50 p-3 text-left border-r border-slate-200">Tipo de Actividad / Proyecto</div>
-          {['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'].map(mes => (
-            <div key={mes} className="bg-slate-50 p-3 flex items-center justify-center border-l border-slate-100">
-              {mes}
-            </div>
-          ))}
-        </div>
+      <div className="px-6 pb-6 relative">
+        <div className="min-w-[1000px] flex flex-col">
+          {/* CABECERA DE MESES (Inmovilizada debajo del Navbar) */}
+          <div className="grid grid-cols-[280px_repeat(12,1fr)] gap-px bg-white border-b-2 border-slate-300 text-[10px] font-bold text-slate-500 text-center uppercase sticky top-[80px] z-[50] shadow-xl -mx-6 px-6">
+            <div className="bg-slate-50 p-3 text-left border-r border-slate-200">Tipo de Actividad / Proyecto</div>
+            {['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'].map(mes => (
+              <div key={mes} className="bg-slate-50 p-3 flex items-center justify-center border-l border-slate-100">
+                {mes}
+              </div>
+            ))}
+          </div>
 
-        {/* CUERPO DEL GANTT AGRUPADO POR PROYECTO */}
-        <div className="divide-y divide-slate-200 border-x border-b border-slate-200">
+          {/* CUERPO DEL GANTT (Ahora comparte el mismo padre largo que la cabecera) */}
+          <div className="divide-y divide-slate-200 border-x border-b border-slate-200 bg-white"></div>
             {(!hitos || hitos.length === 0) ? (
               <div className="p-10 text-center text-slate-400 text-xs italic">
                 No hay actividades programadas en el cronograma.
