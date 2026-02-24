@@ -29,6 +29,9 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
   const [rescheduleName, setRescheduleName] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  // ✨ ESTADO SANSCE: Registra la tarea recién movida para activarle el destello
+  const [lastMovedId, setLastMovedId] = React.useState<string | null>(null);
+
   const toggleProject = (name: string) => setExpandedProjects(prev => prev.includes(name) ? prev.filter(p => p !== name) : [...prev, name]);
   return (
     <div className="bg-white rounded-xl shadow-md p-6 border-t-4 border-green-500 overflow-x-auto">
@@ -91,10 +94,22 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                   colorStatus = "text-red-700 bg-red-50";
                 }
 
-                const fechasInicio = hitosDelProyecto.map(h => new Date(h['Fecha Inicio']).getTime()).filter(t => !isNaN(t));
-                const fechasFin = hitosDelProyecto.map(h => new Date(h['Fecha Fin']).getTime()).filter(t => !isNaN(t));
-                const minFecha = fechasInicio.length ? new Date(Math.min(...fechasInicio)).toLocaleDateString() : 'N/A';
-                const maxFecha = fechasFin.length ? new Date(Math.max(...fechasFin)).toLocaleDateString() : 'N/A';
+                // 🛠️ TRADUCTOR UNIVERSAL SANSCE: Convierte texto "DD/MM/AAAA" a fecha real para el sistema
+                const parseSanceDate = (dStr: string) => {
+                  if (!dStr || typeof dStr !== 'string') return new Date();
+                  if (dStr.includes('-')) return new Date(dStr); // Si ya viene en formato sistema (AAAA-MM-DD)
+                  const [d, m, a] = dStr.split('/').map(n => parseInt(n));
+                  return new Date(a, m - 1, d); // Crea la fecha entendible por el navegador
+                };
+
+                const fechasInicio = hitosDelProyecto.map(h => parseSanceDate(h['Fecha Inicio']).getTime()).filter(t => !isNaN(t));
+                const fechasFin = hitosDelProyecto.map(h => parseSanceDate(h['Fecha Fin']).getTime()).filter(t => !isNaN(t));
+                
+                const minFecha = fechasInicio.length ? 
+                  ((d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`)(new Date(Math.min(...fechasInicio))) : 'N/A';
+                
+                const maxFecha = fechasFin.length ? 
+                  ((d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`)(new Date(Math.max(...fechasFin))) : 'N/A';
 
                 return (
                   <div 
@@ -117,7 +132,10 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                         if (confirmar) {
                           const result = await moveTaskAction(taskId, proyecto);
                           if (result.success) {
-                            router.refresh(); // ⚡ Actualiza el Gantt al instante
+                            setLastMovedId(taskId); // Activamos el destello para esta tarea
+                            router.refresh(); 
+                            // El destello se apaga solo tras 3 segundos para no cansar la vista
+                            setTimeout(() => setLastMovedId(null), 3000);
                           } else {
                             alert("Error técnico en el trasplante: " + result.error);
                           }
@@ -253,10 +271,28 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                       const tPosIzquierda = ((tDiaInicio - 1) / 365) * 100;
                       const tAnchoBarra = ((tDiaFin - tDiaInicio + 1) / 365) * 100;
 
-                      // 🚦 Lógica de Semáforo Único
+                      // 🚦 SEMÁFORO PREVENTIVO SANSCE OS v3.0 (Sincronizado)
+                      const parseSanceDate = (dStr: string) => {
+                        if (!dStr || typeof dStr !== 'string') return new Date();
+                        if (dStr.includes('-')) return new Date(dStr);
+                        const [d, m, a] = dStr.split('/').map(n => parseInt(n));
+                        return new Date(a, m - 1, d);
+                      };
+
                       const isRealizada = tarea.Estado === 'Realizada';
-                      const isAtrasada = !isRealizada && new Date(tarea.FechaEntrega) < hoy;
-                      const statusColor = isRealizada ? '#10b981' : isAtrasada ? '#ef4444' : '#f59e0b';
+                      const fechaEntrega = parseSanceDate(tarea.FechaEntrega); // ✅ Traducción activada
+                      const diffHoras = (fechaEntrega.getTime() - hoy.getTime()) / (1000 * 3600);
+
+                      let statusColor = '#3b82f6'; // Azul: Programada
+                      let statusText = "Programada"; // 🆕 Variable para el texto del globo informativo
+
+                      if (isRealizada) {
+                        statusColor = '#10b981'; statusText = "Realizada";
+                      } else if (diffHoras < 0) {
+                        statusColor = '#ef4444'; statusText = "Atrasada";
+                      } else if (diffHoras <= 48) {
+                        statusColor = '#f97316'; statusText = "Urgente (<48h)";
+                      }
 
                       return (
                           <div 
@@ -269,7 +305,7 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                             onDragEnd={(e) => {
                               e.currentTarget.style.opacity = "1"; // Restauramos la visibilidad al soltar
                             }}
-                            className={`grid grid-cols-[280px_repeat(12,1fr)] items-stretch bg-slate-50/30 border-b border-slate-50 group/task hover:bg-slate-100/50 transition-colors ${!isRealizada ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                            className={`grid grid-cols-[280px_repeat(12,1fr)] items-stretch border-b border-slate-50 group/task hover:bg-slate-100/50 transition-all duration-700 ${lastMovedId === tarea.ID_Tarea ? 'bg-blue-200 ring-2 ring-blue-500 ring-inset shadow-lg' : 'bg-slate-50/30'} ${!isRealizada ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                           >
                           {/* COLUMNA 1: DESCRIPCIÓN + SEMÁFORO INTERACTIVO */}
                           <div className="p-3 pl-8 border-r border-slate-100 relative flex gap-3 items-start">
@@ -280,7 +316,7 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                               onClick={() => !isRealizada && updateTaskStatusAction(tarea.ID_Tarea, 'Realizada').then(() => router.refresh())}
                               className={`mt-1 w-3 h-3 rounded-full flex-shrink-0 border transition-transform hover:scale-125 shadow-sm`}
                               style={{ backgroundColor: statusColor, borderColor: 'rgba(0,0,0,0.1)' }}
-                              title={isRealizada ? "Tarea Realizada" : isAtrasada ? "Tarea Atrasada - Clic para completar" : "Tarea Programada - Clic para completar"}
+                              title={`Estado: ${statusText} - Clic para completar`}
                             />
 
                             <div className="flex-1 min-w-0">
@@ -313,6 +349,91 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                   </React.Fragment>
                 );
               })}
+
+              {/* --- CAPA 4: CONTENEDOR DE TAREAS GENERALES (Fuera del ciclo de Hitos) --- */}
+              {expandedProjects.includes(proyecto) && (() => {
+                const idsHitosReales = hitosDelProyecto.map(h => h.ID_Hito);
+                const tareasSinHito = tasks.filter(t => 
+                  t.Proyecto === proyecto && 
+                  (!t.ID_Hito || t.ID_Hito === 'Gral' || !idsHitosReales.includes(t.ID_Hito))
+                );
+
+                if (tareasSinHito.length === 0) return null;
+
+                return (
+                  <div className="bg-slate-50/80 border-t border-blue-200">
+                    <div className="px-4 py-2 bg-blue-50/50 flex items-center gap-2">
+                      <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">
+                        📥 Tareas por Clasificar / Generales ({tareasSinHito.length})
+                      </span>
+                    </div>
+                    {tareasSinHito.map((tarea: any) => {
+                      // 🚦 SEMÁFORO PREVENTIVO SANSCE OS v3.0 (Sincronizado)
+                      const parseSanceDate = (dStr: string) => {
+                        if (!dStr || typeof dStr !== 'string') return new Date();
+                        if (dStr.includes('-')) return new Date(dStr);
+                        const [d, m, a] = dStr.split('/').map(n => parseInt(n));
+                        return new Date(a, m - 1, d);
+                      };
+
+                      const isRealizada = tarea.Estado === 'Realizada';
+                      const fechaEntrega = parseSanceDate(tarea.FechaEntrega); // ✅ Traducción activada
+                      const diffHoras = (fechaEntrega.getTime() - hoy.getTime()) / (1000 * 3600);
+
+                      let statusColor = '#3b82f6'; // Azul: Con tiempo
+                      let statusText = "Programada";
+
+                      if (isRealizada) {
+                        statusColor = '#10b981'; // Verde: Realizada
+                        statusText = "Realizada";
+                      } else if (diffHoras < 0) {
+                        statusColor = '#ef4444'; // Rojo: Vencida
+                        statusText = "Atrasada";
+                      } else if (diffHoras <= 48) {
+                        statusColor = '#f97316'; // Naranja: Urgente (<48h)
+                        statusText = "Urgente";
+                      }
+
+                      return (
+                          <div 
+                            key={tarea.ID_Tarea} 
+                            draggable={!isRealizada}
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("taskId", tarea.ID_Tarea);
+                              e.currentTarget.style.opacity = "0.4";
+                            }}
+                            onDragEnd={(e) => {
+                              e.currentTarget.style.opacity = "1";
+                            }}
+                            className={`grid grid-cols-[280px_repeat(12,1fr)] items-stretch border-b border-slate-50 group/task hover:bg-slate-100/50 transition-all duration-700 ${lastMovedId === tarea.ID_Tarea ? 'bg-blue-200 ring-2 ring-blue-500 ring-inset shadow-lg' : 'bg-slate-50/30'} ${!isRealizada ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                          >
+                          <div className="p-3 pl-8 border-r border-slate-100 relative flex gap-3 items-start">
+                            <div className="absolute left-4 top-0 bottom-0 w-px bg-slate-200"></div>
+                            
+                            <button 
+                              onClick={() => !isRealizada && updateTaskStatusAction(tarea.ID_Tarea, 'Realizada').then(() => router.refresh())}
+                              className={`mt-1 w-3 h-3 rounded-full flex-shrink-0 border transition-transform hover:scale-125 shadow-sm`}
+                              style={{ backgroundColor: statusColor, borderColor: 'rgba(0,0,0,0.1)' }}
+                              title={`Estado: ${statusText} - Clic para completar`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[10px] text-slate-600 font-bold leading-tight">{tarea.Descripcion}</p>
+                              <p className="text-[8px] text-blue-500 uppercase font-black mt-1">Hito: {tarea.ID_Hito}</p>
+                            </div>
+                          </div>
+                          <div className="relative col-span-12 h-10 flex items-center px-1">
+                            <div className="absolute h-1 w-full bg-blue-100/30"></div>
+                            <div 
+                              className="absolute h-3 rounded-full opacity-60"
+                              style={{ left: '0%', width: '100%', backgroundColor: statusColor }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>
