@@ -406,6 +406,13 @@ export async function saveMinutaCompletaAction(datosMinuta: {
             });
         }
 
+        // 🛡️ REGLA DE ORO SANSCE: Sincronización de 3 capas
+        // Notificamos que la Minuta, las Tareas y el Cronograma han cambiado
+        const { revalidateTag } = await import('next/cache');
+        revalidateTag('op-minutas-v1');
+        revalidateTag('op-tareas-v1');
+        revalidateTag('op-cronograma-v1');
+
         return { success: true, message: "Minuta y Tareas vinculadas correctamente" };
     } catch (error: any) {
         console.error("❌ Error en Trazabilidad de Minuta:", error);
