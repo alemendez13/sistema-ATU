@@ -644,3 +644,49 @@ export async function saveSingleTaskAction(formData: FormData) {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * 🚀 ACCIÓN: TRASPLANTE DE TAREA ENTRE PROYECTOS
+ * Mueve una tarea de un proyecto a otro, asegurando la integridad del hito.
+ */
+export async function moveTaskAction(idTarea: string, nuevoProyecto: string) {
+  try {
+    const { GoogleSpreadsheet } = await import('google-spreadsheet');
+    const { JWT } = await import('google-auth-library');
+    const { revalidateTag } = await import('next/cache');
+
+    const auth = new JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+    await doc.loadInfo();
+
+    const sheet = doc.sheetsByTitle['OPERACION_TAREAS'];
+    const rows = await sheet.getRows();
+    
+    // 🔍 BÚSQUEDA QUIRÚRGICA: Localizamos la tarea por su ID único
+    const row = rows.find(r => r.get('ID_Tarea') === idTarea);
+
+    if (!row) throw new Error("La tarea no existe o fue eliminada previamente.");
+
+    // 🛡️ REGLA DE INTEGRIDAD SANSCE OS:
+    // 1. Cambiamos el Proyecto al destino seleccionado.
+    // 2. Reseteamos el ID_Hito a 'Gral'. Esto es vital porque el hito original
+    //    no existe en el nuevo proyecto. Así evitamos que la tarea desaparezca del radar.
+    row.set('Proyecto', nuevoProyecto);
+    row.set('ID_Hito', 'Gral'); 
+
+    await row.save();
+
+    // ⚡ SINCRONIZACIÓN: Forzamos al sistema a refrescar los datos del Cronograma
+    revalidateTag('op-tareas-v1');
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("❌ Error en el trasplante de tarea:", error);
+    return { success: false, error: error.message };
+  }
+}
