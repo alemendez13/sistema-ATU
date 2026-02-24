@@ -378,26 +378,33 @@ export async function saveMinutaCompletaAction(datosMinuta: {
         const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
         await doc.loadInfo();
 
-        // 1. Guardar el Acta en OPERACION_MINUTAS
+        // 🛠️ FORMATEADOR SANSCE (Garantiza DD/MM/AAAA)
+        const toSanceDate = (d: any) => {
+            const s = String(d);
+            if (!s || !s.includes('-')) return s;
+            const [y, m, day] = s.split('-');
+            return `${day}/${m}/${y}`;
+        };
+
+        // 1. Guardar el Acta en OPERACION_MINUTAS con fecha blindada
         const sheetMinutas = doc.sheetsByTitle['OPERACION_MINUTAS'];
         await sheetMinutas.addRow({
-            Fecha: datosMinuta.fecha,
+            Fecha: toSanceDate(datosMinuta.fecha),
             Moderador: datosMinuta.moderador,
             Temas: datosMinuta.temas,
             Asistentes: datosMinuta.asistentes,
             Conclusiones: datosMinuta.conclusiones
         });
 
-        // 2. Desglosar Tareas en OPERACION_TAREAS
+        // 2. Desglosar Tareas con fechas blindadas
         const sheetTareas = doc.sheetsByTitle['OPERACION_TAREAS'];
         for (const tarea of datosMinuta.compromisos) {
             await sheetTareas.addRow({
-                // Si la tarea ya trae un ID de la interfaz, lo usamos; si no, creamos uno nuevo con nuestra utilería.
                 ID_Tarea: (tarea as any).idTarea || generateTaskId(),
                 Descripcion: tarea.descripcion,
                 EmailAsignado: tarea.responsable,
-                FechaInicio: tarea.fechaInicio,     // ✅ Trazabilidad Activa
-                FechaEntrega: tarea.fechaEntrega,   // ✅ Trazabilidad Activa
+                FechaInicio: toSanceDate(tarea.fechaInicio),
+                FechaEntrega: toSanceDate(tarea.fechaEntrega),
                 Estado: 'Pendiente',
                 ID_Hito: tarea.idHito || 'Gral',
                 Area: tarea.area,
@@ -526,13 +533,21 @@ export async function saveHitoAction(formData: FormData) {
 
     const sheet = doc.sheetsByTitle['OPERACION_CRONOGRAMA'];
     
+    // 🛠️ FORMATEADOR SANSCE
+    const toSanceDate = (d: any) => {
+      const s = String(d);
+      if (!s || !s.includes('-')) return s;
+      const [y, m, day] = s.split('-');
+      return `${day}/${m}/${y}`;
+    };
+
     // Captura de trazabilidad completa: Proyecto -> Actividad -> Area -> Responsable
     await sheet.addRow({
       ID_Hito: `HITO-${Date.now()}`,
-      'Nombre de la Actividad': String(formData.get('nombre_hito') ?? ''), // 🚀 Sincronizado con Google Sheets
+      'Nombre de la Actividad': String(formData.get('nombre_hito') ?? ''), 
       'Responsable': String(formData.get('responsable') ?? ''),
-      'Fecha Inicio': String(formData.get('fecha_inicio') ?? ''),
-      'Fecha Fin': String(formData.get('fecha_fin') ?? ''),
+      'Fecha Inicio': toSanceDate(formData.get('fecha_inicio')),
+      'Fecha Fin': toSanceDate(formData.get('fecha_fin')),
       'Estado': 'Pendiente',
       'Area': String(formData.get('area_responsable') ?? 'General'),
       'Proyecto': String(formData.get('pc_impactado') ?? ''),
@@ -582,7 +597,9 @@ export async function rescheduleHitoAction(idHito: string, nuevaFecha: string, m
     // 📝 HISTORIAL DE CAMBIOS:
     // Acumulamos el motivo de la reprogramación para auditoría
     const historialPrevio = row.get('Observaciones') || '';
-    const fechaHoy = new Date().toLocaleDateString();
+    // Estandarización SANSCE: Forzamos formato DD/MM/AAAA manual para evitar errores de hidratación y servidor
+    const d = new Date();
+    const fechaHoy = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     const nuevaNota = `[REPROG ${fechaHoy}]: Nueva fecha ${nuevaFecha} - Motivo: ${motivo}`;
     
     row.set('Fecha Fin', nuevaFecha);
@@ -621,13 +638,21 @@ export async function saveSingleTaskAction(formData: FormData) {
 
     const sheet = doc.sheetsByTitle['OPERACION_TAREAS'];
     
-    // Captura de datos con trazabilidad descendente
+    // 🛠️ FORMATEADOR SANSCE: Convierte YYYY-MM-DD (Navegador) a DD/MM/YYYY (Sheets)
+    const toSanceDate = (d: any) => {
+      const s = String(d);
+      if (!s || !s.includes('-')) return s; // Si ya está formateado o vacío, no toca nada
+      const [y, m, day] = s.split('-');
+      return `${day}/${m}/${y}`;
+    };
+
+    // Captura de datos con trazabilidad descendente y formato unificado
     await sheet.addRow({
       ID_Tarea: generateTaskId(),
       Descripcion: String(formData.get('descripcion') ?? ''),
       EmailAsignado: String(formData.get('responsable') ?? ''),
-      FechaInicio: String(formData.get('fecha_inicio') ?? ''),
-      FechaEntrega: String(formData.get('fecha_entrega') ?? ''),
+      FechaInicio: toSanceDate(formData.get('fecha_inicio')),
+      FechaEntrega: toSanceDate(formData.get('fecha_entrega')),
       Estado: 'Pendiente',
       ID_Hito: String(formData.get('id_hito') ?? ''),
       Area: String(formData.get('area') ?? 'General'),
