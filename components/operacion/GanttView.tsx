@@ -1,17 +1,19 @@
 "use client";
 
 import React from 'react';
-import { Plus } from 'lucide-react'; // 🆕 Importamos el ícono de suma
-import { rescheduleHitoAction, updateTaskStatusAction } from '@/lib/actions'; // 🆕 Importamos la actualización de tareas
+import { useRouter } from 'next/navigation'; // 🚀 Importación para actualización reactiva
+import { Plus } from 'lucide-react'; 
+import { rescheduleHitoAction, updateTaskStatusAction } from '@/lib/actions'; 
 
 interface GanttViewProps {
   hitos: any[];
   tasks?: any[];
   onAddActivity?: (projectName: string) => void;
-  onAddTask?: (projectName: string, hitoId: string) => void; // 🆕 Prop para crear tareas vinculadas
+  onAddTask?: (projectName: string, hitoId: string) => void; 
 }
 
 export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask }: GanttViewProps) {
+  const router = useRouter(); // ⚡ Iniciamos el controlador de sincronización
   const [expandedProjects, setExpandedProjects] = React.useState<string[]>([]);
   const [expandedHitos, setExpandedHitos] = React.useState<string[]>([]); 
   
@@ -233,7 +235,7 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                             
                             {/* Círculo Semáforo Único */}
                             <button 
-                              onClick={() => !isRealizada && updateTaskStatusAction(tarea.ID_Tarea, 'Realizada').then(() => window.location.reload())}
+                              onClick={() => !isRealizada && updateTaskStatusAction(tarea.ID_Tarea, 'Realizada').then(() => router.refresh())}
                               className={`mt-1 w-3 h-3 rounded-full flex-shrink-0 border transition-transform hover:scale-125 shadow-sm`}
                               style={{ backgroundColor: statusColor, borderColor: 'rgba(0,0,0,0.1)' }}
                               title={isRealizada ? "Tarea Realizada" : isAtrasada ? "Tarea Atrasada - Clic para completar" : "Tarea Programada - Clic para completar"}
@@ -291,7 +293,7 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
               const result = await rescheduleHitoAction(rescheduleId, nuevaFecha, motivo);
               if (result.success) {
                 setRescheduleId(null);
-                window.location.reload();
+                router.refresh(); // ⚡ Actualización inmediata del calendario
               } else {
                 alert("Error: " + result.error);
               }

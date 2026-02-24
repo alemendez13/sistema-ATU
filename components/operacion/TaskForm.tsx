@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation'; // 🚀 Conector de actualización silenciosa
 import { List, User, Calendar, Save, Loader2, Briefcase } from 'lucide-react';
 import { saveSingleTaskAction } from '@/lib/actions';
 
@@ -13,6 +14,7 @@ interface TaskFormProps {
 
 export default function TaskForm({ personal, onSuccess, defaultProject, defaultHitoId }: TaskFormProps) {
   const [loading, setLoading] = useState(false);
+  const router = useRouter(); // ⚡ Activamos el sincronizador
 
   async function clientAction(formData: FormData) {
     setLoading(true);
@@ -20,8 +22,8 @@ export default function TaskForm({ personal, onSuccess, defaultProject, defaultH
       const result = await saveSingleTaskAction(formData);
       if (result.success) {
         onSuccess();
-        // Recarga para sincronizar el Gantt y la Lista de Tareas
-        window.location.reload();
+        // Inyectamos los datos nuevos sin refrescar la página entera
+        router.refresh(); 
       } else {
         alert("Error: " + result.error);
       }

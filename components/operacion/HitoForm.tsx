@@ -1,17 +1,19 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation'; // 🚀 Importación para sincronización inteligente
 import { Calendar, User, Target, Save, Loader2, Briefcase } from 'lucide-react';
 import { saveHitoAction } from '@/lib/actions';
 
 interface HitoFormProps {
   personal: any[];
   onSuccess: () => void;
-  defaultProject?: string; // 🆕 Propiedad opcional para recibir el nombre del proyecto
+  defaultProject?: string; 
 }
 
 export default function HitoForm({ personal, onSuccess, defaultProject }: HitoFormProps) {
   const [loading, setLoading] = useState(false);
+  const router = useRouter(); // ⚡ Activamos el controlador de actualización
 
   async function clientAction(formData: FormData) {
     setLoading(true);
@@ -19,8 +21,8 @@ export default function HitoForm({ personal, onSuccess, defaultProject }: HitoFo
       const result = await saveHitoAction(formData);
       if (result.success) {
         onSuccess();
-        // Recargamos para que el GanttView tome los nuevos datos de la caché
-        window.location.reload();
+        // Sincronización instantánea sin parpadeo de pantalla
+        router.refresh(); 
       } else {
         alert("Error: " + result.error);
       }
