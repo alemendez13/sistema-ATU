@@ -49,14 +49,19 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
 
         {/* CUERPO DEL GANTT AGRUPADO POR PROYECTO */}
         <div className="divide-y divide-slate-200 border-x border-b border-slate-200">
-          {(Object.entries(
-            hitos.reduce((acc, hito) => {
-              const proy = hito.Proyecto || 'General';
-              if (!acc[proy]) acc[proy] = [];
-              acc[proy].push(hito);
-              return acc;
-            }, {} as Record<string, any[]>)
-          ) as [string, any[]][]).map(([proyecto, hitosDelProyecto]) => (
+            {(!hitos || hitos.length === 0) ? (
+              <div className="p-10 text-center text-slate-400 text-xs italic">
+                No hay actividades programadas en el cronograma.
+              </div>
+            ) : (Object.entries(
+              hitos.reduce((acc, hito) => {
+                if (!hito || !hito.Proyecto) return acc; // 🛡️ Salto de seguridad si el dato viene roto
+                const proy = hito.Proyecto || 'General';
+                if (!acc[proy]) acc[proy] = [];
+                acc[proy].push(hito);
+                return acc;
+              }, {} as Record<string, any[]>)
+            ) as [string, any[]][]).map(([proyecto, hitosDelProyecto]) => (
             <div key={proyecto} className="bg-slate-50/50">
               {/* Encabezado de Proyecto Interactivo (Metadatos) */}
               {(() => {
