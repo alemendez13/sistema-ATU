@@ -18,7 +18,7 @@ export default function TaskBoardClient({
   initialHitos: any[],
   personal: any[] 
 }) {
-  const [view, setView] = useState<'lista' | 'cronograma'>('lista');
+  const [view, setView] = useState<'lista' | 'cronograma'>('cronograma'); // 🕒 Prioridad Estratégica: El sistema inicia siempre en el Gantt
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'minuta' | 'hito' | 'tarea'>('minuta');
