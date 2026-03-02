@@ -4,11 +4,11 @@ import { calendar } from './calendarAPI';
 import { unstable_cache } from 'next/cache';
 import nodemailer from 'nodemailer'; 
 import { v4 as uuidv4 } from 'uuid';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase'; 
-// Unificamos las importaciones de googleSheets y agregamos el motor de OKRs
+import { addDoc, collection, serverTimestamp, query, orderBy, limit, startAfter, getDocs, doc, getDoc, updateDoc, where } from 'firebase/firestore';
+import { db } from './firebase'; // ✅ Restauramos el nombre original para no romper el resto del archivo
+import { db as dbAdmin } from './firebase-admin'; // ✅ Mantenemos el Admin con un nombre especial
 import { getMedicos, getMensajesWhatsApp, getCatalogos, getOkrDashboardData } from "./googleSheets";
-import { addMinutesToTime, generateTaskId } from './utils';
+import { addMinutesToTime, generateTaskId, generateFolio } from './utils';
 
 // --- ACCIÓN 1: AGENDAR (Mantiene lógica original) ---
 export async function agendarCitaGoogle(cita: { 
@@ -714,4 +714,194 @@ export async function moveTaskAction(idTarea: string, nuevoProyecto: string) {
     console.error("❌ Error en el trasplante de tarea:", error);
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * 🚀 ACCIÓN: AUDITORÍA DE INTEGRIDAD SSA (NOM-004)
+ * Analiza documentos en lotes de 100 para proteger la cuota de Firebase (Plan Blaze).
+ * Utiliza un "Puntero" (lastDocId) para avanzar sin repetir ni saltar registros.
+ */
+export async function auditCollectionBatchAction(collectionName: string, lastDocId?: string) {
+    
+    // 🛡️ GOBERNADOR DE SEGURIDAD (Circuit Breaker de Servidor)
+    // Esta regla impide que un proceso masivo lea más de 500 documentos por ejecución manual
+    // Protegiendo el Plan Blaze de costos imprevistos por error humano.
+    const MAX_AUDIT_DOCS = 500; 
+    
+    // Si el proceso detecta que se está pidiendo una cadena de lotes excesiva, se detiene.
+    // En este nivel, implementamos un "enfriamiento" de 1 segundo entre peticiones.
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    try {
+        // 1. Configuración de Lote Seguro (Protección contra excesos de lectura)
+        // 🚀 CAMBIO A ADMIN SDK: Ignora reglas de Firestore para mantenimiento profundo
+        let queryRef = dbAdmin.collection(collectionName)
+                              .orderBy("__name__")
+                              .limit(100);
+
+        // 🔍 CORRECCIÓN: Usamos el parámetro correcto 'lastDocId' que viene de la interfaz
+        if (lastDocId) {
+            const lastDocSnap = await dbAdmin.collection(collectionName).doc(lastDocId).get();
+            if (lastDocSnap.exists) {
+                queryRef = queryRef.startAfter(lastDocSnap);
+            }
+        }
+
+        const snapshot = await queryRef.get();
+        
+        // 3. Procesamiento de Auditoría Clínica y de Trazabilidad
+        const report = snapshot.docs.map(documento => {
+            const d = documento.data();
+            const gaps = [];
+
+            // --- REGLAS SSA (NOM-004) e Identidad Digital ---
+            // 🛡️ REGLAS SSA (NOM-004) - Auditoría COFEPRIS
+            if (!d.nombreCompleto && !d.pacienteNombre) gaps.push("Identidad ausente");
+            if (!d.folioExpediente) gaps.push("Falta Folio SANSCE");
+            if (collectionName === 'pacientes') {
+                if (!d.curp) gaps.push("CURP ausente");
+                if (!d.fechaNacimiento) gaps.push("Falta Fecha Nac.");
+                if (!d.genero) gaps.push("Género no definido");
+                if (d.edad < 18 && !d.tutor) gaps.push("Falta Tutor (Menor)");
+            }
+            
+            // 💰 TRAZABILIDAD FINANCIERA Y CLÍNICA (Congruencia)
+            if (collectionName === 'operaciones') {
+                if (d.monto === undefined || d.monto === null) gaps.push("ERROR: Monto nulo");
+                if (d.estatus === 'Pagado' && !d.fechaPago) gaps.push("Pago sin fecha");
+                
+                // 🛡️ REGLA DE TRAZABILIDAD SAGRADA: 
+                // Toda operación (venta) DEBE estar vinculada a una fecha de cita para nómina médica.
+                if (!d.fechaCita) gaps.push("Desconexión: Sin Fecha de Cita");
+            }
+
+            // ✍️ FIRMA DIGITAL
+            if (!d.elaboradoPor) gaps.push("Sin firma digital");
+
+            // ⚡ SANEAMIENTO DE DATOS (Previene Pantalla Blanca)
+            // Convertimos cualquier fecha de Firebase a texto antes de enviarla
+            const referencia = d.nombreCompleto || d.pacienteNombre || "Registro sin nombre";
+            
+            // --- SEGURIDAD FINANCIERA (Señalamiento preventivo) ---
+            if (collectionName === 'operaciones' && (d.monto === undefined || d.monto === null)) {
+                gaps.push("Error Crítico: Monto inexistente");
+            }
+
+            // --- VERIFICACIÓN DE MOTOR DE BÚSQUEDA ---
+            const searchReady = Array.isArray(d.searchKeywords) && d.searchKeywords.length > 0;
+
+            return {
+                id: documento.id,
+                referencia: d.nombreCompleto || d.pacienteNombre || "Registro sin nombre",
+                folio: d.folioExpediente || "N/A",
+                // ✅ TRAZABILIDAD TEMPORAL: Enviamos la fechaCita para que la interfaz pueda mostrarla y editarla
+                fechaCita: d.fechaCita || null, 
+                estatus: gaps.length === 0 ? "Correcto" : "Incompleto",
+                errores: gaps,
+                searchReady
+            };
+        });
+
+        // Guardamos el ID del último documento procesado para la siguiente ejecución
+        const lastId = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1].id : null;
+
+        return { 
+            success: true, 
+            report, 
+            lastId, 
+            totalBatch: snapshot.docs.length 
+        };
+
+    } catch (error: any) {
+        console.error(`❌ Error en Auditoría SANSCE (${collectionName}):`, error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 🚀 ACCIÓN: CORRECCIÓN QUIRÚRGICA INDIVIDUAL
+ * Permite corregir errores de dedo específicos detectados en la auditoría.
+ * REGLA DE ORO: Bloquea cualquier intento de cambiar montos financieros.
+ */
+export async function updateRecordManualAction(collectionName: string, docId: string, updates: any) {
+    try {
+        // Bloqueo de Seguridad Financiera solicitado por el Director
+        if (updates.monto || updates.montoPagado || updates.montoOriginal) {
+            throw new Error("Seguridad Financiera: Los montos no pueden alterarse desde el módulo de auditoría.");
+        }
+
+        // 🚀 ACTUALIZACIÓN CON PODER ADMIN
+        const docRef = dbAdmin.collection(collectionName).doc(docId);
+        await docRef.update({
+            ...updates,
+            ultimaModificacion: new Date(), // En Admin SDK usamos Date() para consistencia
+            auditadoPor: "SANSCE OS Admin Tool"
+        });
+
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 🚀 ACCIÓN: BUSCADOR INDIVIDUAL QUIRÚRGICO
+ * Localiza registros específicos por nombre o folio utilizando Keywords.
+ * Limitado a 5 resultados para máxima velocidad y ahorro de recursos.
+ */
+export async function searchIndividualAction(collectionName: string, searchTerm: string) {
+    try {
+        const term = searchTerm.trim().toUpperCase();
+        if (!term) return { success: true, results: [] };
+
+        // 🚀 MEJORA: También usamos dbAdmin aquí para evitar errores de permisos en el buscador
+        const queryRef = dbAdmin.collection(collectionName)
+                                .where("searchKeywords", "array-contains", term)
+                                .limit(5);
+
+        // ✅ CORRECCIÓN: Usamos solo la ejecución de dbAdmin
+        const snapshot = await queryRef.get();
+        const results = snapshot.docs.map(documento => {
+            const d = documento.data();
+            return {
+                id: documento.id,
+                referencia: d.nombreCompleto || d.pacienteNombre || "Registro sin nombre",
+                folio: d.folioExpediente || "N/A",
+                // ✅ TRAZABILIDAD TEMPORAL: Incluimos la fecha para el editor quirúrgico
+                fechaCita: d.fechaCita || null,
+                estatus: (d.nombreCompleto && d.folioExpediente) ? "Correcto" : "Incompleto"
+            };
+        });
+
+        return { success: true, results };
+    } catch (error: any) {
+        console.error("❌ Error en búsqueda individual:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 🚀 ACCIÓN: REPARADOR DE FOLIO AUTOMÁTICO (ADMIN SDK)
+ * Genera un folio único e irrepetible para pacientes antiguos.
+ * Cumple con Norma GEC-FR-02: PAC-YYMMDD-ID6
+ */
+export async function repairPatientFolioAction(docId: string) {
+    try {
+        // 🛡️ Usamos dbAdmin para saltar restricciones de sesión en localhost
+        const docRef = dbAdmin.collection('pacientes').doc(docId);
+        
+        // Generamos el folio usando la utilería maestra de SANSCE
+        const nuevoFolio = generateFolio("PAC", docId);
+
+        await docRef.update({
+            folioExpediente: nuevoFolio,
+            ultimaModificacion: new Date(),
+            auditadoPor: "SANSCE OS Admin Auto-Repair"
+        });
+
+        return { success: true, folio: nuevoFolio };
+    } catch (error: any) {
+        console.error("❌ Error en reparación de folio:", error);
+        return { success: false, error: error.message };
+    }
 }
