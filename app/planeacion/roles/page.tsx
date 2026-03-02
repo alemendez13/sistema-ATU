@@ -1,3 +1,4 @@
+/* UBICACIÓN: app/planeacion/roles/page.tsx */
 export default function RolesPage() {
   return (
     <div className="space-y-6">

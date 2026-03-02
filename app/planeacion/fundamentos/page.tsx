@@ -1,3 +1,4 @@
+/* UBICACIÓN: app/planeacion/fundamentos/page.tsx */
 export default function FundamentosPage() {
   return (
     <div className="space-y-6">

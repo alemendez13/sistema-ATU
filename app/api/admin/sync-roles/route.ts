@@ -1,3 +1,4 @@
+/* app/api/admin/sync-roles/route.ts */
 import { NextResponse } from 'next/server';
 import { db, auth } from 'lib/firebase-admin'; 
 

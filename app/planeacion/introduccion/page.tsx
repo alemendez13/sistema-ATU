@@ -1,3 +1,4 @@
+/* UBICACIÓN: app/planeacion/introduccion/page.tsx */
 export default function IntroduccionPage() {
   return (
     <div className="space-y-6">

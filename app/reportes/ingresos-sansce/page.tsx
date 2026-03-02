@@ -451,7 +451,7 @@ export default function ReporteIngresosPage() {
               <div className="flex items-center gap-3 mb-4">
                 <span className="text-2xl">🦄</span>
                 <div>
-                  <h3 className="font-bold text-purple-900 text-lg">Regularización de Pagos (Recuperación)</h3>
+                  <h3 className="font-bold text-purple-900 text-lg">Regularización de cartera vencida (Recuperación)</h3>
                   <p className="text-sm text-purple-700">Pagos recibidos hoy correspondientes a citas de fechas pasadas.</p>
                 </div>
                 <div className="ml-auto text-right">

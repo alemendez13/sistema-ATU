@@ -41,7 +41,7 @@ export default function Sidebar() {
     { id: 10, name: "Agenda Médica", icon: <Calendar size={20} />, href: "/agenda", color: "text-blue-600" }, // ✨ Nuevo acceso directo
     { id: 11, name: "Directorio", icon: <FolderOpen size={20} />, href: "/pacientes", color: "text-emerald-600" }, // ✨ Nuevo acceso directo
     { id: 2, name: "Metas / Kpis", icon: <Target size={20} />, href: "/planeacion", color: "text-blue-600" },
-    { id: 3, name: "Sistema de gestión", icon: <GitBranch size={20} />, href: "/procesos", color: "text-purple-600" },
+    { id: 3, name: "Sistema de gestión", icon: <GitBranch size={20} />, href: "/configuracion/auditoria", color: "text-purple-600" },
     { id: 4, name: "Control Diario de Pacientes", icon: <HeartPulse size={20} />, href: "/pacientes", color: "text-red-600" },
     { id: 12, name: "Expediente Clínico", icon: <FileText size={20} />, href: "/expedientes", color: "text-indigo-600" }, // 🩺 Preparación Módulo
     { id: 5, name: "Recursos humanos", icon: <Users size={20} />, href: "/personal", color: "text-orange-600" },

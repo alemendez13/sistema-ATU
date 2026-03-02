@@ -1,3 +1,5 @@
+// app/operacion/minutas/page.tsx
+
 import { getMedicos } from "@/lib/googleSheets";
 import MinutaForm from "@/components/operacion/MinutaForm"; // Lo crearemos en el siguiente paso
 

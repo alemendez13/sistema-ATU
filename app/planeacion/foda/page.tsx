@@ -1,3 +1,4 @@
+/* UBICACIÓN: app/planeacion/foda/page.tsx */
 export default function FodaPage() {
   return (
     <div className="space-y-6">

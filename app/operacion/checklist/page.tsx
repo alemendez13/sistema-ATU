@@ -1,3 +1,4 @@
+// app/operacion/checklist/page.tsx
 import { getOperacionChecklist } from "@/lib/googleSheets";
 import { getDateId } from "@/lib/utils";
 import ChecklistDaily from "../../../components/operacion/ChecklistDaily";
