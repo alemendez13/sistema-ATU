@@ -1,3 +1,4 @@
+//components/operacion/HitoForm.tsx
 "use client";
 
 import React, { useState } from 'react';

@@ -1,3 +1,4 @@
+//components/operacion/ChecklistDaily.tsx
 "use client";
 
 import React, { useState, useMemo } from 'react';

@@ -1,3 +1,4 @@
+//lib/actions.ts
 "use server"; 
 
 import { calendar } from './calendarAPI';
@@ -396,21 +397,40 @@ export async function saveMinutaCompletaAction(datosMinuta: {
             Conclusiones: datosMinuta.conclusiones
         });
 
-        // 2. Desglosar Tareas con fechas blindadas
+        // 🛡️ GOBERNANZA SANSCE: Actualización o Creación de Tareas
         const sheetTareas = doc.sheetsByTitle['OPERACION_TAREAS'];
+        const rowsTareas = await sheetTareas.getRows();
+
         for (const tarea of datosMinuta.compromisos) {
-            await sheetTareas.addRow({
-                ID_Tarea: (tarea as any).idTarea || generateTaskId(),
+            const idBusqueda = (tarea as any).idTarea;
+            // 🔍 BUSCADOR QUIRÚRGICO: Intentamos localizar una tarea existente
+            const rowExistente = rowsTareas.find(r => r.get('ID_Tarea') === idBusqueda);
+
+            const dataToSave = {
+                ID_Tarea: idBusqueda || generateTaskId(),
                 Descripcion: tarea.descripcion,
                 EmailAsignado: tarea.responsable,
                 FechaInicio: toSanceDate(tarea.fechaInicio),
                 FechaEntrega: toSanceDate(tarea.fechaEntrega),
-                Estado: 'Pendiente',
+                Estado: (tarea as any).estado || 'Pendiente', // 🚦 Ahora acepta el estado desde la minuta
                 ID_Hito: tarea.idHito || 'Gral',
                 Area: tarea.area,
                 Proyecto: tarea.proyecto,
                 AsignadoPor: datosMinuta.moderador
-            });
+            };
+
+            if (rowExistente) {
+                // 📝 MODO EDICIÓN: Sobreescribimos la fila existente
+                Object.keys(dataToSave).forEach(key => {
+                    // 🛡️ VALIDACIÓN SANSCE: Aseguramos al sistema que la "llave" es válida para este objeto
+                    const valor = dataToSave[key as keyof typeof dataToSave];
+                    rowExistente.set(key, valor);
+                });
+                await rowExistente.save();
+            } else {
+                // 🆕 MODO CREACIÓN: Añadimos una nueva fila
+                await sheetTareas.addRow(dataToSave);
+            }
         }
 
         // 🛡️ REGLA DE ORO SANSCE: Sincronización de 3 capas

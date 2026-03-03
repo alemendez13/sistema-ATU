@@ -169,22 +169,10 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      {/* 🆕 BOTÓN DE AGREGAR RÁPIDO */}
-                      <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onAddActivity?.(proyecto);
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 text-white rounded-lg text-[10px] font-bold hover:bg-blue-700 transition-all shadow-sm active:scale-95"
-                        >
-                          <Plus size={12} /> + ACTIVIDAD
-                      </button>
 
                       <div className="text-[10px] font-bold text-slate-400 group-hover:text-blue-500 transition-colors">
                         {isExpanded ? 'Ocultar actividades' : `Ver ${hitosDelProyecto.length} actividades`}
                       </div>
-                    </div>
                   </div>
                 );
               })()}
@@ -238,18 +226,7 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                           <div className="flex items-center justify-between mt-2">
                             <p className="text-[9px] text-slate-500 font-medium">👤 {hito.Responsable}</p>
                             <div className="flex items-center gap-2">
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); onAddTask?.(proyecto, hito.ID_Hito); }}
-                                className="px-2 py-0.5 bg-slate-800 text-white rounded text-[8px] font-bold hover:bg-slate-700 transition-all active:scale-95 shadow-sm"
-                              >
-                                + TAREA
-                              </button>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); setRescheduleId(hito.ID_Hito); setRescheduleName(hito['Nombre de la Actividad'] || hito['Nombre del Hito']); }}
-                                className="p-1 bg-amber-50 text-amber-600 border border-amber-200 rounded hover:bg-amber-100 transition-all shadow-sm"
-                              >
-                                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3"><path d="M8 2v4M16 2v4M3 10h18M21 6a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6zM12 18l3-3m0 0l-3-3m3 3H9"/></svg>
-                              </button>
+                              {/* 🛡️ BLOQUEO SANSCE: Edición transferida a Minuta */}
                             </div>
                           </div>
                         </div>
@@ -315,12 +292,11 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                           <div className="p-3 pl-8 border-r border-slate-100 relative flex gap-3 items-start">
                             <div className="absolute left-4 top-0 bottom-0 w-px bg-slate-200"></div>
                             
-                            {/* Círculo Semáforo Único */}
-                            <button 
-                              onClick={() => !isRealizada && updateTaskStatusAction(tarea.ID_Tarea, 'Realizada').then(() => router.refresh())}
-                              className={`mt-1 w-3 h-3 rounded-full flex-shrink-0 border transition-transform hover:scale-125 shadow-sm`}
+                            {/* Semáforo Visual (Inerte) */}
+                            <div 
+                              className={`mt-1 w-3 h-3 rounded-full flex-shrink-0 border shadow-sm`}
                               style={{ backgroundColor: statusColor, borderColor: 'rgba(0,0,0,0.1)' }}
-                              title={`Estado: ${statusText} - Clic para completar`}
+                              title={`Estado actual: ${statusText}`}
                             />
 
                             <div className="flex-1 min-w-0">
@@ -443,47 +419,6 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
         </div>
       </div>
       {/* 🆕 MODAL QUIRÚRGICO DE REPROGRAMACIÓN */}
-      {rescheduleId && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-slate-200">
-            <h3 className="text-sm font-black text-slate-800 uppercase mb-4">Reprogramar Actividad</h3>
-            <p className="text-[10px] text-slate-500 mb-4 bg-slate-50 p-2 rounded">Actividad: <b className="text-slate-700">{rescheduleName}</b></p>
-            
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              setIsSubmitting(true);
-              const formData = new FormData(e.currentTarget);
-              // 🛡️ Conversión explícita a texto para satisfacer la seguridad de TypeScript
-              const nuevaFecha = String(formData.get('nueva_fecha') || '');
-              const motivo = String(formData.get('motivo') || '');
-              
-              const result = await rescheduleHitoAction(rescheduleId, nuevaFecha, motivo);
-              if (result.success) {
-                setRescheduleId(null);
-                router.refresh(); // ⚡ Actualización inmediata del calendario
-              } else {
-                alert("Error: " + result.error);
-              }
-              setIsSubmitting(false);
-            }} className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Nueva Fecha Compromiso</label>
-                <input name="nueva_fecha" type="date" required className="w-full p-3 bg-slate-50 border rounded-xl text-sm" />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Motivo del Cambio</label>
-                <textarea name="motivo" required placeholder="Ej: Retraso en entrega de insumos" className="w-full p-3 bg-slate-50 border rounded-xl text-sm h-20" />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setRescheduleId(null)} className="flex-1 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-all">Cancelar</button>
-                <button type="submit" disabled={isSubmitting} className="flex-1 py-2 bg-amber-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-amber-200 hover:bg-amber-700 disabled:opacity-50">
-                  {isSubmitting ? 'Guardando...' : 'Confirmar Cambio'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

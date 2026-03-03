@@ -1,3 +1,4 @@
+//components/operacion/TaskBoardClient.tsx
 "use client";
 
 import React, { useState } from 'react';
@@ -96,20 +97,12 @@ export default function TaskBoardClient({
           </div>
 
         <div className="flex gap-2">
-          {/* Botón Proyectos (Azul) */}
-          <button
-            onClick={() => { setModalMode('hito'); setIsModalOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-blue-700 transition-all active:scale-95"
-          >
-            <Plus size={18} /> Nuevo Proyecto / Tipo de Actividad
-          </button>
-
-          {/* Botón Minuta (Esmeralda) */}
+          {/* 🛡️ ACCESO ÚNICO SANSCE OS: Centralización en Minuta */}
           <button
             onClick={() => { setModalMode('minuta'); setIsModalOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-emerald-700 transition-all active:scale-95"
+            className="flex items-center gap-3 px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 border-b-4 border-emerald-800"
           >
-            <Plus size={18} /> Nueva Minuta
+            <Plus size={20} /> REGISTRAR ACUERDOS (MINUTA)
           </button>
 
           {/* 🆕 BOTÓN RADAR ESTRATÉGICO (Violeta) */}

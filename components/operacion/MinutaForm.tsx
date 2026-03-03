@@ -1,3 +1,4 @@
+//components/operacion/MinutaForm.tsx
 "use client";
 
 import React, { useState } from 'react';
@@ -61,12 +62,21 @@ export default function MinutaForm({ personal, hitos = [], tasks = [] }: { perso
 
   const handleTareaChange = (index: number, campo: string, valor: string) => {
     const nuevosCompromisos = [...compromisos];
-    nuevosCompromisos[index][campo] = valor;
+    
+    // 🛡️ REGLA DE LIMPIEZA SANSCE: Si cambiamos el proyecto, reseteamos la actividad y el área
+    if (campo === 'proyecto') {
+      nuevosCompromisos[index].proyecto = valor;
+      nuevosCompromisos[index].idHito = ""; // Borramos la actividad seleccionada anteriormente
+      nuevosCompromisos[index].area = "";   // Borramos el área previa
+    } else {
+      nuevosCompromisos[index][campo] = valor;
+    }
 
-    // 🔗 HERENCIA AUTOMÁTICA: Si seleccionamos un Hito, heredamos su Proyecto y Área
+    // 🔗 HERENCIA AUTOMÁTICA: Al seleccionar una Actividad, traemos sus metadatos
     if (campo === 'idHito' && valor !== "") {
       const hitoEncontrado = hitos.find(h => h.ID_Hito === valor);
       if (hitoEncontrado) {
+        // Reforzamos la vinculación correcta de Proyecto y Área
         nuevosCompromisos[index].proyecto = hitoEncontrado.Proyecto || 'General';
         nuevosCompromisos[index].area = hitoEncontrado.Area || 'General';
       }
@@ -159,19 +169,52 @@ export default function MinutaForm({ personal, hitos = [], tasks = [] }: { perso
           </select>
         </div>
 
-        {/* 🆕 CAMPO DE ASISTENTES (Para trazabilidad total) */}
-        <div className="md:col-span-2 space-y-2">
+        {/* 🛡️ SELECTOR MÚLTIPLE DE ASISTENTES SANSCE OS */}
+        <div className="md:col-span-2 space-y-3">
           <label className="text-xs font-bold uppercase text-slate-500 flex items-center gap-2">
             <User size={14} className="text-emerald-600" /> Lista de Asistentes a la Sesión
           </label>
-          <input
-            type="text"
-            name="asistentes"
-            value={datos.asistentes}
-            onChange={handleChange}
-            placeholder="Ej: Dr. Pérez, Lic. Méndez, Jaqueline B."
-            className="w-full rounded-lg border-slate-200 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-          />
+          
+          {/* Visualizador de Asistentes Seleccionados */}
+          <div className="flex flex-wrap gap-2 mb-2 p-3 bg-slate-50 rounded-xl min-h-[50px] border border-slate-100 shadow-inner">
+            {datos.asistentes.split(',').filter(n => n.trim() !== "").map((nombre, i) => (
+              <span key={i} className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-full text-[11px] font-black shadow-sm border border-emerald-200 animate-in zoom-in-50">
+                {nombre.trim()}
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    const nuevaLista = datos.asistentes.split(',').map(n => n.trim()).filter(n => n !== nombre.trim());
+                    setDatos({...datos, asistentes: nuevaLista.join(', ')});
+                  }} 
+                  className="hover:text-red-600 transition-colors"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </span>
+            ))}
+            {datos.asistentes === "" && <span className="text-[11px] text-slate-400 italic p-1">Usa la lista de abajo para añadir asistentes...</span>}
+          </div>
+
+          {/* Menú Desplegable de Selección */}
+          <select
+            className="w-full rounded-lg border-slate-200 shadow-sm focus:ring-emerald-500 focus:border-emerald-500 text-sm font-bold text-slate-700 bg-white cursor-pointer"
+            onChange={(e) => {
+              if (e.target.value === "") return;
+              const nombre = e.target.value;
+              const lista = datos.asistentes ? datos.asistentes.split(',').map(n => n.trim()) : [];
+              if (!lista.includes(nombre)) {
+                setDatos({ ...datos, asistentes: lista.length > 0 ? `${datos.asistentes}, ${nombre}` : nombre });
+              }
+              e.target.value = ""; // Reseteamos el selector tras añadir
+            }}
+          >
+            <option value="">+ Seleccionar personal de la lista...</option>
+            {personal.sort((a, b) => a.nombre.localeCompare(b.nombre)).map(p => (
+              <option key={p.id} value={p.nombre}>
+                {p.nombre} {p.email ? `— (${p.email.split('@')[0]})` : ''}
+              </option>
+            ))}
+          </select>
         </div>
       </section>
 
@@ -222,19 +265,22 @@ export default function MinutaForm({ personal, hitos = [], tasks = [] }: { perso
           ))}
         </div>
 
+        {/* SECCIÓN 4: CIERRE Y CONCLUSIONES */}
+      <section className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
         <div className="space-y-2">
           <label className="text-xs font-bold uppercase text-slate-500 flex items-center gap-2">
-            <ClipboardList size={14} /> Conclusiones Finales
+            <ClipboardList size={14} className="text-blue-600" /> Conclusiones Finales y Cierre de Sesión
           </label>
           <textarea
             name="conclusiones"
             rows={4}
             value={datos.conclusiones}
             onChange={handleChange}
-            placeholder="Registra los acuerdos definitivos..."
-            className="w-full rounded-lg border-slate-200 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Registra los acuerdos definitivos, resoluciones y puntos clave del cierre..."
+            className="w-full rounded-lg border-slate-200 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
           />
         </div>
+      </section>
       </section>
 
       {/* 🆕 SECCIÓN: SEGUIMIENTO INTELIGENTE (RADAR DE COMPROMISOS) */}
@@ -262,12 +308,18 @@ export default function MinutaForm({ personal, hitos = [], tasks = [] }: { perso
             <div 
               key={idx} 
               onClick={() => {
-                // Al hacer clic, se agrega automáticamente a la sección de compromisos para revisión
+                // 📡 CARGA QUIRÚRGICA: Mantiene ID original para permitir edición absoluta
                 if (!compromisos.find(c => c.idTarea === tarea.ID_Tarea)) {
                   setCompromisos([...compromisos, { 
-                    ...tarea, 
                     idTarea: tarea.ID_Tarea,
-                    descripcion: `REVISIÓN: ${tarea.Descripcion}` 
+                    descripcion: tarea.Descripcion, 
+                    responsable: tarea.EmailAsignado, 
+                    fechaInicio: tarea.FechaInicio, 
+                    fechaEntrega: tarea.FechaEntrega, 
+                    area: tarea.Area, 
+                    proyecto: tarea.Proyecto, 
+                    idHito: tarea.ID_Hito,
+                    estado: tarea.Estado || 'Pendiente'
                   }]);
                 }
               }}
@@ -313,11 +365,17 @@ export default function MinutaForm({ personal, hitos = [], tasks = [] }: { perso
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <input
+                  <textarea
                     placeholder="¿Qué se debe hacer?"
-                    className="w-full bg-transparent border-b border-slate-200 focus:border-blue-500 outline-none py-1 text-sm text-slate-800"
+                    className="w-full bg-transparent border-b border-slate-200 focus:border-blue-500 outline-none py-1 text-sm text-slate-800 resize-none overflow-hidden"
+                    rows={1}
                     value={tarea.descripcion}
-                    onChange={(e) => handleTareaChange(index, 'descripcion', e.target.value)}
+                    onChange={(e) => {
+                      handleTareaChange(index, 'descripcion', e.target.value);
+                      // ⚡ EFECTO ELÁSTICO: Ajusta la altura dinámicamente al escribir
+                      e.currentTarget.style.height = 'auto';
+                      e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px';
+                    }}
                   />
                 </div>
                 
@@ -333,19 +391,55 @@ export default function MinutaForm({ personal, hitos = [], tasks = [] }: { perso
                   </select>
                 </div>
 
+                {/* 🚦 SELECTOR DE ESTATUS (Gobernanza Minuta) */}
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Vincular a Tipo de Actividad / Proyecto</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Estado / Avance</label>
                   <select
-                    className="w-full bg-transparent text-sm outline-none text-blue-700 font-medium"
+                    className={`w-full bg-transparent text-sm font-black outline-none ${
+                      tarea.estado === 'Realizada' ? 'text-emerald-600' : 'text-blue-600'
+                    }`}
+                    value={tarea.estado || 'Pendiente'}
+                    onChange={(e) => handleTareaChange(index, 'estado', e.target.value)}
+                  >
+                    <option value="Pendiente">⚪ Pendiente</option>
+                    <option value="En Proceso">🔵 En Proceso</option>
+                    <option value="Realizada">🟢 Realizada (Finalizada)</option>
+                  </select>
+                </div>
+
+                {/* 📂 SELECCIÓN DE PROYECTO (FILTRO MADRE) */}
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Proyecto</label>
+                  <select
+                    className="w-full bg-transparent text-sm outline-none text-slate-700 font-bold"
+                    value={tarea.proyecto}
+                    onChange={(e) => handleTareaChange(index, 'proyecto', e.target.value)}
+                  >
+                    <option value="">Seleccionar Proyecto...</option>
+                    {Array.from(new Set(hitos.map(h => h.Proyecto))).filter(p => p).map(proj => (
+                      <option key={proj} value={proj}>{proj}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 🎯 SELECCIÓN DE ACTIVIDAD (FILTRADO POR PROYECTO) */}
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Tipo de Actividad</label>
+                  <select
+                    className="w-full bg-transparent text-sm outline-none text-blue-700 font-medium disabled:opacity-30"
                     value={tarea.idHito}
+                    disabled={!tarea.proyecto}
                     onChange={(e) => handleTareaChange(index, 'idHito', e.target.value)}
                   >
-                    <option value="">Opcional: Vincular a Actividad...</option>
-                    {hitos.map(h => (
-                      <option key={h.ID_Hito} value={h.ID_Hito}>
-                        [{h.Proyecto}] {h['Nombre del Hito']}
-                      </option>
-                    ))}
+                    <option value="">{tarea.proyecto ? "Vincular a Actividad..." : "Primero elige un proyecto"}</option>
+                    {hitos
+                      .filter(h => h.Proyecto === tarea.proyecto)
+                      .map(h => (
+                        <option key={h.ID_Hito} value={h.ID_Hito}>
+                          {h['Nombre de la Actividad'] || h['Nombre del Hito']}
+                        </option>
+                      ))
+                    }
                   </select>
                 </div>
 
