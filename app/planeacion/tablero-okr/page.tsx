@@ -7,11 +7,12 @@ interface UserData {
   email: string | null;
   uid: string;
 }
-import { fetchOkrDataAction } from "@/lib/actions"; // El puente que creamos
+import { fetchOkrDataAction, saveOkrElementAction } from "@/lib/actions"; // ➕ Importamos la nueva acción de guardado
 import Chart from 'chart.js/auto'; 
+import { AlertCircle, ArrowUp, RefreshCw, Target, ChevronDown, ChevronUp, User, Layers, Activity, X, Filter, Plus } from "lucide-react"; // ➕ Agregamos icono Plus
 import { Doughnut, Bar } from "react-chartjs-2";
-import { AlertCircle, ArrowUp, RefreshCw, Target, ChevronDown, ChevronUp, User, Layers, Activity, X, Filter } from "lucide-react";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/utils"; // 💰 Importamos el formateador de moneda SANSCE
 
 // 1. REGISTRO DE GRÁFICAS: En la versión 'auto', Chart.js se registra automáticamente al importar.
 
@@ -23,8 +24,10 @@ export default function TableroOkrPage() {
 
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
-  // Estado para el Modal de KPI (La "Burbuja")
+  // --- ESTADOS DE GESTIÓN DE METAS ---
   const [selectedKpi, setSelectedKpi] = useState<any>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false); // Controla el formulario
+  const [isSaving, setIsSaving] = useState(false); // Estado de carga al guardar
 
   // --- FILTROS INTELIGENTES ---
   const [filterResponsable, setFilterResponsable] = useState<string>('all');
@@ -150,9 +153,19 @@ export default function TableroOkrPage() {
       
       {/* --- BARRA DE HERRAMIENTAS Y FILTROS --- */}
       <div className="flex flex-col md:flex-row gap-4 justify-between items-end bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-         <div className="flex items-center gap-2 text-slate-500">
-            <Filter size={20} />
-            <span className="text-sm font-bold uppercase tracking-wider">Filtrar Tablero</span>
+         <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-slate-500">
+               <Filter size={18} />
+               <span className="text-xs font-bold uppercase tracking-widest">Herramientas de Gestión</span>
+            </div>
+            {/* BOTÓN PROFESIONAL DE CREACIÓN */}
+            <button 
+              onClick={() => setShowCreateModal(true)}
+              className="mt-2 flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 hover:scale-105 active:scale-95"
+            >
+              <Plus size={18} />
+              Establecer Meta / KPI
+            </button>
          </div>
          
          <div className="flex flex-wrap gap-3 w-full md:w-auto">
@@ -255,11 +268,26 @@ export default function TableroOkrPage() {
                           <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: obj.Color || '#cbd5e1' }}></div>
 
                           <div className="pl-2">
-                            <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-start justify-between mb-1">
                                <h4 className="text-xs font-bold text-slate-700 line-clamp-2 leading-tight pr-2" title={kpi.NombreKPI}>
                                  {kpi.NombreKPI}
                                </h4>
                                <Activity size={14} className="text-slate-300 group-hover:text-blue-500 shrink-0" />
+                            </div>
+                            
+                            {/* Muestra el valor/meta si es financiero o tiene valor */}
+                            <div className="mb-2">
+                               <span className="text-[10px] font-black text-emerald-600">
+                                 {kpi.EsFinanciero === 'TRUE' || kpi.EsFinanciero === true 
+                                   ? formatCurrency(kpi.latestValue) 
+                                   : kpi.latestValue}
+                               </span>
+                               <span className="text-[9px] text-slate-300 mx-1">/</span>
+                               <span className="text-[9px] font-medium text-slate-400">
+                                 {kpi.EsFinanciero === 'TRUE' || kpi.EsFinanciero === true 
+                                   ? formatCurrency(kpi.Meta_Anual) 
+                                   : kpi.Meta_Anual}
+                               </span>
                             </div>
                             
                             <div className="flex flex-wrap gap-2 items-center mt-2">
@@ -370,6 +398,12 @@ export default function TableroOkrPage() {
           </div>
         </div>
       )}
+      {/* MODAL DE CREACIÓN INTELIGENTE */}
+      <CreateElementModal 
+        isOpen={showCreateModal} 
+        onClose={() => setShowCreateModal(false)} 
+        data={data} 
+      />
     </div>
   );
 }
@@ -452,4 +486,130 @@ function getLevelBadgeStyle(tipo: string) {
   if (t.includes('estrat')) return "bg-purple-100 text-purple-700";
   if (t.includes('táctico') || t.includes('tactico')) return "bg-blue-100 text-blue-700";
   return "bg-slate-100 text-slate-600"; // Operativo o Default
+}
+
+// --- COMPONENTE: FORMULARIO INTELIGENTE DE METAS ---
+function CreateElementModal({ isOpen, onClose, data }: { isOpen: boolean, onClose: () => void, data: any[] }) {
+  const [type, setType] = useState<'OBJ' | 'KR' | 'KPI'>('KPI');
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<any>({
+    nombre: '', parentId: '', tipo: 'operativo', frecuencia: 'mensual', responsable: '', proceso: 'General', meta: '',
+    esFinanciero: false // 💰 Nuevo control financiero
+  });
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await saveOkrElementAction(type, formData);
+      if (res.success) {
+        toast.success(`${type} creado con éxito en SANSCE_CONFIG`);
+        onClose();
+        window.location.reload(); // Refresco suave para ver el cambio
+      } else {
+        toast.error("Error al guardar: " + res.error);
+      }
+    } catch (err) {
+      toast.error("Error de conexión");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-4 animate-in fade-in duration-300">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200">
+        <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2">
+            <Target className="text-blue-600" size={20} /> Establecer Nueva Estructura
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Selector de Tipo */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nivel de la Meta</label>
+            <div className="mt-1 grid grid-cols-3 gap-2">
+              {(['OBJ', 'KR', 'KPI'] as const).map((t) => (
+                <button
+                  key={t} type="button"
+                  onClick={() => setType(t)}
+                  className={`py-2 text-xs font-bold rounded-lg border transition-all ${type === t ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                >
+                  {t === 'OBJ' ? 'Objetivo' : t === 'KR' ? 'Resultado Clave' : 'KPI / Indicador'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Campo: Nombre */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nombre / Título</label>
+            <input 
+              required
+              className="mt-1 w-full rounded-lg border-slate-200 text-sm focus:ring-blue-500 focus:border-blue-500"
+              placeholder={`Ej: ${type === 'OBJ' ? 'Consolidar Crecimiento' : 'Aumentar Ventas'}`}
+              value={formData.nombre}
+              onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+            />
+          </div>
+
+          {/* Selector de Alineación Jerárquica */}
+          {type !== 'OBJ' && (
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {type === 'KR' ? 'Alineado al Objetivo' : 'Alineado al Resultado clave'}
+              </label>
+              <select 
+                required
+                className="mt-1 w-full rounded-lg border-slate-200 text-sm"
+                value={formData.parentId}
+                onChange={(e) => setFormData({...formData, parentId: e.target.value})}
+              >
+                <option value="">Seleccione el superior...</option>
+                {type === 'KR' 
+                  ? data.map(o => <option key={o.Objective_ID} value={o.Objective_ID}>{o.Nombre}</option>)
+                  : data.flatMap(o => o.ResultadosClave).map(kr => <option key={kr.KR_ID} value={kr.KR_ID}>{kr.Nombre_KR}</option>)
+                }
+              </select>
+            </div>
+          )}
+
+          {/* Campos Extra para KPI */}
+          {type === 'KPI' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Meta Anual</label>
+                <input 
+                  type="text" className="mt-1 w-full rounded-lg border-slate-200 text-sm"
+                  placeholder="Ej: 100000"
+                  value={formData.meta}
+                  onChange={(e) => setFormData({...formData, meta: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Responsable</label>
+                <input 
+                  required className="mt-1 w-full rounded-lg border-slate-200 text-sm"
+                  placeholder="Email o Nombre"
+                  value={formData.responsable}
+                  onChange={(e) => setFormData({...formData, responsable: e.target.value})}
+                />
+              </div>
+            </div>
+          )}
+
+          <button 
+            disabled={loading}
+            className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-xl hover:bg-black transition-all disabled:opacity-50"
+          >
+            {loading ? 'Sincronizando con Sheets...' : `Guardar ${type} en el Ecosistema`}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 }

@@ -2,7 +2,7 @@
 "use server"; 
 
 import { calendar } from './calendarAPI';
-import { unstable_cache } from 'next/cache';
+import { unstable_cache, revalidateTag, revalidatePath } from 'next/cache'; // 🚀 Herramientas promovidas al encabezado
 import nodemailer from 'nodemailer'; 
 import { v4 as uuidv4 } from 'uuid';
 import { addDoc, collection, serverTimestamp, query, orderBy, limit, startAfter, getDocs, doc, getDoc, updateDoc, where } from 'firebase/firestore';
@@ -922,6 +922,88 @@ export async function repairPatientFolioAction(docId: string) {
         return { success: true, folio: nuevoFolio };
     } catch (error: any) {
         console.error("❌ Error en reparación de folio:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 🚀 ACCIÓN: CREACIÓN DE ESTRUCTURA OKR (OBJ/KR/KPI)
+ * Inyecta nuevos elementos en Google Sheets manteniendo la jerarquía y trazabilidad.
+ */
+export async function saveOkrElementAction(type: 'OBJ' | 'KR' | 'KPI', data: any) {
+    try {
+        const { GoogleSpreadsheet } = await import('google-spreadsheet');
+        const { JWT } = await import('google-auth-library');
+
+        // 1. Configuración de Acceso Seguro
+        const auth = new JWT({
+            email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+            key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        });
+
+        const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+        await doc.loadInfo();
+
+        const sheetNames = {
+            'OBJ': 'Objetivos',
+            'KR': 'ResultadosClave',
+            'KPI': 'CatalogoKPIs'
+        };
+
+        const sheet = doc.sheetsByTitle[sheetNames[type]];
+        if (!sheet) throw new Error(`La pestaña "${sheetNames[type]}" no existe en el Sheets.`);
+
+        // 2. Generación de ID Automático (Mantiene el orden correlativo OBJ01, KR001, etc.)
+        const rows = await sheet.getRows();
+        const nextNum = rows.length + 1;
+        const padding = type === 'OBJ' ? 2 : 3; // OBJ01 vs KR001
+        const generatedId = `${type}${String(nextNum).padStart(padding, '0')}`;
+
+        let rowData = {};
+
+        // 3. Mapeo Quirúrgico según la pestaña
+        if (type === 'OBJ') {
+            rowData = {
+                Objective_ID: generatedId,
+                Nombre_Objetivo: data.nombre,
+                Color_Primario: data.color || '#3b82f6',
+                Color_Secundario: data.colorSecundario || '#dbeafe'
+            };
+        } else if (type === 'KR') {
+            rowData = {
+                KR_ID: generatedId,
+                Nombre_KR: data.nombre,
+                Objective_ID: data.parentId // Vinculación con su Objetivo padre
+            };
+        } else if (type === 'KPI') {
+            rowData = {
+                KPI_ID: generatedId,
+                NombreKPI: data.nombre,
+                Descripcion: data.descripcion || '',
+                Tipo: data.tipo || 'operativo',
+                Frecuencia: data.frecuencia || 'mensual',
+                EsFinanciero: data.esFinanciero ? 'TRUE' : 'FALSE',
+                Responsable: data.responsable,
+                MetodoAgregacion: data.metodo || 'ULTIMO_VALOR',
+                KR_ID: data.parentId, // Vinculación con su Resultado Clave padre
+                Proceso: data.proceso || 'General',
+                Meta_Anual: data.meta || '0'
+            };
+        }
+
+        // 4. Escritura y Refresco de Caché (Doble Refuerzo SANSCE)
+        await sheet.addRow(rowData);
+        
+        revalidateTag('okr-data-v1'); // 👈 Ya funciona porque lo pusimos en la línea 4 del archivo
+        revalidatePath('/planeacion/tablero-okr'); 
+        revalidatePath('/planeacion/tablero-okr', 'page'); 
+
+        return { success: true, id: generatedId };
+
+        return { success: true, id: generatedId };
+    } catch (error: any) {
+        console.error(`❌ Error en SANSCE OKR Engine (${type}):`, error);
         return { success: false, error: error.message };
     }
 }
