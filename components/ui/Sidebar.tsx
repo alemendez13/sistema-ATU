@@ -1,3 +1,4 @@
+// components/ui/Siderbar.tsx
 "use client";
 import Link from "next/link";
 import Image from "next/image"; // ✅ Agregado para el Logo
@@ -52,17 +53,12 @@ export default function Sidebar() {
 
   return (
     <aside 
+      onMouseEnter={() => setIsCollapsed(false)}
+      onMouseLeave={() => setIsCollapsed(true)}
       className={`fixed left-0 top-0 h-full bg-white border-r border-slate-200 z-50 flex flex-col shadow-xl transition-all duration-300 ease-in-out ${
         isCollapsed ? "w-20" : "w-64"
       }`}
     >
-      {/* Botón de Toggle (El "Gatillo" para ocultar) */}
-      <button 
-        onClick={toggleSidebar}
-        className="absolute -right-3 top-20 bg-white border border-slate-200 rounded-full p-1 shadow-sm hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all z-50"
-      >
-        {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-      </button>
 
       {/* LOGO SANSCE: Isotipo maximizado para impacto visual */}
       <div className="h-24 flex items-center justify-center border-b border-slate-50 overflow-hidden bg-white">

@@ -13,7 +13,7 @@ interface Personal {
 
 // Añadimos 'hitos' a las herramientas que recibe el formulario
 // 🆕 Agregamos 'tasks' a las herramientas que recibe el formulario
-export default function MinutaForm({ personal, hitos = [], tasks = [] }: { personal: Personal[], hitos?: any[], tasks?: any[] }) {
+export default function MinutaForm({ personal, hitos = [], tasks = [], history = [] }: { personal: Personal[], hitos?: any[], tasks?: any[], history?: any[] }) {
   // 1. Estados Maestros
   const [datos, setDatos] = useState({
     fecha: new Date().toISOString().split('T')[0],
@@ -22,14 +22,26 @@ export default function MinutaForm({ personal, hitos = [], tasks = [] }: { perso
     conclusiones: ''
   });
 
-  // 🆕 Estado para la Tabla de Orden del Día
+  // 🆕 Estados de Memoria Organizacional
+  const [minutaPrevia, setMinutaPrevia] = useState<any>(null);
+  const [verBurbuja, setVerBurbuja] = useState(false);
+
   const [puntosOrden, setPuntosOrden] = useState([{ punto: '', proyecto: '' }]);
   const [isSaving, setIsSaving] = useState(false);
   const [compromisos, setCompromisos] = useState<any[]>([]);
 
   // --- LÓGICA DE CONTROL ---
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setDatos({ ...datos, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setDatos({ ...datos, [name]: value });
+
+    // 🧠 DETECTOR DE MEMORIA: Si cambia la fecha, buscamos actas anteriores
+    if (name === 'fecha') {
+      const [y, m, d] = value.split('-');
+      const fechaBusqueda = `${d}/${m}/${y}`;
+      const encontrada = history.find(h => h.Fecha === fechaBusqueda);
+      setMinutaPrevia(encontrada || null);
+    }
   };
 
   const agregarPuntoOrden = () => setPuntosOrden([...puntosOrden, { punto: '', proyecto: '' }]);
@@ -120,13 +132,17 @@ export default function MinutaForm({ personal, hitos = [], tasks = [] }: { perso
     }
   };
 
-  // 🆕 Estado para el filtro por persona
   const [filtroPersona, setFiltroPersona] = useState("");
 
-  // 🆕 Cálculo de la semana actual y filtrado de pendientes
-  const hoy = new Date();
-  const lunes = new Date(hoy.setDate(hoy.getDate() - hoy.getDay() + 1)).toISOString().split('T')[0];
-  const domingo = new Date(hoy.setDate(hoy.getDate() - hoy.getDay() + 7)).toISOString().split('T')[0];
+  // 🕒 MOTOR DE RADAR DINÁMICO (Sincronizado a la fecha de la reunión)
+  const fechaRef = new Date(datos.fecha + 'T12:00:00'); 
+  const lunesDate = new Date(fechaRef);
+  lunesDate.setDate(fechaRef.getDate() - (fechaRef.getDay() === 0 ? 6 : fechaRef.getDay() - 1));
+  const domingoDate = new Date(lunesDate);
+  domingoDate.setDate(lunesDate.getDate() + 6);
+
+  const lunes = lunesDate.toISOString().split('T')[0];
+  const domingo = domingoDate.toISOString().split('T')[0];
 
   const pendientesSemana = tasks.filter(t => {
     const esEstaSemana = t.FechaEntrega >= lunes && t.FechaEntrega <= domingo;
@@ -150,6 +166,42 @@ export default function MinutaForm({ personal, hitos = [], tasks = [] }: { perso
             onChange={handleChange}
             className="w-full rounded-lg border-slate-200 shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
+
+          {/* 🔍 BURBUJA DE MEMORIA ORGANIZACIONAL (SANSCE OS v2.5) */}
+          {minutaPrevia && (
+            <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-xl shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-1">
+                  <ClipboardList size={12} /> Antecedentes Detectados
+                </span>
+                <button 
+                  type="button"
+                  onClick={() => setVerBurbuja(!verBurbuja)}
+                  className="text-[10px] bg-amber-200/50 hover:bg-amber-200 px-2 py-1 rounded-md text-amber-800 font-bold transition-colors"
+                >
+                  {verBurbuja ? 'Ocultar información' : 'Ver resumen anterior'}
+                </button>
+              </div>
+              
+              {verBurbuja && (
+                <div className="space-y-3 text-[11px] text-amber-900 border-t border-amber-200/50 pt-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <p><strong>Moderador:</strong> {minutaPrevia.Moderador}</p>
+                    <p><strong>Asistentes:</strong> {minutaPrevia.Asistentes}</p>
+                  </div>
+                  <div className="bg-white/60 p-2 rounded-lg border border-amber-100 shadow-inner">
+                    <p className="font-bold mb-1 uppercase text-[9px] text-amber-700">Orden del Día Tratada:</p>
+                    <p className="whitespace-pre-line leading-relaxed italic">
+                      {minutaPrevia.Temas || 'Sin temas registrados'}
+                    </p>
+                  </div>
+                  <p className="text-[9px] text-amber-600 font-medium italic">
+                    * Esta información es de solo lectura para referencia de la sesión.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -265,22 +317,6 @@ export default function MinutaForm({ personal, hitos = [], tasks = [] }: { perso
           ))}
         </div>
 
-        {/* SECCIÓN 4: CIERRE Y CONCLUSIONES */}
-      <section className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-        <div className="space-y-2">
-          <label className="text-xs font-bold uppercase text-slate-500 flex items-center gap-2">
-            <ClipboardList size={14} className="text-blue-600" /> Conclusiones Finales y Cierre de Sesión
-          </label>
-          <textarea
-            name="conclusiones"
-            rows={4}
-            value={datos.conclusiones}
-            onChange={handleChange}
-            placeholder="Registra los acuerdos definitivos, resoluciones y puntos clave del cierre..."
-            className="w-full rounded-lg border-slate-200 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-          />
-        </div>
-      </section>
       </section>
 
       {/* 🆕 SECCIÓN: SEGUIMIENTO INTELIGENTE (RADAR DE COMPROMISOS) */}
@@ -466,6 +502,23 @@ export default function MinutaForm({ personal, hitos = [], tasks = [] }: { perso
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* SECCIÓN 4: CIERRE Y CONCLUSIONES (Reubicada para flujo natural) */}
+      <section className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase text-slate-500 flex items-center gap-2">
+            <ClipboardList size={14} className="text-blue-600" /> Conclusiones Finales y Cierre de Sesión
+          </label>
+          <textarea
+            name="conclusiones"
+            rows={4}
+            value={datos.conclusiones}
+            onChange={handleChange}
+            placeholder="Registra los acuerdos definitivos, resoluciones y puntos clave del cierre..."
+            className="w-full rounded-lg border-slate-200 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+          />
         </div>
       </section>
 

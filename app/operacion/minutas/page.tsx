@@ -1,11 +1,16 @@
 // app/operacion/minutas/page.tsx
 
-import { getMedicos } from "@/lib/googleSheets";
-import MinutaForm from "@/components/operacion/MinutaForm"; // Lo crearemos en el siguiente paso
+import { getMedicos, getOperacionTareas, getOperacionCronograma, getOperacionMinutas } from "@/lib/googleSheets";
+import MinutaForm from "@/components/operacion/MinutaForm";
 
 export default async function MinutasPage() {
-  // 1. Cargamos la lista de médicos/usuarios para el formulario
-  const personal = await getMedicos();
+  // 🛡️ CARGA MULTICANAL SANSCE: Traemos el historial completo para el Motor de Memoria
+  const [personal, tareas, hitos, historial] = await Promise.all([
+    getMedicos(),
+    getOperacionTareas(),
+    getOperacionCronograma(),
+    getOperacionMinutas() // 📜 Historial de acuerdos previos desde Sheets
+  ]);
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-8">
@@ -15,9 +20,14 @@ export default async function MinutasPage() {
           <p className="text-slate-500">Gestión de acuerdos, hitos y compromisos estratégicos</p>
         </header>
 
-        {/* El Formulario Modular */}
+        {/* Inyectamos tareas e historial para habilitar el Radar Dinámico y la Burbuja de Memoria */}
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-          <MinutaForm personal={personal} />
+          <MinutaForm 
+            personal={personal} 
+            tasks={tareas} 
+            hitos={hitos} 
+            history={historial} 
+          />
         </div>
       </div>
     </main>

@@ -1,3 +1,4 @@
+// types/index.ts
 // Definición de qué es un PACIENTE en tu sistema
 export interface Paciente {
   id?: string;

@@ -9,7 +9,7 @@ interface UserData {
 }
 import { fetchOkrDataAction, saveOkrElementAction } from "@/lib/actions"; // ➕ Importamos la nueva acción de guardado
 import Chart from 'chart.js/auto'; 
-import { AlertCircle, ArrowUp, RefreshCw, Target, ChevronDown, ChevronUp, User, Layers, Activity, X, Filter, Plus } from "lucide-react"; // ➕ Agregamos icono Plus
+import { AlertCircle, ArrowUp, RefreshCw, Target, ChevronDown, ChevronUp, User, Layers, Activity, X, Filter, Plus, Search } from "lucide-react";
 import { Doughnut, Bar } from "react-chartjs-2";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils"; // 💰 Importamos el formateador de moneda SANSCE
@@ -37,21 +37,32 @@ export default function TableroOkrPage() {
   const responsablesUnicos = Array.from(new Set(data.flatMap(obj => obj.ResultadosClave.flatMap((kr: any) => kr.KPIs.map((k: any) => k.Responsable))))).filter(Boolean).sort();
   const procesosUnicos = Array.from(new Set(data.flatMap(obj => obj.ResultadosClave.flatMap((kr: any) => kr.KPIs.map((k: any) => k.Proceso))))).filter(Boolean).sort();
 
-  // 2. El "Motor de Filtrado": Crea una copia limpia de los datos según los filtros
+  const [searchTerm, setSearchTerm] = useState(""); // 🔍 Nuevo: Estado del buscador
+
+  // 2. El "Motor de Filtrado Pro" (Búsqueda por Objetivo + KPIs)
   const filteredData = data.map((obj: any) => {
-      // Filtramos los KRs
+      const searchLower = searchTerm.toLowerCase();
+      // Verificamos si el título del Objetivo coincide
+      const objectiveMatches = obj.Nombre.toLowerCase().includes(searchLower);
+
       const krsFiltrados = obj.ResultadosClave.map((kr: any) => {
-          // Filtramos los KPIs dentro del KR
           const kpisFiltrados = kr.KPIs.filter((kpi: any) => {
+              // 1. Filtros de Gestión (Responsable/Proceso)
               const matchResp = filterResponsable === 'all' || kpi.Responsable === filterResponsable;
               const matchProc = filterProceso === 'all' || kpi.Proceso === filterProceso;
-              return matchResp && matchProc;
+              
+              // 2. Filtro de Búsqueda: Coincide si el Objetivo ya coincide O si el nombre del KPI coincide
+              const kpiNameMatches = kpi.NombreKPI.toLowerCase().includes(searchLower);
+              const searchMatch = searchTerm === "" || objectiveMatches || kpiNameMatches;
+              
+              return matchResp && matchProc && searchMatch;
           });
           return { ...kr, KPIs: kpisFiltrados };
-      }).filter((kr: any) => kr.KPIs.length > 0); // Si el KR se queda sin KPIs, lo ocultamos
+      }).filter((kr: any) => kr.KPIs.length > 0);
 
+      // El Objetivo se mantiene si después de filtrar sus hijos, aún tiene resultados
       return { ...obj, ResultadosClave: krsFiltrados };
-  }).filter((obj: any) => obj.ResultadosClave.length > 0); // Si el Objetivo se queda sin KRs, lo ocultamos
+  }).filter((obj: any) => obj.ResultadosClave.length > 0);
 
   const toggleAccordion = (id: string) => {
     setExpandedIds(prev => 
@@ -167,7 +178,17 @@ export default function TableroOkrPage() {
               Establecer Meta / KPI
             </button>
          </div>
-         
+         {/* Buscador por Nombre */}
+            <div className="relative min-w-[200px] flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input 
+                type="text"
+                placeholder="Buscar objetivo por nombre..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 text-sm border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white"
+              />
+            </div>
          <div className="flex flex-wrap gap-3 w-full md:w-auto">
             {/* Selector de Responsable */}
             <select 

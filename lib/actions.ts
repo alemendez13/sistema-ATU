@@ -694,7 +694,7 @@ export async function saveSingleTaskAction(formData: FormData) {
  * 🚀 ACCIÓN: TRASPLANTE DE TAREA ENTRE PROYECTOS
  * Mueve una tarea de un proyecto a otro, asegurando la integridad del hito.
  */
-export async function moveTaskAction(idTarea: string, nuevoProyecto: string) {
+export async function moveTaskAction(idTarea: string, nuevoProyecto: string, nuevoHitoId?: string) {
   try {
     const { GoogleSpreadsheet } = await import('google-spreadsheet');
     const { JWT } = await import('google-auth-library');
@@ -717,12 +717,11 @@ export async function moveTaskAction(idTarea: string, nuevoProyecto: string) {
 
     if (!row) throw new Error("La tarea no existe o fue eliminada previamente.");
 
-    // 🛡️ REGLA DE INTEGRIDAD SANSCE OS:
-    // 1. Cambiamos el Proyecto al destino seleccionado.
-    // 2. Reseteamos el ID_Hito a 'Gral'. Esto es vital porque el hito original
-    //    no existe en el nuevo proyecto. Así evitamos que la tarea desaparezca del radar.
+    // 🛡️ REGLA DE INTEGRIDAD SANSCE OS ACTUALIZADA:
+    // Ahora el sistema acepta un 'nuevoHitoId'. Si no se proporciona uno, 
+    // por seguridad lo mandamos a 'Gral' para no perder la tarea.
     row.set('Proyecto', nuevoProyecto);
-    row.set('ID_Hito', 'Gral'); 
+    row.set('ID_Hito', nuevoHitoId || 'Gral'); 
 
     await row.save();
 

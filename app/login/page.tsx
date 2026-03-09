@@ -43,9 +43,13 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border border-slate-200">
         
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-slate-900">SANSCE</h1>
-          <p className="text-slate-500 text-sm mt-1">Sistema de Gestión Clínica</p>
+        <div className="flex flex-col items-center mb-8">
+          <img 
+            src="/logo-sansce.png" 
+            alt="Logo SANSCE" 
+            className="h-20 w-auto object-contain" 
+          />
+          <p className="text-slate-500 text-sm mt-3">Sistema de Gestión Clínica</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">

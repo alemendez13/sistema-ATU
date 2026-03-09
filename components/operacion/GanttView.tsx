@@ -127,21 +127,34 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                     }}
                     onDrop={async (e) => {
                       e.preventDefault();
-                      e.currentTarget.style.backgroundColor = ""; // Restauramos color original
+                      e.currentTarget.style.backgroundColor = ""; 
                       const taskId = e.dataTransfer.getData("taskId");
                       
                       if (taskId) {
-                        // 🛡️ SEGURIDAD OPERATIVA: Confirmamos el movimiento para evitar errores de dedo
-                        const confirmar = window.confirm(`¿Confirmar trasplante de la tarea al proyecto: ${proyecto}?`);
-                        if (confirmar) {
-                          const result = await moveTaskAction(taskId, proyecto);
+                        // 🧠 MOTOR DE SELECCIÓN SANSCE: Identificamos actividades del proyecto destino
+                        const opcionesHitos = hitosDelProyecto.map(h => ({ 
+                          id: h.ID_Hito, 
+                          nombre: h['Nombre de la Actividad'] || h['Nombre del Hito'] 
+                        }));
+
+                        // Creamos la lista visual para el Director
+                        const listaTexto = opcionesHitos.map((h, i) => `${i + 1}. ${h.nombre}`).join('\n');
+                        const respuesta = window.prompt(
+                          `TRASPLANTE DE TAREA\nProyecto Destino: ${proyecto}\n\nSeleccione el número del Tipo de Actividad:\n0. Tarea General (Sin clasificar)\n${listaTexto}`, 
+                          "0"
+                        );
+
+                        if (respuesta !== null) { // Si el usuario no canceló
+                          const index = parseInt(respuesta) - 1;
+                          const hitoSeleccionado = index === -1 ? 'Gral' : (opcionesHitos[index]?.id || 'Gral');
+
+                          const result = await moveTaskAction(taskId, proyecto, hitoSeleccionado);
                           if (result.success) {
-                            setLastMovedId(taskId); // Activamos el destello para esta tarea
+                            setLastMovedId(taskId);
                             router.refresh(); 
-                            // El destello se apaga solo tras 3 segundos para no cansar la vista
                             setTimeout(() => setLastMovedId(null), 3000);
                           } else {
-                            alert("Error técnico en el trasplante: " + result.error);
+                            alert("Error en el trasplante: " + result.error);
                           }
                         }
                       }
