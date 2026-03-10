@@ -1,10 +1,11 @@
 //components/operacion/MinutaForm.tsx
 "use client";
 
-import React, { useState } from 'react';
-import { User, Calendar, MessageSquare, ClipboardList, Plus, Trash2, Send } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation'; // 👈 Inyectamos el timón de Next.js
+import { User, Calendar, MessageSquare, ClipboardList, Plus, Trash2, Send, Target, Briefcase, X } from 'lucide-react';
 import { saveMinutaCompletaAction } from '@/lib/actions';
-
+import HitoForm from './HitoForm'; // 👈 Importamos el creador de Proyectos/Actividades
 interface Personal {
   id: string;
   nombre: string;
@@ -29,19 +30,38 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
   const [puntosOrden, setPuntosOrden] = useState([{ punto: '', proyecto: '' }]);
   const [isSaving, setIsSaving] = useState(false);
   const [compromisos, setCompromisos] = useState<any[]>([]);
+  // 🚀 CONTROLADOR DE MODAL SANSCE: Para nuevos Proyectos y Actividades
+  const [showHitoModal, setShowHitoModal] = useState(false);
+
+  // 🧠 SENSOR DE MEMORIA PROACTIVO: Localiza la reunión inmediata anterior con Diagnóstico
+  useEffect(() => {
+    console.log("🔍 [SANSCE DEBUG] Ejecutando Sensor de Memoria...");
+    console.log("📅 Fecha en Formulario:", datos.fecha);
+    console.log("📚 Total registros en Historial:", history?.length || 0);
+
+    if (datos.fecha && history.length > 0) {
+      const reunionesAnteriores = history
+        .filter(h => {
+          const esAnterior = h.Fecha < datos.fecha;
+          if (esAnterior) console.log(`✅ Coincidencia: ${h.Fecha} es menor a ${datos.fecha}`);
+          return esAnterior;
+        })
+        .sort((a, b) => b.Fecha.localeCompare(a.Fecha));
+
+      const ultimaBitacora = reunionesAnteriores.length > 0 ? reunionesAnteriores[0] : null;
+      
+      console.log("🎯 Minuta Previa Seleccionada:", ultimaBitacora);
+      setMinutaPrevia(ultimaBitacora);
+    } else {
+      console.warn("⚠️ No hay fecha seleccionada o el historial está vacío.");
+    }
+  }, [datos.fecha, history]);
 
   // --- LÓGICA DE CONTROL ---
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setDatos({ ...datos, [name]: value });
 
-    // 🧠 DETECTOR DE MEMORIA: Si cambia la fecha, buscamos actas anteriores
-    if (name === 'fecha') {
-      const [y, m, d] = value.split('-');
-      const fechaBusqueda = `${d}/${m}/${y}`;
-      const encontrada = history.find(h => h.Fecha === fechaBusqueda);
-      setMinutaPrevia(encontrada || null);
-    }
   };
 
   const agregarPuntoOrden = () => setPuntosOrden([...puntosOrden, { punto: '', proyecto: '' }]);
@@ -195,6 +215,12 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
                       {minutaPrevia.Temas || 'Sin temas registrados'}
                     </p>
                   </div>
+                  <div className="bg-amber-100/50 p-2 rounded-lg border border-amber-200">
+                    <p className="font-bold mb-1 uppercase text-[9px] text-amber-700">Conclusiones Previas:</p>
+                    <p className="whitespace-pre-line leading-relaxed">
+                      {minutaPrevia.Conclusiones || 'Sin conclusiones registradas'}
+                    </p>
+                  </div>
                   <p className="text-[9px] text-amber-600 font-medium italic">
                     * Esta información es de solo lectura para referencia de la sesión.
                   </p>
@@ -340,34 +366,54 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {pendientesSemana.length > 0 ? pendientesSemana.map((tarea, idx) => (
-            <div 
-              key={idx} 
-              onClick={() => {
-                // 📡 CARGA QUIRÚRGICA: Mantiene ID original para permitir edición absoluta
-                if (!compromisos.find(c => c.idTarea === tarea.ID_Tarea)) {
-                  setCompromisos([...compromisos, { 
-                    idTarea: tarea.ID_Tarea,
-                    descripcion: tarea.Descripcion, 
-                    responsable: tarea.EmailAsignado, 
-                    fechaInicio: tarea.FechaInicio, 
-                    fechaEntrega: tarea.FechaEntrega, 
-                    area: tarea.Area, 
-                    proyecto: tarea.Proyecto, 
-                    idHito: tarea.ID_Hito,
-                    estado: tarea.Estado || 'Pendiente'
-                  }]);
-                }
-              }}
-              className="p-3 bg-white border border-blue-100 rounded-xl hover:border-blue-400 cursor-pointer transition-all group flex justify-between items-center"
-            >
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-700 leading-tight group-hover:text-blue-700">{tarea.Descripcion}</span>
-                <span className="text-[8px] text-slate-400 font-bold uppercase mt-1">🗓️ {tarea.FechaEntrega} • {tarea.Proyecto}</span>
+          {pendientesSemana.length > 0 ? pendientesSemana.map((tarea, idx) => {
+            // 🛡️ DETECTOR DE ARRASTRE: ¿Esta tarea nació en la minuta anterior?
+            const esArrastre = minutaPrevia && tarea.FechaInicio === minutaPrevia.Fecha;
+
+            return (
+              <div 
+                key={idx} 
+                onClick={() => {
+                  if (!compromisos.find(c => c.idTarea === tarea.ID_Tarea)) {
+                    setCompromisos([...compromisos, { 
+                      idTarea: tarea.ID_Tarea,
+                      descripcion: tarea.Descripcion, 
+                      responsable: tarea.EmailAsignado, 
+                      fechaInicio: tarea.FechaInicio, 
+                      fechaEntrega: tarea.FechaEntrega, 
+                      area: tarea.Area, 
+                      proyecto: tarea.Proyecto, 
+                      idHito: tarea.ID_Hito,
+                      estado: tarea.Estado || 'Pendiente'
+                    }]);
+                  }
+                }}
+                className={`p-3 bg-white border rounded-xl cursor-pointer transition-all group flex justify-between items-center ${
+                  esArrastre 
+                    ? 'border-red-500 shadow-md shadow-red-50' 
+                    : 'border-blue-100 hover:border-blue-400'
+                }`}
+              >
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-1">
+                    {esArrastre && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded-sm font-black animate-pulse">ARRASTRE</span>}
+                    <span className={`text-[10px] font-bold leading-tight ${esArrastre ? 'text-red-700' : 'text-slate-700 group-hover:text-blue-700'}`}>
+                      {tarea.Descripcion}
+                    </span>
+                  </div>
+                  <span className="text-[8px] text-slate-400 font-bold uppercase mt-1">🗓️ Vence: {tarea.FechaEntrega} • {tarea.Proyecto}</span>
+                </div>
+                {esArrastre ? (
+                  <div className="flex flex-col items-center gap-1">
+                    <Plus size={14} className="text-red-600" />
+                    <span className="text-[7px] font-black text-red-500">REVISAR</span>
+                  </div>
+                ) : (
+                  <Plus size={14} className="text-blue-300 group-hover:text-blue-600" />
+                )}
               </div>
-              <Plus size={14} className="text-blue-300 group-hover:text-blue-600" />
-            </div>
-          )) : (
+            );
+          }) : (
             <p className="text-[10px] text-slate-400 italic py-4">No hay compromisos pendientes de entrega para esta semana.</p>
           )}
         </div>
@@ -379,13 +425,24 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
           <label className="text-xs font-bold uppercase text-blue-600 flex items-center gap-2">
             <Plus size={14} /> Tareas y Compromisos Generados
           </label>
-          <button
-            type="button"
-            onClick={agregarCompromiso}
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md text-xs font-bold hover:bg-blue-100 transition-colors"
-          >
-            + Añadir Compromiso
-          </button>
+          <div className="flex gap-2">
+  {/* 🆕 BOTÓN: NUEVO PROYECTO / ACTIVIDAD */}
+  <button
+    type="button"
+    onClick={() => setShowHitoModal(true)}
+    className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-md text-[10px] font-black hover:bg-emerald-100 transition-all uppercase"
+  >
+    <Target size={12} /> + Proyecto / Actividad
+  </button>
+
+  <button
+    type="button"
+    onClick={agregarCompromiso}
+    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-black hover:bg-blue-100 transition-all uppercase"
+  >
+    <Plus size={12} /> + Añadir Compromiso
+  </button>
+</div>
         </div>
 
         <div className="space-y-4">
@@ -542,6 +599,32 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
           )}
         </button>
       </div>
+      {/* 🛡️ INTERFAZ DE CREACIÓN QUIRÚRGICA (MODAL) */}
+      {showHitoModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Maestro de Proyectos e Hitos</h3>
+                <p className="text-xs text-slate-500 font-medium">Registra una nueva categoría o acción estratégica en el Cronograma</p>
+              </div>
+              <button 
+                onClick={() => setShowHitoModal(false)}
+                className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <HitoForm 
+              personal={personal} 
+              onSuccess={() => {
+                setShowHitoModal(false);
+                alert("✅ El nuevo proyecto/actividad ya está disponible en la lista.");
+              }} 
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

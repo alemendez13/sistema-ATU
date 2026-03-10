@@ -13,11 +13,13 @@ import TaskForm from './TaskForm';
 export default function TaskBoardClient({ 
   initialTasks, 
   initialHitos, 
-  personal // 🆕 Recibimos la lista de personal
+  personal,
+  history = [] // 👈 Recibimos el historial con un valor vacío por defecto
 }: { 
   initialTasks: any[], 
   initialHitos: any[],
-  personal: any[] 
+  personal: any[],
+  history?: any[] // 👈 Declaramos que es opcional para evitar errores
 }) {
   const [view, setView] = useState<'lista' | 'cronograma'>('cronograma'); // 🕒 Prioridad Estratégica: El sistema inicia siempre en el Gantt
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -162,8 +164,13 @@ export default function TaskBoardClient({
               </h2>
               
               {modalMode === 'minuta' ? (
-                <MinutaForm personal={personal} hitos={initialHitos} tasks={initialTasks} />
-              ) : modalMode === 'tarea' ? (
+  <MinutaForm 
+    personal={personal} 
+    hitos={initialHitos} 
+    tasks={initialTasks} 
+    history={history} // 👈 Pasamos la señal del historial al formulario
+  />
+) : modalMode === 'tarea' ? (
                 <TaskForm 
                   personal={personal} 
                   onSuccess={() => {
