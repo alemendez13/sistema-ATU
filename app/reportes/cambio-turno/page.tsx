@@ -8,8 +8,11 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cleanPrice, formatCurrency } from "../../../lib/utils";
+import { getMedicosAction } from "../../../lib/actions";
+import { useAuth } from "../../../hooks/useAuth"; // 🔐 Importamos el vigilante de identidad
 
 export default function CambioTurnoPage() {
+  const { user } = useAuth() as any; // 👤 Obtenemos al usuario activo
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [procesandoCierre, setProcesandoCierre] = useState(false);
@@ -24,8 +27,9 @@ export default function CambioTurnoPage() {
   const [ingresosTotal, setIngresosTotal] = useState(0);
   const [ingresosEfectivo, setIngresosEfectivo] = useState(0); // Suma de TODO el dinero físico (Recepción + PS)
   const [gastosTotal, setGastosTotal] = useState(0); // Solo salidas reales de dinero
-  const [inyeccionesTotal, setInyeccionesTotal] = useState(0); // Dinero inyectado para fondo fijo
+  const [inyeccionesTotal, setInyeccionesTotal] = useState(0); 
   const [desgloseMetodos, setDesgloseMetodos] = useState<any>({});
+  const [ingresosPorDoctor, setIngresosPorDoctor] = useState<any>({});
 
   // 3. Productividad (WhatsApp) - Automatizado 🤖
   const [msgsConfirmacion, setMsgsConfirmacion] = useState(0);
@@ -54,17 +58,40 @@ export default function CambioTurnoPage() {
     const hoyStr = inicioDia.toISOString().split('T')[0]; // Para citas (YYYY-MM-DD)
 
     try {
-      // A. PACIENTES (Recuperado del Original)
-      const qCitas = query(collection(db, "citas"), where("fecha", "==", hoyStr));
-      const snapCitas = await getDocs(qCitas);
+      // A. PACIENTES (Refactorización SANSCE OS: Clasificación por Esquema Real)
+      const [snapCitas, medicosConfig] = await Promise.all([
+          getDocs(query(collection(db, "citas"), where("fecha", "==", hoyStr))),
+          getMedicosAction() // Traemos la lista de Google Sheets
+      ]);
+      
       const listaCitas = snapCitas.docs.map(d => d.data());
       
-      setCitasHoy(listaCitas);
-      setStatsPacientes({
-          total: listaCitas.length,
-          sansce: listaCitas.filter(c => c.doctorNombre?.toUpperCase().includes("SANSCE") || c.doctorNombre?.includes("Clínica")).length,
-          renta: listaCitas.filter(c => !c.doctorNombre?.toUpperCase().includes("SANSCE") && !c.doctorNombre?.includes("Clínica")).length
+      // 🧠 Lógica de Emparejamiento Flexible (SANSCE OS Standard)
+      const esquemaMap = new Map(
+          medicosConfig.map((m: any) => [
+              String(m.nombreCompleto || "").trim().toLowerCase(), 
+              m.esquema
+          ])
+      );
+
+      let consultasSansce = 0;
+      let consultasExternos = 0;
+
+      listaCitas.forEach(cita => {
+          // Normalizamos el nombre que viene de la agenda para la búsqueda
+          const nombreEnAgenda = String(cita.doctorNombre || "").trim().toLowerCase();
+          const esquema = esquemaMap.get(nombreEnAgenda);
+
+          if (esquema === "Nómina") {
+              consultasSansce++;
+          } else {
+              // 🛡️ Por definición de negocio: Si no es Nómina explícita, es Externo (Renta)
+              consultasExternos++;
+          }
       });
+
+      setCitasHoy(listaCitas);
+      setStatsPacientes({ total: listaCitas.length, sansce: consultasSansce, renta: consultasExternos });
 
       // B. INGRESOS Y DESGLOSE (Sincronizado con Efectivo PS)
       const qIngresos = query(
@@ -77,17 +104,21 @@ export default function CambioTurnoPage() {
       
       let total = 0;
       let efectivo = 0;
-      const desglose: any = {};
+      const desgloseMetodosMap: any = {};
+      const ingresosDoctorMap: any = {}; // 🩺 Acumulador quirúrgico
 
       snapIngresos.forEach(doc => {
         const data = doc.data();
         const monto = cleanPrice(data.monto);
         const metodo = data.metodoPago || "No especificado";
+        const doctor = data.doctorNombre || "Sin especificar"; // 🛡️ Evitamos datos huérfanos
 
         total += monto;
-        desglose[metodo] = (desglose[metodo] || 0) + monto;
+        desgloseMetodosMap[metodo] = (desgloseMetodosMap[metodo] || 0) + monto;
+        
+        // 🩺 TRAZABILIDAD POR PROFESIONAL:
+        ingresosDoctorMap[doctor] = (ingresosDoctorMap[doctor] || 0) + monto;
 
-        // ✅ CORRECCIÓN: Detectamos tanto Efectivo de Recepción como de PS
         if (metodo && metodo.includes("Efectivo")) {
             efectivo += monto;
         }
@@ -95,7 +126,8 @@ export default function CambioTurnoPage() {
       
       setIngresosTotal(total);
       setIngresosEfectivo(efectivo);
-      setDesgloseMetodos(desglose);
+      setDesgloseMetodos(desgloseMetodosMap);
+      setIngresosPorDoctor(ingresosDoctorMap);
 
       // C. GASTOS E INYECCIONES (Diferenciación Quirúrgica)
       const qGastos = query(
@@ -132,10 +164,22 @@ export default function CambioTurnoPage() {
       
       let confirm = 0, cobro = 0, info = 0;
       snapMsgs.forEach(doc => {
-          const tipo = doc.data().tipo || "";
-          if (tipo.includes("Confirmación")) confirm++;
-          else if (tipo.includes("Cobro") || tipo.includes("Pago")) cobro++;
-          else info++;
+          const etiqueta = doc.data().tipo || "";
+          
+          // 🧠 Lógica de Clasificación Quirúrgica (SANSCE OS Standard)
+          // Suma: Confirmaciones (excepto cancelaciones), Reagendar y Recordatorios.
+          const esCitaConfirmada = (etiqueta.includes("Confirmación") && !etiqueta.toLowerCase().includes("cancelación")) || 
+                                   etiqueta.includes("Reagendar") || 
+                                   etiqueta.includes("Recordatorio");
+          
+          // Suma: Todo lo relacionado a flujos de cobranza o comprobantes.
+          const esMensajeCobranza = etiqueta.includes("Cobro") || 
+                                    etiqueta.includes("Pago") || 
+                                    etiqueta.includes("Ticket");
+
+          if (esCitaConfirmada) confirm++;
+          else if (esMensajeCobranza) cobro++;
+          else info++; // El resto: Meet, Formularios, Cancelaciones, Ubicación, etc.
       });
 
       setMsgsConfirmacion(confirm);
@@ -151,11 +195,15 @@ export default function CambioTurnoPage() {
   };
 
   const handleCerrarTurno = async () => {
-    // Validaciones Híbridas
+    // 🛡️ Validaciones de Seguridad (SANSCE OS Standard)
     if (!efectivoReportado) return toast.warning("⚠️ Faltan datos: Debes ingresar el efectivo contado en caja.");
-    if (!asistenteEntrega || !asistenteRecibe) return toast.warning("⚠️ Faltan firmas: Ambas asistentes deben escribir su nombre.");
+    
+    // El .trim() evita que firmen con espacios vacíos
+    if (!asistenteEntrega.trim() || !asistenteRecibe.trim()) {
+        return toast.warning("⚠️ Faltan firmas: Ambas asistentes deben escribir su nombre real.");
+    }
 
-    if(!confirm("¿Confirmas que el efectivo físico coincide con lo reportado?")) return;
+    if(!confirm("¿Confirmas que el efectivo físico coincide con lo reportado? El reporte quedará sellado con tu usuario.")) return;
     
     setProcesandoCierre(true);
     try {
@@ -163,34 +211,31 @@ export default function CambioTurnoPage() {
             fecha: serverTimestamp(),
             fechaLegible: new Date().toLocaleString(),
             
-            // Finanzas (Sincronizado con Inyecciones)
             ingresosTotal,
             ingresosEfectivo,
-            inyeccionesTotal, // ✅ Guardamos cuánto dinero se inyectó en este turno
-            gastosTotal,      // Salidas reales
-            efectivoEsperado, // (Ingresos + Inyecciones - Gastos)
+            inyeccionesTotal, 
+            gastosTotal,      
+            efectivoEsperado, 
             efectivoReportado: parseFloat(efectivoReportado),
             diferencia,
             desgloseMetodos,
             
-            // Operativo
             totalPacientes: statsPacientes.total,
-            pacientesDetalle: citasHoy.map(c => ({ paciente: c.paciente, doctor: c.doctorNombre })), // Guardamos snapshot ligero
+            pacientesDetalle: citasHoy.map(c => ({ paciente: c.paciente, doctor: c.doctorNombre })), 
             
-            // Productividad
             mensajes: {
                 confirmacion: msgsConfirmacion,
                 cobranza: msgsCobranza,
                 info: msgsInfo
             },
             
-            // Responsabilidad
-            observaciones,
+            observaciones: observaciones.trim(),
             personal: {
-                entrega: asistenteEntrega,
-                recibe: asistenteRecibe
+                entrega: asistenteEntrega.trim(),
+                recibe: asistenteRecibe.trim()
             },
-            usuario: "Sistema SANSCE"
+            // 🖋️ SELLO DE RESPONSABILIDAD: Vinculamos el email de la sesión activa
+            elaboradoPor: user?.email || "Usuario no identificado"
         });
 
         toast.success("✅ Turno cerrado correctamente");
@@ -269,26 +314,33 @@ export default function CambioTurnoPage() {
                         <h3 className="font-bold text-slate-800 mb-6 border-b pb-2">2. Arqueo de Caja (Ciego)</h3>
 
                         {/* Calculadora Visual Sincronizada */}
-                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6 space-y-2">
-                            <div className="flex justify-between text-[11px] uppercase font-bold text-slate-400">
-                                <span>Concepto</span>
-                                <span>Monto</span>
+                        {/* 🛡️ DESGLOSE DE CUENTAS SEPARADAS (SANSCE M8 Standard) */}
+                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6 space-y-3">
+                            {/* Cuenta A: Ventas (Dinero del Cliente) */}
+                            <div className="border-b border-slate-200 pb-2">
+                                <p className="text-[10px] font-black text-blue-600 uppercase mb-1 tracking-wider">Cuenta A: Ingresos por Ventas</p>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-600 italic">Efectivo por Servicios (Recep + PS):</span>
+                                    <span className="font-mono font-bold text-slate-800">${ingresosEfectivo.toFixed(2)}</span>
+                                </div>
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">Ventas en Efectivo (Recep + PS):</span>
-                                <span className="font-mono font-bold text-slate-700">+ ${ingresosEfectivo.toFixed(2)}</span>
+                            
+                            {/* Cuenta B: Caja Chica (Dinero de Operación) */}
+                            <div className="border-b border-slate-200 pb-2">
+                                <p className="text-[10px] font-black text-orange-600 uppercase mb-1 tracking-wider">Cuenta B: Movimientos de Caja Chica</p>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Inyecciones (Fondos inyectados):</span>
+                                    <span className="font-mono text-emerald-600 font-bold">+${inyeccionesTotal.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Egresos (Gastos pagados):</span>
+                                    <span className="font-mono text-red-600 font-bold">-${gastosTotal.toFixed(2)}</span>
+                                </div>
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-emerald-600 font-medium">Inyecciones a Caja Chica:</span>
-                                <span className="font-mono font-bold text-emerald-600">+ ${inyeccionesTotal.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-red-500 font-medium">Gastos / Salidas Operativas:</span>
-                                <span className="font-mono font-bold text-red-500">- ${gastosTotal.toFixed(2)}</span>
-                            </div>
-                            <div className="border-t border-slate-300 my-2"></div>
-                            <div className="flex justify-between items-center">
-                                <span className="font-black text-slate-800 text-xs uppercase tracking-tighter">Arqueo Esperado (Físico):</span>
+
+                            {/* Consolidado Final para Arqueo Físico */}
+                            <div className="flex justify-between items-center pt-1">
+                                <span className="font-black text-slate-900 text-xs uppercase">Efectivo Final Esperado (A + B):</span>
                                 <span className="text-2xl font-black text-slate-900 tracking-tighter">${efectivoEsperado.toFixed(2)}</span>
                             </div>
                         </div>
@@ -338,29 +390,61 @@ export default function CambioTurnoPage() {
                         </details>
                     </div>
 
+                    {/* 🩺 2.1 TRAZABILIDAD POR PROFESIONAL (Auditoría de Ventas) */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">TRAZABILIDAD</div>
+                        <h3 className="font-bold text-slate-800 mb-4 border-b pb-2">Detalle de Ingresos por Médico</h3>
+                        
+                        <div className="space-y-3 max-h-56 overflow-y-auto pr-2 custom-scrollbar">
+                            {Object.entries(ingresosPorDoctor).length === 0 ? (
+                                <p className="text-slate-400 italic text-center text-sm py-4">No hay ventas registradas en este turno.</p>
+                            ) : (
+                                Object.entries(ingresosPorDoctor)
+                                  .sort(([,a]: any, [,b]: any) => b - a) // Ordenamos: El que más generó arriba
+                                  .map(([doctor, monto]: any) => (
+                                    <div key={doctor} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors px-2 rounded-lg">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-700">{doctor}</span>
+                                            <span className="text-[9px] text-slate-400 uppercase font-black tracking-tighter">Producción Total Bruta</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="font-mono font-black text-blue-600 text-sm">
+                                                ${Number(monto).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        
+                        <p className="text-[9px] text-slate-400 mt-4 italic">
+                            * Estos montos incluyen todos los métodos de pago (Efectivo, Tarjetas, Transferencias).
+                        </p>
+                    </div>
+
                 </div>
 
                 {/* === COLUMNA DERECHA: PRODUCTIVIDAD Y FIRMAS === */}
                 <div className="space-y-6 flex flex-col h-full">
                     
-                    {/* 3. PRODUCTIVIDAD (Automatización WhatsApp) */}
+                    {/* 3. USO DE WHATSAPP (SANSCE OS Auditoría Digital) */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                        <h3 className="font-bold text-slate-800 mb-4 border-b pb-2">3. Productividad Digital</h3>
+                        <h3 className="font-bold text-slate-800 mb-4 border-b pb-2">3. Uso de whatsapp</h3>
                         <div className="grid grid-cols-3 gap-3">
                             <div className="p-3 bg-blue-50 rounded-lg text-center border border-blue-100">
                                 <span className="text-2xl block mb-1">📅</span>
                                 <span className="text-xl font-bold text-blue-900 block">{msgsConfirmacion}</span>
-                                <span className="text-[10px] text-blue-500 uppercase font-bold">Citas</span>
+                                <span className="text-[10px] text-blue-500 uppercase font-bold">Citas confirmadas</span>
                             </div>
                             <div className="p-3 bg-green-50 rounded-lg text-center border border-green-100">
                                 <span className="text-2xl block mb-1">💵</span>
                                 <span className="text-xl font-bold text-green-900 block">{msgsCobranza}</span>
-                                <span className="text-[10px] text-green-500 uppercase font-bold">Cobranza</span>
+                                <span className="text-[10px] text-green-500 uppercase font-bold">Mensajes de cobranza</span>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg text-center border border-slate-200">
                                 <span className="text-2xl block mb-1">ℹ️</span>
                                 <span className="text-xl font-bold text-slate-700 block">{msgsInfo}</span>
-                                <span className="text-[10px] text-slate-400 uppercase font-bold">Info</span>
+                                <span className="text-[10px] text-slate-400 uppercase font-bold">Mensajes de Info</span>
                             </div>
                         </div>
                     </div>
