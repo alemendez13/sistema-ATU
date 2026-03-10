@@ -41,7 +41,8 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
   const [loading, setLoading] = useState(false);
   const { user } = useAuth() as any;
   const [tieneRFC, setTieneRFC] = useState(false);
-  const [requiereFactura, setRequiereFactura] = useState(false);
+  const [requiereFactura, setRequiereFactura] = useState(false); // 🛠️ ESTADO RECUPERADO
+  const [ubicacionVenta, setUbicacionVenta] = useState("Satelite"); // 📍 Default a Satélite
   
   // Estados del Formulario
   const [servicioSku, setServicioSku] = useState("");
@@ -264,11 +265,12 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
       // 🔄 BUCLE DE PROCESAMIENTO (Mantiene integridad por transacción individual)
       for (const item of carrito) {
           
-          // 2. Crear OPERACIÓN (Normalización Financiera idéntica al original)
+          // 2. Crear OPERACIÓN (Sincronizada con Sucursal)
           const docRef = await addDoc(collection(db, "operaciones"), {
             pacienteId,
             pacienteNombre: pNombre,
-            requiereFactura, // Checkbox global aplica al lote
+            sucursal: ubicacionVenta, // 🛰️ MARCA DE SUCURSAL PARA FINANZAS
+            requiereFactura, 
             servicioSku: item.servicioSku,
             servicioNombre: item.servicioNombre,
             especialidad: item.especialidad || null,
@@ -313,18 +315,15 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
             try {
                 const folioRastreo = generateFolio("FIN-FR-09", docRef.id); 
                 
-                // 📍 CONFIGURACIÓN DE ORIGEN DE STOCK
-                // null = Busca en cualquier lado (Comportamiento General)
-                // "Satelite" = Fuerza la búsqueda solo en inventario satélite
-                // Puedes cambiar esto dinámicamente según el usuario o tipo de producto
-                const ubicacionSalida = null; 
+                // 🛡️ CONGRUENCIA SANSCE: Vinculamos la venta a la ubicación elegida en UI
+                const ubicacionSalida = ubicacionVenta; 
 
                 await descontarStockPEPS(
                     item.servicioSku, 
                     item.servicioNombre, 
                     1, 
                     `${folioRastreo} - ${pNombre}`,
-                    ubicacionSalida // 👈 5to Argumento: La Señal de Ubicación
+                    ubicacionSalida as any // 🛠️ CORRECCIÓN DE TIPADO
                 );
             } catch (err) { 
                 console.warn(`Error stock ${item.servicioSku}`, err); 
@@ -556,6 +555,25 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
                     </div>
                 </div>
             </div>
+
+          {/* 📍 SELECTOR DE ORIGEN DE PRODUCTOS */}
+          <div className="bg-blue-600 p-4 rounded-lg shadow-md flex items-center justify-between text-white">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🏪</span>
+                <div>
+                  <p className="text-[10px] font-black uppercase leading-none opacity-80">Punto de Entrega</p>
+                  <p className="text-sm font-bold">Sucursal de Inventario</p>
+                </div>
+              </div>
+              <select 
+                  value={ubicacionVenta}
+                  onChange={(e) => setUbicacionVenta(e.target.value)}
+                  className="bg-blue-700 border-none rounded-md font-bold text-xs p-2 focus:ring-2 focus:ring-white outline-none"
+              >
+                  <option value="Satelite">🛰️ SUCURSAL SATÉLITE</option>
+                  <option value="Central">🏥 MATRIZ / CENTRAL</option>
+              </select>
+          </div>
 
           {/* ✅ BLOQUE DE DOBLE CHECK PARA FACTURA */}
           <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 flex items-center justify-between">

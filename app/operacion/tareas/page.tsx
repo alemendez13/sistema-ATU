@@ -3,19 +3,24 @@
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-import { getOperacionTareas, getOperacionCronograma, getPersonalTodo } from "@/lib/googleSheets";
+import { 
+  getOperacionTareas, 
+  getOperacionCronograma, 
+  getPersonalTodo, 
+  getOperacionMinutas // 👈 1. Importamos el historial
+} from "@/lib/googleSheets";
 import { fetchOkrDataAction } from "@/lib/actions";
 import TaskBoardClient from "../../../components/operacion/TaskBoardClient";
-import Link from 'next/link'; // 🆕 Para navegación instantánea
-import { ClipboardCheck } from 'lucide-react'; // 🆕 Icono de Checklist
+import Link from 'next/link'; 
+import { ClipboardCheck } from 'lucide-react'; 
 
 export default async function TareasPage() {
-  // 1. Carga de datos desde el Servidor (Alta Velocidad)
-  // Añadimos getMedicos() para que el formulario de Minuta tenga la lista de personal lista para el modal
-  const [tareas, hitos, personal] = await Promise.all([
+  // 1. CARGA MULTICANAL SANSCE: Traemos la "Memoria" junto con las tareas
+  const [tareas, hitos, personal, historial] = await Promise.all([
     getOperacionTareas(),
     getOperacionCronograma(),
-    getPersonalTodo() // 🆕 Carga unificada: Especialistas + Equipo Operativo
+    getPersonalTodo(),
+    getOperacionMinutas() // 👈 2. Conectamos la señal del historial
   ]);
 
   return (
@@ -44,7 +49,12 @@ export default async function TareasPage() {
         </header>
 
         {/* El "Cerebro" del Tablero (Lógica de Filtros y Lista) */}
-        <TaskBoardClient initialTasks={tareas} initialHitos={hitos} personal={personal} />
+        <TaskBoardClient 
+  initialTasks={tareas} 
+  initialHitos={hitos} 
+  personal={personal} 
+  history={historial} // 👈 3. Inyectamos la señal al cliente
+/>
 
       </div>
     </div>

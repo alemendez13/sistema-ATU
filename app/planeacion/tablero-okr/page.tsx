@@ -7,7 +7,7 @@ interface UserData {
   email: string | null;
   uid: string;
 }
-import { fetchOkrDataAction, saveOkrElementAction } from "@/lib/actions"; // ➕ Importamos la nueva acción de guardado
+import { fetchOkrDataAction, saveOkrElementAction, updateObjectiveStatusAction } from "@/lib/actions";
 import Chart from 'chart.js/auto'; 
 import { AlertCircle, ArrowUp, RefreshCw, Target, ChevronDown, ChevronUp, User, Layers, Activity, X, Filter, Plus, Search } from "lucide-react";
 import { Doughnut, Bar } from "react-chartjs-2";
@@ -32,37 +32,64 @@ export default function TableroOkrPage() {
   // --- FILTROS INTELIGENTES ---
   const [filterResponsable, setFilterResponsable] = useState<string>('all');
   const [filterProceso, setFilterProceso] = useState<string>('all');
+  const [filterEstatus, setFilterEstatus] = useState<string>('Activo'); // 👁️ Control maestro de visibilidad
 
   // 1. Extraemos las opciones únicas para los selectores (dropdowns)
   const responsablesUnicos = Array.from(new Set(data.flatMap(obj => obj.ResultadosClave.flatMap((kr: any) => kr.KPIs.map((k: any) => k.Responsable))))).filter(Boolean).sort();
   const procesosUnicos = Array.from(new Set(data.flatMap(obj => obj.ResultadosClave.flatMap((kr: any) => kr.KPIs.map((k: any) => k.Proceso))))).filter(Boolean).sort();
 
-  const [searchTerm, setSearchTerm] = useState(""); // 🔍 Nuevo: Estado del buscador
+  const [searchTerm, setSearchTerm] = useState(""); 
 
-  // 2. El "Motor de Filtrado Pro" (Búsqueda por Objetivo + KPIs)
-  const filteredData = data.map((obj: any) => {
+  // 2. El "Motor de Filtrado Pro" (Flexibilizado para Gestión Estratégica)
+  const filteredData = data
+    .filter((obj: any) => filterEstatus === 'all' || obj.Estatus === filterEstatus)
+    .map((obj: any) => {
       const searchLower = searchTerm.toLowerCase();
-      // Verificamos si el título del Objetivo coincide
       const objectiveMatches = obj.Nombre.toLowerCase().includes(searchLower);
 
-      const krsFiltrados = obj.ResultadosClave.map((kr: any) => {
-          const kpisFiltrados = kr.KPIs.filter((kpi: any) => {
-              // 1. Filtros de Gestión (Responsable/Proceso)
+      // Mapeamos los KRs y KPIs, pero permitimos que existan aunque estén vacíos si estamos navegando
+      const krsFiltrados = (obj.ResultadosClave || []).map((kr: any) => {
+          const kpisFiltrados = (kr.KPIs || []).filter((kpi: any) => {
               const matchResp = filterResponsable === 'all' || kpi.Responsable === filterResponsable;
               const matchProc = filterProceso === 'all' || kpi.Proceso === filterProceso;
-              
-              // 2. Filtro de Búsqueda: Coincide si el Objetivo ya coincide O si el nombre del KPI coincide
               const kpiNameMatches = kpi.NombreKPI.toLowerCase().includes(searchLower);
-              const searchMatch = searchTerm === "" || objectiveMatches || kpiNameMatches;
               
-              return matchResp && matchProc && searchMatch;
+              // El KPI pasa si cumple con los filtros de gestión Y la búsqueda
+              return matchResp && matchProc && (searchTerm === "" || objectiveMatches || kpiNameMatches);
           });
           return { ...kr, KPIs: kpisFiltrados };
-      }).filter((kr: any) => kr.KPIs.length > 0);
+      });
 
-      // El Objetivo se mantiene si después de filtrar sus hijos, aún tiene resultados
       return { ...obj, ResultadosClave: krsFiltrados };
-  }).filter((obj: any) => obj.ResultadosClave.length > 0);
+  }).filter((obj: any) => {
+      // 🧠 LÓGICA DE VISIBILIDAD INTELIGENTE:
+      // Si el Director está BUSCANDO (texto, responsable o proceso), ocultamos lo vacío.
+      // Si el Director solo está NAVEGANDO (Ver Todos / Activos / Inactivos), mostramos el Objetivo siempre.
+      const isSearching = searchTerm !== "" || filterResponsable !== 'all' || filterProceso !== 'all';
+      if (isSearching) {
+          return obj.ResultadosClave.some((kr: any) => kr.KPIs.length > 0);
+      }
+      return true; // En modo navegación, mostrar todo lo que coincida con el estatus
+  });
+
+  const handleStatusToggle = async (e: React.MouseEvent, objId: string, currentStatus: string) => {
+    e.stopPropagation(); // 🛡️ Evita que el acordeón se abra/cierre al tocar el botón
+    const nextStatus = currentStatus === 'Activo' ? 'Inactivo' : 'Activo';
+    
+    const toastId = toast.loading(`Sincronizando estatus con SANSCE Sheets...`);
+    
+    try {
+      const res = await updateObjectiveStatusAction(objId, nextStatus as 'Activo' | 'Inactivo');
+      if (res.success) {
+        toast.success(`Objetivo marcado como ${nextStatus}`, { id: toastId });
+        window.location.reload(); // Refresco para actualizar la vista filtrada
+      } else {
+        toast.error("Error al actualizar Sheets", { id: toastId });
+      }
+    } catch (error) {
+      toast.error("Error de conexión", { id: toastId });
+    }
+  };
 
   const toggleAccordion = (id: string) => {
     setExpandedIds(prev => 
@@ -190,6 +217,17 @@ export default function TableroOkrPage() {
               />
             </div>
          <div className="flex flex-wrap gap-3 w-full md:w-auto">
+            {/* 👁️ Selector de Visibilidad Estratégica */}
+            <select 
+              value={filterEstatus}
+              onChange={(e) => setFilterEstatus(e.target.value)}
+              className="text-sm border-blue-200 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 bg-blue-50 font-bold text-blue-700 min-w-[140px]"
+            >
+              <option value="Activo">🟢 Solo Activos</option>
+              <option value="all">📁 Ver Todo el Plan</option>
+              <option value="Inactivo">⚪ Solo Inactivos</option>
+            </select>
+
             {/* Selector de Responsable */}
             <select 
               value={filterResponsable}
@@ -210,13 +248,13 @@ export default function TableroOkrPage() {
               {procesosUnicos.map((proc: any) => <option key={proc} value={proc}>{proc}</option>)}
             </select>
             
-            {/* Botón de Limpiar */}
-            {(filterResponsable !== 'all' || filterProceso !== 'all') && (
+            {/* Botón de Limpiar mejorado */}
+            {(filterResponsable !== 'all' || filterProceso !== 'all' || filterEstatus !== 'Activo') && (
                <button 
-                 onClick={() => { setFilterResponsable('all'); setFilterProceso('all'); }}
+                 onClick={() => { setFilterResponsable('all'); setFilterProceso('all'); setFilterEstatus('Activo'); }}
                  className="text-xs font-bold text-red-600 hover:text-red-800 underline px-2"
                >
-                 Borrar Filtros
+                 Restablecer Vista
                </button>
             )}
          </div>
@@ -251,6 +289,25 @@ export default function TableroOkrPage() {
                 <span className="text-xs font-bold text-slate-600">Avance:</span>
                 <span className={`text-sm font-black ${getScoreColor(obj.Promedio)}`}>
                   {obj.Promedio}%
+                </span>
+              </div>
+              {/* INTERRUPTOR DE ESTATUS SANSCE */}
+              <div className="flex items-center gap-4 mr-4">
+                <button
+                  onClick={(e) => handleStatusToggle(e, obj.Objective_ID, obj.Estatus)}
+                  className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none ${
+                    obj.Estatus === 'Activo' ? 'bg-emerald-500' : 'bg-slate-300'
+                  }`}
+                >
+                  <span className="sr-only">Cambiar visibilidad</span>
+                  <span
+                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                      obj.Estatus === 'Activo' ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className={`text-[10px] font-bold uppercase tracking-tighter ${obj.Estatus === 'Activo' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  {obj.Estatus === 'Activo' ? 'Visible' : 'Oculto'}
                 </span>
               </div>
             </div>

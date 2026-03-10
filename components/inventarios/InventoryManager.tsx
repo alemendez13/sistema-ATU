@@ -1,3 +1,4 @@
+//components/inventarios/InventoryManager
 "use client";
 import { useState, useEffect } from "react";
 import { collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "@/lib/firebase-guard";
@@ -20,7 +21,8 @@ export default function InventoryManager({ productosIniciales }: InventoryProps)
   const [skuSeleccionado, setSkuSeleccionado] = useState("");
   const [loteFab, setLoteFab] = useState("");
   const [caducidad, setCaducidad] = useState("");
-  const [cantidad, setCantidad] = useState<number | "">("");
+  const [cantidad, setCantidad] = useState<number | "">(""); // 🛠️ ESTADO RECUPERADO
+  const [ubicacion, setUbicacion] = useState(""); // 📍 Etiqueta de ubicación
   const [loading, setLoading] = useState(false);
 
   // 1. Cargar inventario actual al abrir
@@ -48,12 +50,15 @@ export default function InventoryManager({ productosIniciales }: InventoryProps)
       await addDoc(collection(db, "inventarios"), {
         sku: skuSeleccionado,
         nombre: productoInfo?.nombre,
+        ubicacion: ubicacion, 
         lote: loteFab.toUpperCase(),
         fechaCaducidad: caducidad,
         stockInicial: Number(cantidad),
-        stockActual: Number(cantidad), // Al inicio es igual al inicial
+        stockActual: Number(cantidad),
         fechaRegistro: serverTimestamp()
       });
+
+      setUbicacion(""); // Limpiar después de guardar
 
       alert("✅ Lote registrado correctamente");
       setLoteFab("");
@@ -116,6 +121,20 @@ export default function InventoryManager({ productosIniciales }: InventoryProps)
         <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cantidad (Unidades)</label>
             <input type="number" required min="1" className="w-full p-2 border rounded" value={cantidad} onChange={e => setCantidad(Number(e.target.value))} placeholder="0" />
+        </div>
+
+        <div>
+            <label className="block text-xs font-bold text-blue-600 uppercase mb-1">📍 Ubicación de Destino</label>
+            <select 
+                className="w-full p-2 border-2 border-blue-100 rounded bg-blue-50 font-bold"
+                value={ubicacion}
+                onChange={(e) => setUbicacion(e.target.value)}
+                required
+            >
+                <option value="">-- Seleccionar --</option>
+                <option value="Satelite">🛰️ Satélite</option>
+                <option value="Central">🏥 Central / Matriz</option>
+            </select>
         </div>
 
         <button disabled={loading} className="bg-blue-600 text-white font-bold p-2 rounded hover:bg-blue-700 transition-colors">

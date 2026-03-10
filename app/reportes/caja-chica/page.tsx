@@ -18,21 +18,15 @@ export default function ReporteCajaChicaPage() {
   const [fechaFin, setFechaFin] = useState(ultimoDia);
   const [gastos, setGastos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [totalGasto, setTotalGasto] = useState(0);
+  const [totalInyecciones, setTotalInyecciones] = useState(0); // Acumulado de entradas
+  const [totalEgresos, setTotalEgresos] = useState(0);         // Acumulado de salidas
 
   const cargarGastos = async () => {
     setLoading(true);
-    setGastos([]);
-    setTotalGasto(0);
-
     try {
-      // Ajustamos las fechas para cubrir todo el día
-      // "T00:00:00" para el inicio y "T23:59:59" para el final
       const start = new Date(`${fechaInicio}T00:00:00`);
       const end = new Date(`${fechaFin}T23:59:59`);
 
-      // Consulta a la colección 'gastos' (Asumiendo que GastosManager guarda ahí)
-      // Si tu colección se llama diferente (ej. 'egresos'), cambia "gastos" por el nombre real.
       const q = query(
         collection(db, "gastos"), 
         where("fecha", ">=", start),
@@ -42,22 +36,31 @@ export default function ReporteCajaChicaPage() {
 
       const snapshot = await getDocs(q);
       
-      let suma = 0;
-      const datos = snapshot.docs.map(doc => {
-  const data = doc.data();
-  const monto = cleanPrice(data.monto);
-  suma += monto;
+      let sumaInyecciones = 0;
+      let sumaEgresos = 0;
 
-  return {
-    id: doc.id,
-    ...data,
-    monto: monto,
-    fechaLegible: formatDate(data.fecha) // Usa la función maestra
-  };
-});
+      const datos = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const monto = cleanPrice(data.monto);
+        
+        // 🧠 LÓGICA DE DIFERENCIACIÓN (SANSCE OS Standard)
+        if (data.tipo === "Ingreso") {
+          sumaInyecciones += monto;
+        } else {
+          sumaEgresos += monto;
+        }
+
+        return {
+          id: doc.id,
+          ...data,
+          monto: monto,
+          fechaLegible: formatDate(data.fecha)
+        };
+      });
 
       setGastos(datos);
-      setTotalGasto(suma);
+      setTotalInyecciones(sumaInyecciones);
+      setTotalEgresos(sumaEgresos);
 
       if (datos.length === 0) {
         toast.info("No hay gastos registrados en este periodo.");
@@ -128,24 +131,27 @@ export default function ReporteCajaChicaPage() {
             </div>
           </div>
 
-          {/* Resumen */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-             <div className="bg-white p-6 rounded-xl border border-red-100 shadow-sm flex items-center justify-between">
-                <div>
-                    <p className="text-sm font-bold text-slate-400 uppercase">Total Egresos</p>
-                    <p className="text-3xl font-bold text-red-600 mt-1">
-                        -${totalGasto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                    </p>
-                </div>
-                <div className="text-4xl opacity-20">💸</div>
+          {/* Resumen de Tres Vías (SANSCE OS Standard) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+             <div className="bg-white p-5 rounded-xl border border-green-100 shadow-sm">
+                <p className="text-[10px] font-black text-green-600 uppercase tracking-widest">Inyecciones (Entradas)</p>
+                <p className="text-2xl font-bold text-slate-800 mt-1">
+                    ${totalInyecciones.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </p>
+             </div>
+
+             <div className="bg-white p-5 rounded-xl border border-red-100 shadow-sm">
+                <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">Egresos (Gastos)</p>
+                <p className="text-2xl font-bold text-slate-800 mt-1">
+                    -${totalEgresos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </p>
              </div>
              
-             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                <div>
-                    <p className="text-sm font-bold text-slate-400 uppercase">Movimientos</p>
-                    <p className="text-3xl font-bold text-slate-800 mt-1">{gastos.length}</p>
-                </div>
-                <div className="text-4xl opacity-20">🧾</div>
+             <div className={`p-5 rounded-xl border shadow-md transition-colors ${ (totalInyecciones - totalEgresos) >= 0 ? 'bg-blue-600 border-blue-700' : 'bg-orange-600 border-orange-700'}`}>
+                <p className="text-[10px] font-black text-white/80 uppercase tracking-widest">Efectivo Neto en Caja</p>
+                <p className="text-2xl font-bold text-white mt-1">
+                    ${(totalInyecciones - totalEgresos).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </p>
              </div>
           </div>
 
@@ -169,12 +175,19 @@ export default function ReporteCajaChicaPage() {
                     <tbody className="divide-y divide-slate-100">
                         {gastos.length > 0 ? (
                             gastos.map((gasto) => (
-                                <tr key={gasto.id} className="hover:bg-slate-50 transition-colors">
+                                <tr key={gasto.id} className={`hover:bg-slate-50 transition-colors ${gasto.tipo === 'Ingreso' ? 'bg-green-50/20' : ''}`}>
                                     <td className="px-4 py-3 text-slate-500 font-mono text-xs">
                                         {gasto.fechaLegible}
                                     </td>
-                                    <td className="px-4 py-3 font-medium text-slate-800">
-                                        {gasto.descripcion || gasto.concepto || "Sin descripción"}
+                                    <td className="px-4 py-3">
+                                        <div className="flex flex-col">
+                                            <span className="font-medium text-slate-800">
+                                                {gasto.descripcion || gasto.concepto || "Sin descripción"}
+                                            </span>
+                                            <span className={`text-[9px] font-black uppercase tracking-tighter ${gasto.tipo === 'Ingreso' ? 'text-green-600' : 'text-red-400'}`}>
+                                                {gasto.tipo === 'Ingreso' ? '📥 Inyección de Caja' : '📤 Egreso / Gasto'}
+                                            </span>
+                                        </div>
                                     </td>
                                     <td className="px-4 py-3">
                                         <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs">
@@ -184,8 +197,8 @@ export default function ReporteCajaChicaPage() {
                                     <td className="px-4 py-3 text-slate-500 text-xs">
                                         {gasto.autorizadoPor || gasto.responsable || "-"}
                                     </td>
-                                    <td className="px-4 py-3 text-right font-bold text-red-600">
-                                        -${Number(gasto.monto).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                    <td className={`px-4 py-3 text-right font-bold ${gasto.tipo === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
+                                        {gasto.tipo === 'Ingreso' ? '+' : '-'}${Number(gasto.monto).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                     </td>
                                 </tr>
                             ))

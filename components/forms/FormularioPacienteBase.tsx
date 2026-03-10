@@ -1,3 +1,4 @@
+//components/forms/FormularioPacientesBase.tsx
 "use client";
 import React from "react";
 import SmartAvatarUploader from "../ui/SmartAvatarUploader";

@@ -1,3 +1,4 @@
+//components/finanzas/CorteDia.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { collection, query, where, onSnapshot, orderBy } from "@/lib/firebase-guard";
@@ -61,8 +62,12 @@ export default function CorteDia() {
 
   // --- CÁLCULOS MATEMÁTICOS ---
   // 🛠️ FUNCIÓN DE SUMA ROBUSTA (Corregida para el problema de los ceros)
-  const calcularTotal = (arr: any[], filtro?: string) => {
+  // 🛠️ FUNCIÓN DE SUMA MULTICRITERIO (SANSCE OS)
+  const calcularTotal = (arr: any[], filtro?: string, sucursalFiltro?: string) => {
     return arr.reduce((acc, curr) => {
+        // 🛡️ FILTRO DE SUCURSAL: Si pedimos una sucursal específica, ignoramos el resto.
+        if (sucursalFiltro && curr.sucursal !== sucursalFiltro) return acc;
+
         let montoItem = 0;
         
         // 1. Determinar el monto real (Vales y Cortesías siempre computan como $0 en flujo de caja)
@@ -95,6 +100,9 @@ export default function CorteDia() {
   };
 
   const totalVendido = calcularTotal(ingresos); 
+  // 🛰️ Totales segregados por punto de venta
+  const totalSatelite = calcularTotal(ingresos, undefined, "Satelite");
+  const totalCentral = calcularTotal(ingresos, undefined, "Central");
 
   // --- NUEVA LÓGICA DE CAJA CHICA (Inyecciones vs Gastos) ---
   const sumaInyecciones = gastos
@@ -175,9 +183,23 @@ export default function CorteDia() {
             <div className="flex justify-between items-start mb-4">
               <p className="text-xs font-black text-blue-600 uppercase tracking-wider">🟢 Cuenta de Ventas</p>
             </div>
-            <div className="border-b border-slate-50 pb-4 mb-4">
-                <p className="text-xs text-slate-400 font-bold uppercase">Ventas Totales (Bruto)</p>
-                <p className="text-3xl font-black text-slate-800">${totalVendido.toFixed(2)}</p>
+            <div className="border-b border-slate-50 pb-4 mb-4 space-y-4">
+                <div>
+                  <p className="text-xs text-slate-400 font-bold uppercase">Ventas Totales (Bruto)</p>
+                  <p className="text-3xl font-black text-slate-800">${totalVendido.toFixed(2)}</p>
+                </div>
+                
+                {/* 🛰️ DESGLOSE POR SUCURSAL (SANSCE OS) */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 shadow-sm animate-fade-in">
+                    <span className="block text-[10px] text-blue-600 font-black uppercase tracking-widest">🛰️ Satélite</span>
+                    <span className="text-lg font-black text-slate-700">${totalSatelite.toFixed(2)}</span>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <span className="block text-[10px] text-slate-500 font-black uppercase tracking-widest">🏥 Central</span>
+                    <span className="text-lg font-black text-slate-700">${totalCentral.toFixed(2)}</span>
+                  </div>
+                </div>
             </div>
 
             {esAdmin && (

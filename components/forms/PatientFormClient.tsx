@@ -1,3 +1,4 @@
+//components/forms/PatientFormClient.tsx
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
@@ -53,6 +54,7 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [descuentoSeleccionado, setDescuentoSeleccionado] = useState<any>(null);
   const [montoFinal, setMontoFinal] = useState(0);
+  const [ubicacionVenta, setUbicacionVenta] = useState("Satelite"); // 📍 Default a Satélite
   const [esServicioMedico, setEsServicioMedico] = useState(false);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm();
@@ -217,14 +219,14 @@ const onSubmit = async (data: any) => {
       return { id: newPacRef.id, folio: folioExpediente };
     });
 
-    // 4. DESCONTAR STOCK (Mejora: Homologado con VentaForm para trazabilidad Folio + Nombre)
+    // 4. DESCONTAR STOCK (Sincronizado con Sucursal Satélite)
     if (servicioSeleccionado.tipo === "Producto" && requiereStock) {
-      // @ts-ignore
       await descontarStockPEPS(
         servicioSeleccionado.sku, 
         servicioSeleccionado.nombre, 
         1, 
-        `${result.folio} - ${nombreConstruido}` // 👈 CAMBIO CLAVE: Concatenamos el nombre
+        `${result.folio} - ${nombreConstruido}`,
+        ubicacionVenta as any // 👈 5to Argumento: Ahora descuenta de la sucursal elegida
       );
     }
 
@@ -369,6 +371,24 @@ const onSubmit = async (data: any) => {
                     />
                 </div>
              </div>
+          </div>
+          {/* 📍 SELECTOR DE SUCURSAL (SANSCE OS) */}
+          <div className="mt-6 bg-blue-600 p-4 rounded-xl shadow-md flex items-center justify-between text-white animate-fade-in">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🏪</span>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Inventario de Salida</p>
+                  <p className="text-sm font-bold">¿De qué sucursal sale el producto?</p>
+                </div>
+              </div>
+              <select 
+                  value={ubicacionVenta}
+                  onChange={(e) => setUbicacionVenta(e.target.value)}
+                  className="bg-blue-700 border-2 border-blue-400 rounded-lg font-bold text-xs p-2 focus:ring-2 focus:ring-white outline-none cursor-pointer hover:bg-blue-800 transition-all"
+              >
+                  <option value="Satelite">🛰️ SUCURSAL SATÉLITE</option>
+                  <option value="Central">🏥 MATRIZ / CENTRAL</option>
+              </select>
           </div>
         </section>
 

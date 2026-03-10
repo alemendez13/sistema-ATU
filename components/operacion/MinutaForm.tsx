@@ -30,8 +30,9 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
   const [puntosOrden, setPuntosOrden] = useState([{ punto: '', proyecto: '' }]);
   const [isSaving, setIsSaving] = useState(false);
   const [compromisos, setCompromisos] = useState<any[]>([]);
-  // 🚀 CONTROLADOR DE MODAL SANSCE: Para nuevos Proyectos y Actividades
+  // 🚀 CONTROLADOR DE MODAL SANSCE: Jerarquía dividida (Proyecto vs Actividad)
   const [showHitoModal, setShowHitoModal] = useState(false);
+  const [hitoMode, setHitoMode] = useState<'proyecto' | 'actividad'>('proyecto');
 
   // 🧠 SENSOR DE MEMORIA PROACTIVO: Localiza la reunión inmediata anterior con Diagnóstico
   useEffect(() => {
@@ -426,13 +427,22 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
             <Plus size={14} /> Tareas y Compromisos Generados
           </label>
           <div className="flex gap-2">
-  {/* 🆕 BOTÓN: NUEVO PROYECTO / ACTIVIDAD */}
+  {/* 🆕 BOTÓN A: CATEGORÍA MACRO (PROYECTO) */}
   <button
     type="button"
-    onClick={() => setShowHitoModal(true)}
+    onClick={() => { setHitoMode('proyecto'); setShowHitoModal(true); }}
     className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-md text-[10px] font-black hover:bg-emerald-100 transition-all uppercase"
   >
-    <Target size={12} /> + Proyecto / Actividad
+    <Target size={12} /> + Nuevo Proyecto
+  </button>
+
+  {/* 🆕 BOTÓN B: ACCIÓN ESPECÍFICA (ACTIVIDAD) */}
+  <button
+    type="button"
+    onClick={() => { setHitoMode('actividad'); setShowHitoModal(true); }}
+    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-[10px] font-black hover:bg-indigo-100 transition-all uppercase"
+  >
+    <Briefcase size={12} /> + Nueva Actividad
   </button>
 
   <button
@@ -605,8 +615,14 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <div>
-                <h3 className="text-lg font-black text-slate-800">Maestro de Proyectos e Hitos</h3>
-                <p className="text-xs text-slate-500 font-medium">Registra una nueva categoría o acción estratégica en el Cronograma</p>
+                <h3 className="text-lg font-black text-slate-800">
+                  {hitoMode === 'proyecto' ? 'Registro de Nuevo Proyecto' : 'Registro de Nueva Actividad'}
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  {hitoMode === 'proyecto' 
+                    ? 'Define una nueva categoría macro de trabajo estratégico' 
+                    : 'Registra un entregable subordinado a un proyecto existente'}
+                </p>
               </div>
               <button 
                 onClick={() => setShowHitoModal(false)}
@@ -617,9 +633,11 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
             </div>
             <HitoForm 
               personal={personal} 
+              mode={hitoMode} // 👈 Inyectamos el modo seleccionado
+              projects={Array.from(new Set(hitos.map(h => h.Proyecto)))} // 👈 Enviamos la lista de proyectos existentes
               onSuccess={() => {
                 setShowHitoModal(false);
-                alert("✅ El nuevo proyecto/actividad ya está disponible en la lista.");
+                alert(`✅ ${hitoMode === 'proyecto' ? 'El proyecto' : 'La actividad'} se registró con éxito.`);
               }} 
             />
           </div>

@@ -9,10 +9,12 @@ import { saveHitoAction } from '@/lib/actions';
 interface HitoFormProps {
   personal: any[];
   onSuccess: () => void;
-  defaultProject?: string; 
+  defaultProject?: string;
+  mode?: 'proyecto' | 'actividad'; // 🛠️ Identificador de nivel (Jerarquía SANSCE)
+  projects?: string[]; // 🛠️ Listado de padres existentes para subordinación
 }
 
-export default function HitoForm({ personal, onSuccess, defaultProject }: HitoFormProps) {
+export default function HitoForm({ personal, onSuccess, defaultProject, mode = 'proyecto', projects = [] }: HitoFormProps) {
   const [loading, setLoading] = useState(false);
   const router = useRouter(); // ⚡ Activamos el controlador de actualización
 
@@ -38,18 +40,38 @@ export default function HitoForm({ personal, onSuccess, defaultProject }: HitoFo
     <form action={clientAction} className="p-8 space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
-        {/* 1. NOMBRE DEL PROYECTO (Categoría Macro / PC) */}
+        {/* 1. SELECCIÓN DE PROYECTO (Validación de Jerarquía SANSCE OS) */}
         <div className="md:col-span-2 space-y-2">
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-            <Target size={14} className="text-blue-600" /> Proyecto (PC Impactado / Categoría)
+            <Target size={14} className={mode === 'proyecto' ? "text-emerald-600" : "text-indigo-600"} /> 
+            {mode === 'proyecto' ? 'Nombre del Nuevo Proyecto' : 'Vincular a Proyecto Existente'}
           </label>
-          <input 
-            name="pc_impactado"
-            placeholder="Ej: Optimización de Quirófanos"
-            required
-            defaultValue={defaultProject} // 🆕 Aquí ocurre la magia: se auto-rellena
-            className="w-full p-4 bg-blue-50/30 border border-blue-100 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-blue-900"
-          />
+          
+          {mode === 'proyecto' ? (
+            <input 
+              name="pc_impactado"
+              placeholder="Ej: Expansión de Consultorios 2024"
+              required
+              className="w-full p-4 bg-emerald-50/30 border border-emerald-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-emerald-900 shadow-inner"
+            />
+          ) : (
+            <select
+              name="pc_impactado"
+              required
+              defaultValue={defaultProject}
+              className="w-full p-4 bg-indigo-50/30 border border-indigo-100 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold text-indigo-900 cursor-pointer"
+            >
+              <option value="">-- Seleccione el Proyecto Padre --</option>
+              {projects.filter(p => p).map(proj => (
+                <option key={proj} value={proj}>{proj}</option>
+              ))}
+            </select>
+          )}
+          <p className="text-[9px] text-slate-400 italic px-2">
+            {mode === 'proyecto' 
+              ? '* Esta acción creará una nueva categoría en el Cronograma Maestro.' 
+              : '* La actividad se agrupará bajo el proyecto seleccionado para evitar datos huérfanos.'}
+          </p>
         </div>
 
         {/* 2. TIPO DE ACTIVIDAD (Acción Específica) */}

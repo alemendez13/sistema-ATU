@@ -379,18 +379,10 @@ export async function saveMinutaCompletaAction(datosMinuta: {
         const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
         await doc.loadInfo();
 
-        // 🛠️ FORMATEADOR SANSCE (Garantiza DD/MM/AAAA)
-        const toSanceDate = (d: any) => {
-            const s = String(d);
-            if (!s || !s.includes('-')) return s;
-            const [y, m, day] = s.split('-');
-            return `${day}/${m}/${y}`;
-        };
-
-        // 1. Guardar el Acta en OPERACION_MINUTAS con fecha blindada
+        // 1. Guardar el Acta en OPERACION_MINUTAS (Formato Nativo YYYY-MM-DD)
         const sheetMinutas = doc.sheetsByTitle['OPERACION_MINUTAS'];
         await sheetMinutas.addRow({
-            Fecha: toSanceDate(datosMinuta.fecha),
+            Fecha: datosMinuta.fecha, // Guardado directo sin traducción
             Moderador: datosMinuta.moderador,
             Temas: datosMinuta.temas,
             Asistentes: datosMinuta.asistentes,
@@ -410,9 +402,9 @@ export async function saveMinutaCompletaAction(datosMinuta: {
                 ID_Tarea: idBusqueda || generateTaskId(),
                 Descripcion: tarea.descripcion,
                 EmailAsignado: tarea.responsable,
-                FechaInicio: toSanceDate(tarea.fechaInicio),
-                FechaEntrega: toSanceDate(tarea.fechaEntrega),
-                Estado: (tarea as any).estado || 'Pendiente', // 🚦 Ahora acepta el estado desde la minuta
+                FechaInicio: tarea.fechaInicio, // 📅 Guardado Nativo YYYY-MM-DD
+                FechaEntrega: tarea.fechaEntrega, // 📅 Guardado Nativo YYYY-MM-DD
+                Estado: (tarea as any).estado || 'Pendiente',
                 ID_Hito: tarea.idHito || 'Gral',
                 Area: tarea.area,
                 Proyecto: tarea.proyecto,
@@ -1003,6 +995,47 @@ export async function saveOkrElementAction(type: 'OBJ' | 'KR' | 'KPI', data: any
         return { success: true, id: generatedId };
     } catch (error: any) {
         console.error(`❌ Error en SANSCE OKR Engine (${type}):`, error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 🚀 ACCIÓN: CONTROL DE VISIBILIDAD ESTRATÉGICA
+ * Cambia el estatus de un Objetivo (Activo/Inactivo) directamente en Google Sheets.
+ */
+export async function updateObjectiveStatusAction(objectiveId: string, nuevoEstatus: 'Activo' | 'Inactivo') {
+    try {
+        const { GoogleSpreadsheet } = await import('google-spreadsheet');
+        const { JWT } = await import('google-auth-library');
+
+        const auth = new JWT({
+            email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+            key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        });
+
+        const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+        await doc.loadInfo();
+
+        const sheet = doc.sheetsByTitle['Objetivos'];
+        const rows = await sheet.getRows();
+        
+        // 🔍 BÚSQUEDA QUIRÚRGICA: Localizamos la fila exacta del objetivo
+        const row = rows.find(r => r.get('Objective_ID') === objectiveId);
+
+        if (!row) throw new Error("No se encontró el objetivo en la base de datos.");
+
+        // ✅ ACTUALIZACIÓN DE ESTATUS
+        row.set('Estatus', nuevoEstatus);
+        await row.save();
+
+        // ⚡ REVALIDACIÓN: Forzamos al sistema a refrescar la caché
+        const { revalidateTag } = await import('next/cache');
+        revalidateTag('okr-data-v1');
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("❌ Error en Cambio de Estatus:", error);
         return { success: false, error: error.message };
     }
 }

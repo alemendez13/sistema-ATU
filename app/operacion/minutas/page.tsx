@@ -1,5 +1,9 @@
 // app/operacion/minutas/page.tsx
 
+// 🛡️ PROTOCOLO DE SINCRONIZACIÓN SANSCE OS: Forzamos datos frescos en cada carga
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { getMedicos, getOperacionTareas, getOperacionCronograma, getOperacionMinutas } from "@/lib/googleSheets";
 import MinutaForm from "@/components/operacion/MinutaForm";
 
