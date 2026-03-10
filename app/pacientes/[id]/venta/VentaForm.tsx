@@ -124,19 +124,27 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
   // 1. Encontrar objetos seleccionados
   const servicioSeleccionado = servicios.find(s => s.sku === servicioSku);
 
-  // 2. Lógica de Precios
+  // 2. Lógica de Precios SANSCE OS (Porcentaje / Monto / Fijo)
   const precioOriginal = cleanPrice(servicioSeleccionado?.precio);
   let montoDescuento = 0;
   let precioFinal = precioOriginal;
 
   if (descuentoSeleccionado && precioOriginal > 0) {
-    if (descuentoSeleccionado.tipo === "Porcentaje") {
-      montoDescuento = (precioOriginal * descuentoSeleccionado.valor) / 100;
+    const tipo = descuentoSeleccionado.tipo?.trim().toLowerCase();
+    const valor = Number(descuentoSeleccionado.valor) || 0;
+
+    if (tipo === "porcentaje") {
+      montoDescuento = (precioOriginal * valor) / 100;
+      precioFinal = Math.max(0, precioOriginal - montoDescuento);
+    } else if (tipo === "fijo") {
+      // El valor del descuento se convierte en el Precio Final
+      precioFinal = valor;
+      montoDescuento = Math.max(0, precioOriginal - valor);
     } else {
-      montoDescuento = descuentoSeleccionado.valor;
+      // Por defecto trata como "Monto" (restar cantidad fija)
+      montoDescuento = valor;
+      precioFinal = Math.max(0, precioOriginal - montoDescuento);
     }
-    // Evitar negativos
-    precioFinal = Math.max(0, precioOriginal - montoDescuento);
   }
 
   // Efecto para detectar tipo de servicio
@@ -199,19 +207,28 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
     const servicioDetalle = servicios.find(s => s.sku === servicioSku);
     const medicoDetalle = medicos.find(m => m.id === medicoId);
 
-    // 💰 CÁLCULO DE PRECIOS (Snapshot exacto del momento)
-    let montoOriginalItem = cleanPrice(servicioDetalle?.precio);
+    // 💰 CÁLCULO DE PRECIOS SANSCE OS (Consistencia con Previsualización)
+    const montoOriginalItem = cleanPrice(servicioDetalle?.precio);
     let montoDescuentoItem = 0;
-    
+    let precioFinalItem = montoOriginalItem;
+
     if (descuentoSeleccionado && montoOriginalItem > 0) {
-        if (descuentoSeleccionado.tipo === "Porcentaje") {
-            montoDescuentoItem = (montoOriginalItem * descuentoSeleccionado.valor) / 100;
+        const tipo = descuentoSeleccionado.tipo?.trim().toLowerCase();
+        const valor = Number(descuentoSeleccionado.valor) || 0;
+
+        if (tipo === "porcentaje") {
+            montoDescuentoItem = (montoOriginalItem * valor) / 100;
+            precioFinalItem = Math.max(0, montoOriginalItem - montoDescuentoItem);
+        } else if (tipo === "fijo") {
+            // El valor del descuento se convierte en el Precio Final inamovible
+            precioFinalItem = valor;
+            montoDescuentoItem = Math.max(0, montoOriginalItem - valor);
         } else {
-            montoDescuentoItem = descuentoSeleccionado.valor;
+            // "Monto" (Sustracción directa)
+            montoDescuentoItem = valor;
+            precioFinalItem = Math.max(0, montoOriginalItem - montoDescuentoItem);
         }
     }
-    // Evitar negativos matemáticos
-    const precioFinalItem = Math.max(0, montoOriginalItem - montoDescuentoItem);
 
     const nuevoItem: ItemCarrito = {
         uniqueId: Date.now().toString(),

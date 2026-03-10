@@ -119,13 +119,25 @@ export default function PatientFormClient({ servicios, medicos, descuentos }: Pa
     setEsLaboratorio(isLab);
     setEsServicioMedico(servicioSeleccionado.tipo === "Servicio" || isLab);
 
-    let precioBase = cleanPrice(servicioSeleccionado.precio); 
+    const precioBase = cleanPrice(servicioSeleccionado.precio); 
+    let precioCalculado = precioBase;
+
     if (descuentoSeleccionado && precioBase > 0) {
-      precioBase = descuentoSeleccionado.tipo === "Porcentaje" 
-        ? precioBase - ((precioBase * descuentoSeleccionado.valor) / 100)
-        : precioBase - descuentoSeleccionado.valor;
+      const tipo = descuentoSeleccionado.tipo?.trim().toLowerCase();
+      const valor = Number(descuentoSeleccionado.valor) || 0;
+
+      if (tipo === "porcentaje") {
+        precioCalculado = precioBase - ((precioBase * valor) / 100);
+      } else if (tipo === "fijo") {
+        precioCalculado = valor;
+      } else {
+        // "Monto" o cualquier otro valor resta directamente
+        precioCalculado = precioBase - valor;
+      }
     }
-    setMontoFinal(Math.max(0, precioBase || 0));
+    
+    // Garantizamos que el monto final sea número y no baje de cero
+    setMontoFinal(Math.max(0, precioCalculado || 0));
   }, [servicioSeleccionado, descuentoSeleccionado]);
 
   useEffect(() => {
