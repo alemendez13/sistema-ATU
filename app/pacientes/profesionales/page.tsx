@@ -36,7 +36,12 @@ const parseScheduleToBlocks = (reglaStr: string) => {
 };
 
 export default async function CatalogoProfesionales() {
-    const medicos = await getMedicosAction();
+    const medicosRaw = await getMedicosAction();
+    
+    // Filtramos solo filas que tengan ID y Nombre para evitar errores de 'undefined'
+    const medicos = Array.isArray(medicosRaw) 
+        ? medicosRaw.filter(m => m && m.id && m.nombre && m.nombre.trim() !== "") 
+        : [];
     const START_HOUR = 8 * 60; // El calendario visual inicia a las 8:00 AM
     const END_HOUR = 21 * 60;  // Termina a las 9:00 PM
     const TOTAL_MINS = END_HOUR - START_HOUR;
