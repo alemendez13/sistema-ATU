@@ -1,28 +1,25 @@
+//middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtVerify } from 'jose'; 
+// @ts-ignore - Evita que VSC marque error por falta de tipos en la librería jose
+import { jwtVerify } from 'jose';
 
 // --- MAPA DE ACCESOS (Alineado estrictamente al PDF CONTROL_DOCUMENTAL_RBAC) ---
 const ROLE_ACCESS: Record<string, string[]> = {
-  // FINANZAS: Según PDF (FIN-FR-14, Cartera Vencida), acceden 'admin' y 'recepcion'.
-  // Agregamos 'coord' por lógica de supervisión.
-  '/finanzas': ['admin', 'recepcion', 'coord'], 
+  // CONTROL TOTAL: Solo para el mando más alto.
+  '/configuracion': ['admin_general'],
   
-  // REPORTES: Según PDF (Conciliación Lab), acceden 'admin' y 'recepcion'.
-  '/reportes': ['admin', 'recepcion', 'coord'],
+  // ADMINISTRACIÓN Y FINANZAS: Admin y su coordinación.
+  '/finanzas': ['admin_general', 'coordinacion_admin'], 
+  '/reportes': ['admin_general', 'coordinacion_admin', 'atu'],
   
-  // CONFIGURACIÓN / GESTIÓN DE MATERIALES (GEM): Según PDF, exclusivo 'admin'.
-  '/configuracion': ['admin'],
+  // OPERACIÓN CLÍNICA: Acceso para todo el personal operativo.
+  '/agenda': ['admin_general', 'coordinacion_admin', 'atu', 'medico_renta', 'profesional_salud'],
+  '/pacientes': ['admin_general', 'coordinacion_admin', 'atu', 'profesional_salud'],
   
-  // INVENTARIOS: Acceso operativo para descontar insumos.
-  '/inventarios': ['admin', 'coord', 'enfermeria', 'medico', 'recepcion'],
-  
-  // PACIENTES / AGENDA: El núcleo operativo, acceso general del equipo.
-  '/pacientes': ['admin', 'coord', 'recepcion', 'ps', 'medico', 'enfermeria'],
-  '/agenda': ['admin', 'coord', 'recepcion', 'medico'],
-  
-  // EXPEDIENTES CLÍNICOS ([id]):
-  '/expedientes': ['admin', 'coord', 'medico', 'ps', 'recepcion'],
+  // ÁREA MÉDICA: Exclusivo para clínicos (incluye Admin Gral por supervisión).
+  '/expedientes': ['admin_general', 'medico_renta', 'profesional_salud'],
+  '/inventarios': ['admin_general', 'coordinacion_admin', 'profesional_salud', 'atu'],
 };
 
 export async function middleware(request: NextRequest) {
