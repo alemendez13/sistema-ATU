@@ -40,7 +40,6 @@ export default function Sidebar() {
     { id: 0, name: "Inicio", icon: <LayoutDashboard size={18} />, href: "/" },
     { id: 10, name: "Agenda Médica", icon: <Calendar size={18} />, href: "/agenda" },
     { id: 11, name: "Directorio Clínico", icon: <FolderOpen size={18} />, href: "/pacientes" },
-    { id: 4, name: "Control de Pacientes", icon: <HeartPulse size={18} />, href: "/pacientes" },
     { id: 12, name: "Expediente Digital", icon: <FileText size={18} />, href: "/expedientes" },
     { id: 6, name: "Insumos e Inventario", icon: <Package size={18} />, href: "/inventarios" },
     { id: 7, name: "Cronograma Operativo", icon: <ClipboardList size={18} />, href: "/operacion/tareas" },

@@ -29,10 +29,10 @@ export default async function Page() {
           
           <div className="w-px h-8 bg-slate-200 mx-1 hidden md:block"></div>
 
-          {/* Accesos Migrados desde M8 */}
-          <Link href="/reportes/hoja-frontal" className="text-slate-500 hover:bg-blue-50 hover:text-blue-600 px-4 py-2 rounded-xl text-xs font-medium transition-all">📄 Hoja Frontal</Link>
-          <Link href="/reportes/cotizacion-lab" className="text-slate-500 hover:bg-blue-50 hover:text-blue-600 px-4 py-2 rounded-xl text-xs font-medium transition-all">🧪 Cotización Lab</Link>
-          <Link href="/reportes/facturacion" className="text-slate-500 hover:bg-blue-50 hover:text-blue-600 px-4 py-2 rounded-xl text-xs font-medium transition-all">📑 Control Facturación</Link>
+          {/* Accesos Sincronizados con Módulo de Inteligencia (M8) */}
+          <Link href="/reportes/ingresos-sansce" className="text-slate-500 hover:bg-blue-50 hover:text-blue-600 px-4 py-2 rounded-xl text-xs font-medium transition-all">📊 Reporte Global</Link>
+          <Link href="/reportes/conciliacion-lab" className="text-slate-500 hover:bg-blue-50 hover:text-blue-600 px-4 py-2 rounded-xl text-xs font-medium transition-all">🧪 Conciliación Lab</Link>
+          <Link href="/reportes/factura-global" className="text-slate-500 hover:bg-blue-50 hover:text-blue-600 px-4 py-2 rounded-xl text-xs font-medium transition-all">📑 Factura Global</Link>
 
           <div className="w-px h-8 bg-slate-200 mx-1 hidden md:block"></div>
 
