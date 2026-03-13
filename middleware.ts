@@ -6,12 +6,13 @@ import { jwtVerify } from 'jose';
 
 // --- MAPA DE ACCESOS (Alineado estrictamente al PDF CONTROL_DOCUMENTAL_RBAC) ---
 const ROLE_ACCESS: Record<string, string[]> = {
-  // CONTROL TOTAL: Solo para el mando más alto.
+  // CONTROL TOTAL: Solo para el mando más alto (SANSCE OS v2).
   '/configuracion': ['admin_general'],
   
-  // ADMINISTRACIÓN Y FINANZAS: Admin y su coordinación.
-  '/finanzas': ['admin_general', 'coordinacion_admin'], 
+  // GESTIÓN INTEGRAL: Reportes Financieros, Procesos y Eficacia.
+  // Se unifican permisos y se otorga acceso explícito al rol 'atu'.
   '/reportes': ['admin_general', 'coordinacion_admin', 'atu'],
+  '/finanzas': ['admin_general', 'coordinacion_admin', 'atu'], 
   
   // OPERACIÓN CLÍNICA: Acceso para todo el personal operativo.
   '/agenda': ['admin_general', 'coordinacion_admin', 'atu', 'medico_renta', 'profesional_salud'],
@@ -66,8 +67,8 @@ export async function middleware(request: NextRequest) {
     if (rutaProtegida) {
       const rolesPermitidos = ROLE_ACCESS[rutaProtegida];
       
-      // COMODÍN: El admin siempre pasa
-      if (userRole === 'admin') return NextResponse.next();
+      // COMODÍN DE MANDO: El admin_general siempre tiene paso libre.
+      if (userRole === 'admin' || userRole === 'admin_general') return NextResponse.next();
 
       if (!rolesPermitidos.includes(userRole)) {
         console.log(`⛔ Bloqueo de seguridad: Rol '${userRole}' intentó entrar a '${pathname}'`);
