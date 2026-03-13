@@ -33,14 +33,14 @@ export default function PanelReportesPage() {
           {/* HEADER CON SUB-NAVBAR M8 */}
           <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Centro de Inteligencia</h1>
-              <p className="text-slate-500 text-sm">Módulo 8: Auditoría y Estrategia.</p>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Centro de Inteligencia y Eficacia</h1>
+              <p className="text-slate-500 text-sm">Módulo 8: Inteligencia de Procesos y Estrategia.</p>
             </div>
             
             <div className="flex gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
-              <Link href="/finanzas" className="text-slate-600 hover:bg-slate-100 px-4 py-2 rounded-lg text-xs font-bold transition-all">💰 Caja Principal</Link>
-              <Link href="/reportes" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md">📈 Reportes e Inteligencia</Link>
-              <Link href="/finanzas/gastos" className="text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-xs font-bold transition-all">💸 Gastos</Link>
+              <Link href="/finanzas" className="text-slate-600 hover:bg-slate-100 px-4 py-2 rounded-lg text-xs font-bold transition-all">📊 Eficacia Operativa</Link>
+              <Link href="/reportes" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md">📈 Inteligencia y Estrategia</Link>
+              <Link href="/finanzas/gastos" className="text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-xs font-bold transition-all">🧾 Flujo de Gastos</Link>
             </div>
           </div>
           
