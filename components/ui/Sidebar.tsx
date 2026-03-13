@@ -35,18 +35,20 @@ export default function Sidebar() {
   // Función para alternar el sidebar
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
 
-  // Lista maestra de módulos (Refactorizada para minimalismo)
+  // Lista maestra de módulos (Restauración Quirúrgica v4.2)
   const menuItems = [
     { id: 0, name: "Inicio", icon: <LayoutDashboard size={18} />, href: "/" },
     { id: 10, name: "Agenda Médica", icon: <Calendar size={18} />, href: "/agenda" },
-    { id: 11, name: "Directorio", icon: <FolderOpen size={18} />, href: "/pacientes" },
+    { id: 11, name: "Directorio Clínico", icon: <FolderOpen size={18} />, href: "/pacientes" },
     { id: 4, name: "Control de Pacientes", icon: <HeartPulse size={18} />, href: "/pacientes" },
-    { id: 12, name: "Expediente Clínico", icon: <FileText size={18} />, href: "/expedientes" },
+    { id: 12, name: "Expediente Digital", icon: <FileText size={18} />, href: "/expedientes" },
     { id: 6, name: "Insumos e Inventario", icon: <Package size={18} />, href: "/inventarios" },
+    { id: 7, name: "Cronograma Operativo", icon: <ClipboardList size={18} />, href: "/operacion/tareas" },
     { id: 8, name: "Finanzas y Reportes", icon: <BarChart3 size={18} />, href: "/finanzas" },
     { id: 5, name: "Recursos Humanos", icon: <Users size={18} />, href: "/personal" },
     { id: 2, name: "Metas / KPIs", icon: <Target size={18} />, href: "/planeacion" },
-    { id: 1, name: "Configuración", icon: <Settings size={18} />, href: "/configuracion" },
+    { id: 3, name: "Gestión y Auditoría", icon: <GitBranch size={18} />, href: "/configuracion/auditoria" },
+    { id: 1, name: "Configuración General", icon: <Settings size={18} />, href: "/configuracion" },
   ];
 
   return (
