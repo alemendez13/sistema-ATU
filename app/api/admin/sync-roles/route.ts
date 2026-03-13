@@ -4,24 +4,32 @@ import { db, auth } from 'lib/firebase-admin';
 
 export async function GET() {
   try {
-    // 1. Obtenemos todos los usuarios registrados en Firestore
-    // Asumimos que existe una colección "usuarios" donde guardas el perfil de cada persona
-    const usersSnapshot = await db.collection('usuarios').get();
+    // 1. UNIFICACIÓN SANSCE: Ahora leemos de la colección maestra de roles
+    const usersSnapshot = await db.collection('usuarios_roles').get();
     
     const reporte = [];
-    const rolesValidos = ['admin', 'coord', 'recepcion', 'ps', 'medico', 'all'];
+    // NUEVA MATRIZ DE ROLES SANSCE OS
+    const rolesValidos = [
+      'admin_general', 
+      'coordinacion_admin', 
+      'atu', 
+      'medico_renta', 
+      'profesional_salud'
+    ];
 
     for (const doc of usersSnapshot.docs) {
       const datos = doc.data();
       const uid = doc.id;
       
-      // 2. Buscamos el campo 'rol' en el documento del usuario.
-      // Convertimos a minúsculas para evitar errores (Admin vs admin)
-      let rolUsuario = (datos.rol || 'all').toLowerCase().trim();
+      // Buscamos el rol en el nuevo campo 'rol' o en el antiguo para compatibilidad
+      let rolUsuario = (datos.rol || 'invitado').toLowerCase().trim();
 
-      // Validación de seguridad: Si tiene un rol raro, lo bajamos a 'all'
+      // Mapeo de transición (Opcional: convierte roles viejos a nuevos automáticamente)
+      if (rolUsuario === 'admin') rolUsuario = 'admin_general';
+      if (rolUsuario === 'recepcion') rolUsuario = 'atu';
+
       if (!rolesValidos.includes(rolUsuario)) {
-        rolUsuario = 'all'; 
+        rolUsuario = 'invitado'; 
       }
 
       // 3. Escribimos el "Sello Digital" (Custom Claim) en Firebase Auth

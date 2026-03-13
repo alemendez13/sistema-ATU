@@ -33,6 +33,7 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
   // 🚀 CONTROLADOR DE MODAL SANSCE: Jerarquía dividida (Proyecto vs Actividad)
   const [showHitoModal, setShowHitoModal] = useState(false);
   const [hitoMode, setHitoMode] = useState<'proyecto' | 'actividad'>('proyecto');
+  const [verRadar, setVerRadar] = useState(false); // 📡 Control de visibilidad del radar (SANSCE UI)
 
   // 🧠 SENSOR DE MEMORIA PROACTIVO: Localiza la reunión inmediata anterior con Diagnóstico
   useEffect(() => {
@@ -347,27 +348,40 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
       </section>
 
       {/* 🆕 SECCIÓN: SEGUIMIENTO INTELIGENTE (RADAR DE COMPROMISOS) */}
-      <section className="p-6 bg-blue-50/50 rounded-2xl border-2 border-dashed border-blue-100 space-y-4">
+      <section className={`p-6 bg-blue-50/50 rounded-2xl border-2 border-dashed border-blue-100 transition-all duration-300 ${verRadar ? 'space-y-4' : 'space-y-0'}`}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h3 className="text-sm font-black text-blue-900 uppercase flex items-center gap-2">
-              📡 Radar de Pendientes (Semana Actual)
-            </h3>
-            <p className="text-[10px] text-blue-600 font-medium">Vencimientos entre {lunes} y {domingo}</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h3 className="text-sm font-black text-blue-900 uppercase flex items-center gap-2">
+                📡 Radar de Pendientes (Semana Actual)
+              </h3>
+              <p className="text-[10px] text-blue-600 font-medium">Vencimientos entre {lunes} y {domingo}</p>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setVerRadar(!verRadar)}
+              className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-lg shadow-md hover:bg-blue-700 transition-colors uppercase tracking-widest"
+            >
+              {verRadar ? 'Ocultar' : 'Desplegar Radar'}
+            </button>
           </div>
           
-          <select 
-            value={filtroPersona}
-            onChange={(e) => setFiltroPersona(e.target.value)}
-            className="text-[10px] font-bold py-1 px-3 rounded-full border-blue-200 text-blue-700 bg-white shadow-sm"
-          >
-            <option value="">Filtrar por Responsable (Todos)</option>
-            {personal.map(p => <option key={p.id} value={p.email}>{p.nombre}</option>)}
-          </select>
+          {verRadar && (
+            <select 
+              value={filtroPersona}
+              onChange={(e) => setFiltroPersona(e.target.value)}
+              className="text-[10px] font-bold py-1 px-3 rounded-full border-blue-200 text-blue-700 bg-white shadow-sm animate-in fade-in"
+            >
+              <option value="">Filtrar por Responsable (Todos)</option>
+              {personal.map(p => <option key={p.id} value={p.email}>{p.nombre}</option>)}
+            </select>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {pendientesSemana.length > 0 ? pendientesSemana.map((tarea, idx) => {
+        {verRadar && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in slide-in-from-top-2 duration-300">
+            {pendientesSemana.length > 0 ? pendientesSemana.map((tarea, idx) => {
+              
             // 🛡️ DETECTOR DE ARRASTRE: ¿Esta tarea nació en la minuta anterior?
             const esArrastre = minutaPrevia && tarea.FechaInicio === minutaPrevia.Fecha;
 
@@ -418,15 +432,16 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
             <p className="text-[10px] text-slate-400 italic py-4">No hay compromisos pendientes de entrega para esta semana.</p>
           )}
         </div>
+        )}
       </section>
 
       {/* SECCIÓN 3: COMPROMISOS DINÁMICOS */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="flex flex-col gap-4 border-b border-slate-100 pb-4">
           <label className="text-xs font-bold uppercase text-blue-600 flex items-center gap-2">
             <Plus size={14} /> Tareas y Compromisos Generados
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
   {/* 🆕 BOTÓN A: CATEGORÍA MACRO (PROYECTO) */}
   <button
     type="button"
@@ -450,7 +465,7 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
     onClick={agregarCompromiso}
     className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-black hover:bg-blue-100 transition-all uppercase"
   >
-    <Plus size={12} /> + Añadir Compromiso
+    <Plus size={12} /> + Añadir Tarea
   </button>
 </div>
         </div>

@@ -43,29 +43,39 @@ export default function Navbar() {
 
   return (
     <nav 
-      className="fixed top-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm h-20 px-4 md:px-8 transition-all duration-300 ease-in-out flex items-center justify-end"
+      className="fixed top-0 right-0 z-30 bg-sansce-surface/80 backdrop-blur-md border-b border-sansce-border shadow-premium h-16 px-6 md:px-10 transition-all duration-300 ease-in-out flex items-center justify-end"
       style={{ left: 'var(--sidebar-width, 256px)' }}
     >
       
-      {/* SECCIÓN DERECHA: USUARIO Y SALIR */}
-      <div className="flex items-center gap-4">
-        <div className="hidden md:flex items-center gap-3">
-            <div className="flex flex-col items-end">
-                <span className="text-xs font-bold text-slate-700">{user?.email?.split('@')[0] || "Admin"}</span>
-                <span className="text-[10px] text-slate-400">SANSCE Clínica</span>
+      {/* CONTENEDOR DE USUARIO PREMIUM */}
+      <div className="flex items-center gap-6">
+        <div className="hidden md:flex items-center gap-4">
+            <div className="flex flex-col items-end leading-tight">
+                <span className="text-[13px] font-semibold text-sansce-text uppercase tracking-tight">
+                  {user?.email?.split('@')[0] || "Director"}
+                </span>
+                <span className="text-[10px] font-medium text-sansce-muted tracking-wider uppercase">
+                  SANSCE OS Admin
+                </span>
             </div>
-            <div className="h-8 w-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs border border-blue-200">
-                {user?.email ? user.email[0].toUpperCase() : "A"}
+            
+            {/* Avatar Minimalista */}
+            <div className="h-9 w-9 rounded-full bg-sansce-bg border border-sansce-border flex items-center justify-center shadow-sm">
+                <span className="text-xs font-bold text-sansce-brand">
+                  {user?.email ? user.email[0].toUpperCase() : "D"}
+                </span>
             </div>
         </div>
 
-        <div className="h-6 w-px bg-slate-200 hidden md:block"></div>
+        {/* Divisor Quirúrgico */}
+        <div className="h-4 w-px bg-sansce-border hidden md:block"></div>
 
+        {/* Botón Salir Estilizado */}
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-red-600 transition-colors"
+          className="group flex items-center gap-2 text-[11px] font-bold text-sansce-muted hover:text-status-error transition-all duration-200 uppercase tracking-widest"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 007.5-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
           </svg>
           Salir

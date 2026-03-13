@@ -1,4 +1,4 @@
-/**
+/**lib/utils.ts
  * 🛠️ UTILERÍAS CENTRALIZADAS SANSCE v2.0
  * SSOT (Single Source of Truth) para lógica transversal.
  */

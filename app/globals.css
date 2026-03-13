@@ -3,21 +3,19 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Estilos base opcionales para que se vea más limpio */
-body {
-  background-color: #f8fafc; /* Slate-50 */
-  color: #0f172a; /* Slate-900 */
+@layer base {
+  body {
+    @apply bg-sansce-bg text-sansce-text antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  h1, h2, h3, h4 {
+    @apply text-sansce-text font-semibold tracking-tight;
+  }
 }
 
-/* globals.css - Adición de variables de marca */
 :root {
-  --sansce-primary: #2563eb; /* Azul Institucional actual */
-  --sansce-secondary: #78c9cf; /* Color detectado en Módulo de Cçonocimiento */
-}
-
-body {
-  background-color: #f8fafc;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11"; /* Mejora legibilidad Inter */
+  --sidebar-width: 260px;
 }
 
 /* --- Phase 1: Sidebar Layout & Responsiveness --- */
