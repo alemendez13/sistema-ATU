@@ -30,10 +30,24 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
   const [rescheduleName, setRescheduleName] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // ✨ ESTADO SANSCE: Registra la tarea recién movida para activarle el destello
+  // ✨ ESTADO SANSCE: Control de destellos post-trasplante
   const [lastMovedId, setLastMovedId] = React.useState<string | null>(null);
+  const [lastUpdatedHitoId, setLastUpdatedHitoId] = React.useState<string | null>(null);
 
   const toggleProject = (name: string) => setExpandedProjects(prev => prev.includes(name) ? prev.filter(p => p !== name) : [...prev, name]);
+
+  // 🎨 Definición de la animación de destello (Inyectada quirúrgicamente)
+  const flashStyle = (
+    <style>{`
+      @keyframes flash-green {
+        0% { background-color: #d1fae5; border-left-color: #10b981; }
+        100% { background-color: transparent; border-left-color: transparent; }
+      }
+      .animate-flash-green {
+        animation: flash-green 2s ease-out;
+      }
+    `}</style>
+  );
   return (
     <div className="bg-white rounded-xl shadow-md border-t-4 border-green-500">
       <div className="p-6 pb-0">
@@ -217,10 +231,38 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
 
                 return (
                   <React.Fragment key={hito.ID_Hito}>
-                    {/* --- CAPA 2: TIPO DE ACTIVIDAD --- */}
+                    {/* --- CAPA 2: TIPO DE ACTIVIDAD (Conexión de Animación SANSCE) --- */}
+                    {flashStyle}
                     <div 
                       onClick={() => toggleHito(hito.ID_Hito)}
-                      className="grid grid-cols-[280px_repeat(12,1fr)] items-stretch group/row hover:bg-white transition-colors border-b border-slate-200 relative bg-white/40 cursor-pointer"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.style.backgroundColor = "#e0e7ff"; 
+                      }}
+                      onDragLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = ""; 
+                      }}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        e.currentTarget.style.backgroundColor = ""; 
+                        const taskId = e.dataTransfer.getData("taskId");
+                        
+                        if (taskId) {
+                          const result = await moveTaskAction(taskId, hito.Proyecto, hito.ID_Hito);
+                          if (result.success) {
+                            setLastMovedId(taskId);
+                            setLastUpdatedHitoId(hito.ID_Hito); // 🎯 Disparo de señal para el destello
+                            router.refresh(); 
+                            setTimeout(() => {
+                              setLastMovedId(null);
+                              setLastUpdatedHitoId(null); // Reseteo de señal
+                            }, 2500);
+                          } else {
+                            alert("Error en el trasplante: " + result.error);
+                          }
+                        }
+                      }}
+                      className={`grid grid-cols-[280px_repeat(12,1fr)] items-stretch group/row hover:bg-white transition-all border-b border-slate-200 relative bg-white/40 cursor-pointer border-l-4 ${lastUpdatedHitoId === hito.ID_Hito ? 'animate-flash-green' : 'border-l-transparent'}`}
                     >
                       <div className="p-3 border-r border-slate-100 flex gap-2">
                         <span className={`text-blue-500 transition-transform mt-1 ${isHitoExpanded ? 'rotate-90' : ''}`}>

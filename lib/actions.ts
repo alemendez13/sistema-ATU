@@ -1039,3 +1039,68 @@ export async function updateObjectiveStatusAction(objectiveId: string, nuevoEsta
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * 🚀 ACCIÓN: REGISTRO DE ASISTENCIA BIOMÉTRICO (SANSCE OS)
+ * Valida PIN, previene duplicados y vincula la foto de evidencia.
+ */
+export async function registrarAsistenciaAction(pin: string, tipo: 'Entrada' | 'Salida', fotoUrl: string) {
+    try {
+        // 1. VALIDACIÓN DE IDENTIDAD (SSOT)
+        // Buscamos al colaborador por su PIN en la colección maestra
+        const userQuery = await dbAdmin.collection("usuarios_roles")
+                                      .where("pin", "==", pin)
+                                      .limit(1)
+                                      .get();
+
+        if (userQuery.empty) {
+            return { success: false, error: "PIN no reconocido en el sistema." };
+        }
+
+        const userData = userQuery.docs[0].data();
+        const userEmail = userData.email;
+        const nombreColaborador = userData.nombre;
+
+        // 2. PREVENCIÓN DE DUPLICIDAD (Gobernanza de Nómina)
+        // Generamos un ID de fecha (YYYY-MM-DD) para la búsqueda
+        const hoyId = new Date().toISOString().split('T')[0];
+        
+        const registroPrevio = await dbAdmin.collection("asistencias")
+                                           .where("email", "==", userEmail)
+                                           .where("tipo", "==", tipo)
+                                           .where("fechaId", "==", hoyId)
+                                           .limit(1)
+                                           .get();
+
+        if (!registroPrevio.empty) {
+            return { 
+                success: false, 
+                error: `Ya registraste tu ${tipo} el día de hoy (${registroPrevio.docs[0].data().hora}).` 
+            };
+        }
+
+        // 3. REGISTRO DE TRANSACCIÓN (Trazabilidad Sagrada)
+        const d = new Date();
+        const horaLocal = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+        await dbAdmin.collection("asistencias").add({
+            nombre: nombreColaborador,
+            email: userEmail,
+            tipo: tipo,
+            fotoUrl: fotoUrl, // Enlace a la evidencia en Storage
+            fechaId: hoyId,
+            hora: horaLocal,
+            dispositivo: "TABLET-REC-01",
+            creadoEn: new Date() // Timestamp para ordenamiento
+        });
+
+        return { 
+            success: true, 
+            message: `¡${tipo} registrada! Hola, ${nombreColaborador.split(' ')[0]}.` 
+        };
+
+    } catch (error) {
+        console.error("❌ Error en Registro de Asistencia:", error);
+        return { success: false, error: "Error de conexión con el servidor de nómina." };
+    }
+}

@@ -1,15 +1,44 @@
 // app/rh/reloj/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Clock, UserCheck, LogIn, LogOut, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react'; // ✅ Agregamos useRef
+import { Clock, UserCheck, LogIn, LogOut, ShieldCheck, Camera } from 'lucide-react'; 
 import { useRouter } from 'next/navigation';
+import { storage } from '@/lib/firebase'; // ✅ Acceso a la nube (Storage)
+import { ref, uploadString, getDownloadURL } from 'firebase/storage'; // ✅ Herramientas de subida
+import { registrarAsistenciaAction } from '@/lib/actions'; // ✅ Acción del servidor
 
 export default function RelojChecadorPage() {
   const [pin, setPin] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [mensaje, setMensaje] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // 🛡️ REFS SANSCE: Control directo de hardware (Video y Captura)
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // 🔋 MOTOR DE CÁMARA: Activación segura al cargar la página
+  useEffect(() => {
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user', width: 400, height: 300 } 
+        });
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      } catch (err) {
+        console.error("Acceso a cámara denegado:", err);
+        setMensaje("Error: Verifique permisos de cámara en la tablet.");
+        setStatus("error");
+      }
+    }
+    startCamera();
+    // 🛡️ CLEANUP: Apagamos la cámara al salir de la pantalla para ahorrar batería
+    return () => {
+      const stream = videoRef.current?.srcObject as MediaStream;
+      stream?.getTracks().forEach(track => track.stop());
+    };
+  }, []);
 
   // Reloj Maestro SANSCE (Actualización por segundo)
   useEffect(() => {
@@ -25,24 +54,49 @@ export default function RelojChecadorPage() {
 
   const handleRegistro = async (tipo: 'Entrada' | 'Salida') => {
     if (pin.length < 4) return;
-    
     setStatus('loading');
-    
-    // Simulación de validación SSOT (usuarios_roles) 
-    // En producción, esto llama a una Server Action en lib/actions.ts
-    setTimeout(() => {
-      if (pin === "1234") { // Ejemplo de PIN válido
+
+    try {
+      // 1. CAPTURA DE EVIDENCIA (Biometría Visual)
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      if (!canvas || !video) throw new Error("Hardware de cámara no disponible");
+
+      const context = canvas.getContext('2d');
+      if (context) context.drawImage(video, 0, 0, 400, 300);
+      
+      // Convertimos a JPG comprimido (60%) para ahorro radical de almacenamiento
+      const photoBase64 = canvas.toDataURL('image/jpeg', 0.6);
+
+      // 2. DEPÓSITO EN LA NUBE (Firebase Storage)
+      const fileName = `asistencias/${new Date().toISOString().split('T')[0]}/${pin}-${tipo}-${Date.now()}.jpg`;
+      const storageRef = ref(storage, fileName);
+      
+      await uploadString(storageRef, photoBase64, 'data_url');
+      const photoUrl = await getDownloadURL(storageRef);
+
+      // 3. REGISTRO OFICIAL (SANSCE OS Server Action)
+      // Nota: Asegúrese de tener la función registrarAsistenciaAction en lib/actions.ts
+      const result = await registrarAsistenciaAction(pin, tipo, photoUrl);
+
+      if (result.success) {
         setStatus('success');
-        setMensaje(`¡${tipo} registrada con éxito! Buen día.`);
+        setMensaje(result.message || `¡${tipo} registrada con éxito!`);
         setPin('');
-        setTimeout(() => setStatus('idle'), 3000);
       } else {
         setStatus('error');
-        setMensaje('PIN incorrecto. Reintente.');
+        setMensaje(result.error || 'Error en validación');
         setPin('');
-        setTimeout(() => setStatus('idle'), 3000);
       }
-    }, 80000000); // Latencia simulada para feedback visual
+    } catch (error: any) {
+      console.error("Error en proceso de asistencia:", error);
+      setStatus('error');
+      setMensaje("Error técnico de conexión. Reintente.");
+      setPin('');
+    } finally {
+      // Limpieza de estado después de mostrar el resultado
+      setTimeout(() => setStatus('idle'), 4000);
+    }
   };
 
   return (
@@ -71,6 +125,23 @@ export default function RelojChecadorPage() {
           </div>
           <h1 className="text-xl font-medium text-slate-800">Registro de Asistencia</h1>
           <p className="text-sm text-slate-400">Ingrese su PIN de 4 dígitos</p>
+        </div>
+
+        {/* 📸 VISOR DE BIOMETRÍA VISUAL (Evidence Capture) */}
+        <div className="relative w-full aspect-video bg-slate-900 rounded-2xl overflow-hidden mb-8 border-4 border-[#F8FAF8] shadow-sm">
+          <video 
+            ref={videoRef} 
+            autoPlay 
+            playsInline 
+            muted 
+            className="w-full h-full object-cover grayscale opacity-90"
+          />
+          <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/40 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_5px_red]" />
+            <span className="text-[9px] text-white font-mono uppercase tracking-widest">Live Evidence</span>
+          </div>
+          {/* Canvas oculto para el procesamiento de la foto */}
+          <canvas ref={canvasRef} className="hidden" width="400" height="300" />
         </div>
 
         {/* Visualizador de PIN (Privacidad) */}
