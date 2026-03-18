@@ -1161,3 +1161,87 @@ export async function rescheduleTaskAction(idTarea: string, nuevaFecha: string, 
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * 🚀 ACCIÓN: OBTENER CRONOGRAMA ESTRATÉGICO
+ * Recupera la lista de hitos y actividades desde Google Sheets.
+ * Utiliza caché de 1 hora para optimizar el rendimiento.
+ */
+export const fetchCronogramaAction = unstable_cache(
+  async () => {
+    try {
+      const { GoogleSpreadsheet } = await import('google-spreadsheet');
+      const { JWT } = await import('google-auth-library');
+
+      const auth = new JWT({
+        email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      });
+
+      const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+      await doc.loadInfo();
+
+      const sheet = doc.sheetsByTitle['OPERACION_CRONOGRAMA'];
+      const rows = await sheet.getRows();
+
+      // Mapeo quirúrgico: Solo extraemos lo que la UI elegante necesita
+      return rows.map(r => ({
+        id: r.get('ID_Hito'),
+        actividad: r.get('Nombre de la Actividad'),
+        responsable: r.get('Responsable'),
+        fechaFin: r.get('Fecha Fin'),
+        estado: r.get('Estado') || 'Pendiente',
+        proyecto: r.get('Proyecto') || 'General',
+        area: r.get('Area') || 'Operaciones'
+      }));
+    } catch (error) {
+      console.error("❌ Error recuperando Cronograma:", error);
+      return []; // Retorno seguro para evitar que la pantalla se ponga en blanco
+    }
+  },
+  ['op-cronograma-v1'],
+  { tags: ['op-cronograma-v1'], revalidate: 3600 } // Caché de 1 hora o hasta actualización manual
+);
+
+/**
+ * 🚀 ACCIÓN: OBTENER STATUS DEL CHECKLIST DIARIO
+ * Cruza la configuración de actividades con el cumplimiento real de hoy.
+ */
+export async function fetchDashboardChecklistAction(email: string) {
+  try {
+    const { getOperacionChecklist } = await import('./googleSheets');
+    // 🛡️ SANSCE OS: Tipado explícito para datos dinámicos de Sheets
+    const result = await getOperacionChecklist() as { config: any[], log: any[] };
+    const { config, log } = result;
+    
+    // 1. Identificamos el ID del día (Hoy en formato YYYY-MM-DD)
+    const todayId = new Date().toISOString().split('T')[0];
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 2. Filtramos la configuración: Solo tareas asignadas a este usuario
+    const userTasksConfig = config.filter(item => 
+      (item.EmailAsignado || '').trim().toLowerCase() === cleanEmail
+    );
+
+    // 3. Cruzamos con el Log para ver si ya se marcaron como completadas
+    return userTasksConfig.map((activity, index) => {
+      const activityId = activity["ID, Actividad"];
+      
+      const logEntry = log.find(l => 
+        l.DateID === todayId && 
+        l.Email.trim().toLowerCase() === cleanEmail && 
+        l.ActivityID === activityId
+      );
+
+      return {
+        id: activityId || `task-${index}`,
+        tarea: activityId || "Actividad sin nombre",
+        status: logEntry?.IsCompleted === 'TRUE'
+      };
+    });
+  } catch (error) {
+    console.error("❌ Error en fetchDashboardChecklistAction:", error);
+    return []; // Retorno seguro para evitar errores en la UI
+  }
+}
