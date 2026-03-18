@@ -16,10 +16,10 @@ import {
 } from "@/lib/actions";
 
 export default function Home() {
-  // Estados de Interfaz
-  const [showTasks, setShowTasks] = useState(true);
-  const [showGoals, setShowGoals] = useState(true);
-  const [showChecklist, setShowChecklist] = useState(true);
+  // Estados de Interfaz (Configurados para iniciar contraídos/ocultos)
+  const [showTasks, setShowTasks] = useState(false);
+  const [showGoals, setShowGoals] = useState(false);
+  const [showChecklist, setShowChecklist] = useState(false);
 
   // 🛡️ SANSCE OS: Definición de Identidad y Estados Unificados
   const { user } = useAuth() as { user: any }; // Forzamos el tipo para eliminar el error "never"
