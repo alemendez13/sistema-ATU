@@ -3,7 +3,8 @@
 
 import React, { useState } from 'react';
 import { LayoutList, GanttChartSquare, Filter, Plus, X, Target, Zap, ChevronRight } from 'lucide-react'; 
-import { updateTaskStatusAction, fetchOkrDataAction } from '@/lib/actions'; // 🆕 Importamos fetchOkrDataAction
+import { useRouter } from 'next/navigation'; // 🚀 Motor de actualización silenciosa
+import { updateTaskStatusAction, fetchOkrDataAction } from '@/lib/actions'; 
 import TaskListView from './TaskListView';
 import GanttView from './GanttView';
 import MinutaForm from './MinutaForm'; 
@@ -14,17 +15,47 @@ export default function TaskBoardClient({
   initialTasks, 
   initialHitos, 
   personal,
-  history = [] // 👈 Recibimos el historial con un valor vacío por defecto
+  history = [] 
 }: { 
   initialTasks: any[], 
   initialHitos: any[],
   personal: any[],
-  history?: any[] // 👈 Declaramos que es opcional para evitar errores
+  history?: any[] 
 }) {
-  const [view, setView] = useState<'lista' | 'cronograma'>('cronograma'); // 🕒 Prioridad Estratégica: El sistema inicia siempre en el Gantt
+  const router = useRouter(); // ⚡ Iniciamos el controlador de sincronización SANSCE
+  // 🧠 MOTOR DE FILTRADO INTELIGENTE SANSCE OS
+  const [fResponsable, setFResponsable] = useState('all');
+  const [fEstatus, setFEstatus] = useState('all');
+  const [fUrgencia, setFUrgencia] = useState('all');
+
+  // 1. Extracción de responsables únicos para el dropdown
+  const listaResponsables = Array.from(new Set(initialTasks.map(t => t.EmailAsignado?.split('@')[0]))).filter(Boolean);
+
+  // 2. Lógica de filtrado en tiempo real
+  const tasksFiltradas = initialTasks.filter(t => {
+    const cumpleResp = fResponsable === 'all' || t.EmailAsignado?.includes(fResponsable);
+    
+    const isDone = t.Estado === 'Realizada' || t.Estado === 'Cumplida' || t.Estado === 'Cancelada';
+    const cumpleEstatus = fEstatus === 'all' || 
+                         (fEstatus === 'Terminadas' ? isDone : t.Estado === fEstatus);
+    
+    let cumpleUrgencia = true;
+    if (fUrgencia !== 'all') {
+      const hoyStr = new Date().toISOString().split('T')[0];
+      const esAtrasada = !isDone && t.FechaEntrega && t.FechaEntrega < hoyStr;
+      const esParaHoy = !isDone && t.FechaEntrega === hoyStr;
+      
+      if (fUrgencia === 'atrasadas') cumpleUrgencia = esAtrasada;
+      if (fUrgencia === 'hoy') cumpleUrgencia = esParaHoy;
+    }
+
+    return cumpleResp && cumpleEstatus && cumpleUrgencia;
+  });
+  const [view, setView] = useState<'lista' | 'cronograma'>('cronograma');
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'minuta' | 'hito' | 'tarea'>('minuta');
+  const [isMinutaMinimized, setIsMinutaMinimized] = useState(false); // 🔍 Memoria de persistencia
   const [prefilledProject, setPrefilledProject] = useState<string>("");
   const [prefilledHitoId, setPrefilledHitoId] = useState<string>("");
 
@@ -129,11 +160,66 @@ export default function TaskBoardClient({
       <div className="min-h-[400px]">
         {view === 'lista' ? (
           <div className="bg-white rounded-xl shadow-md p-6 border-t-4 border-blue-500">
-            <h2 className="text-lg font-bold text-slate-800 mb-6 text-center">Tareas Operativas</h2>
+            {/* 🎛️ BARRA DE FILTROS INTELIGENTES SANSCE */}
+            <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <h2 className="text-lg font-black text-slate-800 uppercase tracking-tighter">
+                Tareas Operativas <span className="text-blue-600">[{tasksFiltradas.length}]</span>
+              </h2>
+              
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Filtro 1: Responsable */}
+                <select 
+                  value={fResponsable}
+                  onChange={(e) => setFResponsable(e.target.value)}
+                  className="text-[10px] font-bold uppercase p-2 rounded-lg border border-slate-200 bg-white text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="all">👤 Todos los Responsables</option>
+                  {listaResponsables.map(res => (
+                    <option key={res} value={res}>{res.toUpperCase()}</option>
+                  ))}
+                </select>
+
+                {/* Filtro 2: Estatus */}
+                <select 
+                  value={fEstatus}
+                  onChange={(e) => setFEstatus(e.target.value)}
+                  className="text-[10px] font-bold uppercase p-2 rounded-lg border border-slate-200 bg-white text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="all">📊 Todos los Estatus</option>
+                  <option value="Pendiente">Pendientes</option>
+                  <option value="En Proceso">En Proceso</option>
+                  <option value="Terminadas">Realizadas / Canceladas</option>
+                </select>
+
+                {/* Filtro 3: Urgencia */}
+                <select 
+                  value={fUrgencia}
+                  onChange={(e) => setFUrgencia(e.target.value)}
+                  className="text-[10px] font-bold uppercase p-2 rounded-lg border border-slate-200 bg-white text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="all">📅 Todas las Fechas</option>
+                  <option value="atrasadas">⚠️ Solo Atrasadas</option>
+                  <option value="hoy">🔔 Para Hoy</option>
+                </select>
+
+                {/* Botón Limpiar */}
+                {(fResponsable !== 'all' || fEstatus !== 'all' || fUrgencia !== 'all') && (
+                  <button 
+                    onClick={() => { setFResponsable('all'); setFEstatus('all'); setFUrgencia('all'); }}
+                    className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                    title="Limpiar filtros"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
             <TaskListView 
-              tasks={initialTasks} 
+              tasks={tasksFiltradas} // 👈 Conexión con el motor de filtrado
               loadingId={loadingId} 
               onToggleStatus={handleToggleStatus} 
+              history={history} 
             />
           </div>
         ) : (
@@ -145,38 +231,73 @@ export default function TaskBoardClient({
           />
         )}
       </div>
-      {/* 🆕 VENTANA EMERGENTE (MODAL) */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="relative w-full max-w-4xl max-h-[90vh] bg-white rounded-3xl shadow-2xl overflow-y-auto overflow-x-hidden">
-            {/* Botón para cerrar */}
-            <button 
-              onClick={() => setIsModalOpen(false)}
-              className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all z-10"
-            >
-              <X size={24} />
-            </button>
+      {/* 🆕 VENTANA EMERGENTE (MODAL PERSISTENTE SANSCE) */}
+      {(isModalOpen || isMinutaMinimized) && (
+        <div 
+          className={`fixed z-[100] transition-all duration-500 ease-in-out ${
+            isMinutaMinimized 
+              ? 'bottom-4 right-4 w-80 h-16 cursor-pointer shadow-2xl hover:scale-105' 
+              : 'inset-0 p-4 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center'
+          }`}
+          onClick={() => isMinutaMinimized && setIsMinutaMinimized(false)}
+        >
+          <div className={`relative bg-white shadow-2xl overflow-hidden transition-all duration-500 ${
+            isMinutaMinimized 
+              ? 'w-full h-full rounded-2xl border-2 border-emerald-500 flex items-center px-4 bg-emerald-50' 
+              : 'w-full max-w-4xl max-h-[90vh] rounded-3xl overflow-y-auto'
+          }`}>
             
-            <div className="p-2">
+            {/* Cabecera de Control de Superpoderes */}
+            <div className={`absolute top-4 right-6 flex gap-2 z-10 ${isMinutaMinimized ? 'hidden' : ''}`}>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsMinutaMinimized(true); }}
+                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"
+                title="Minimizar para consultar cronograma"
+              >
+                <LayoutList size={20} />
+              </button>
+              <button 
+                onClick={() => { setIsModalOpen(false); setIsMinutaMinimized(false); }}
+                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* 🟢 VISTA MINIMIZADA (BARRA DE ESTADO): Solo visible cuando se activa la minimización */}
+            {isMinutaMinimized && (
+              <div className="flex items-center gap-3 w-full h-full animate-pulse">
+                <div className="bg-emerald-500 p-2 rounded-lg text-white"><Plus size={16}/></div>
+                <span className="text-xs font-black text-emerald-800 uppercase tracking-tighter">Minuta en progreso... (Clic para recuperar)</span>
+              </div>
+            )}
+
+            {/* ⚪ VISTA EXPANDIDA (EL CEREBRO): Siempre presente en memoria, pero invisible si está minimizada */}
+            <div className={`p-2 ${isMinutaMinimized ? 'hidden' : 'block'}`}>
               <h2 className="text-2xl font-bold text-slate-800 p-8 pb-0">
                 {modalMode === 'minuta' ? 'Registrar Nuevos Acuerdos' : 
                  modalMode === 'tarea' ? 'Nueva Tarea Ejecutiva' : 'Configurar Tipo de Actividad'}
               </h2>
               
               {modalMode === 'minuta' ? (
-  <MinutaForm 
-    personal={personal} 
-    hitos={initialHitos} 
-    tasks={initialTasks} 
-    history={history} // 👈 Pasamos la señal del historial al formulario
-  />
-) : modalMode === 'tarea' ? (
+                <MinutaForm 
+                  personal={personal} 
+                  hitos={initialHitos} 
+                  tasks={initialTasks} 
+                  history={history} 
+                  onSuccess={() => {
+                    setIsModalOpen(false);
+                    setIsMinutaMinimized(false);
+                    router.refresh();
+                  }}
+                />
+              ) : modalMode === 'tarea' ? (
                 <TaskForm 
                   personal={personal} 
                   onSuccess={() => {
                     setIsModalOpen(false);
                     setPrefilledProject("");
-                    setPrefilledHitoId(""); // Limpiamos rastro de hito
+                    setPrefilledHitoId("");
                   }} 
                   defaultProject={prefilledProject} 
                   defaultHitoId={prefilledHitoId}

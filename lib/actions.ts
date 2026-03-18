@@ -1104,3 +1104,60 @@ export async function registrarAsistenciaAction(pin: string, tipo: 'Entrada' | '
         return { success: false, error: "Error de conexión con el servidor de nómina." };
     }
 }
+
+/**
+ * 🚀 ACCIÓN: REPROGRAMACIÓN DE TAREA CON TRAZABILIDAD (SANSCE OS)
+ * Actualiza la fecha de entrega y guarda la fecha anterior en la bitácora de auditoría.
+ */
+export async function rescheduleTaskAction(idTarea: string, nuevaFecha: string, motivo: string) {
+  try {
+    const { GoogleSpreadsheet } = await import('google-spreadsheet');
+    const { JWT } = await import('google-auth-library');
+    const { revalidateTag } = await import('next/cache');
+
+    const auth = new JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+    await doc.loadInfo();
+
+    const sheet = doc.sheetsByTitle['OPERACION_TAREAS'];
+    const rows = await sheet.getRows();
+    const row = rows.find(r => r.get('ID_Tarea') === idTarea);
+
+    if (!row) throw new Error("No se encontró la tarea para reprogramar.");
+
+    // 🛠️ FORMATEADOR SANSCE: Asegura que la fecha entre como DD/MM/YYYY al Excel
+    const toSanceDate = (d: any) => {
+      const s = String(d);
+      if (!s || !s.includes('-')) return s;
+      const [y, m, day] = s.split('-');
+      return `${day}/${m}/${y}`;
+    };
+
+    const fechaAnterior = row.get('FechaEntrega');
+    const bitacoraPrevia = row.get('AsignadoPor') || '';
+    const d = new Date();
+    const hoy = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+
+    // 📝 TRAZABILIDAD: Guardamos el cambio en el campo AsignadoPor sin perder lo anterior
+    const logReprogramacion = `[REPROG ${hoy}]: De ${fechaAnterior} a ${toSanceDate(nuevaFecha)} - Motivo: ${motivo}`;
+    const nuevaBitacora = `${bitacoraPrevia} | ${logReprogramacion}`.trim();
+
+    row.set('FechaEntrega', toSanceDate(nuevaFecha));
+    row.set('AsignadoPor', nuevaBitacora);
+
+    await row.save();
+    
+    // ⚡ SINCRONIZACIÓN: Actualizamos la caché de tareas
+    revalidateTag('op-tareas-v1');
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("❌ Error en rescheduleTaskAction:", error);
+    return { success: false, error: error.message };
+  }
+}

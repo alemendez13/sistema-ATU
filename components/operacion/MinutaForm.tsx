@@ -14,7 +14,7 @@ interface Personal {
 
 // Añadimos 'hitos' a las herramientas que recibe el formulario
 // 🆕 Agregamos 'tasks' a las herramientas que recibe el formulario
-export default function MinutaForm({ personal, hitos = [], tasks = [], history = [] }: { personal: Personal[], hitos?: any[], tasks?: any[], history?: any[] }) {
+export default function MinutaForm({ personal, hitos = [], tasks = [], history = [], onSuccess }: { personal: Personal[], hitos?: any[], tasks?: any[], history?: any[], onSuccess?: () => void }) {
   // 1. Estados Maestros
   const [datos, setDatos] = useState({
     fecha: new Date().toISOString().split('T')[0],
@@ -142,8 +142,11 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
 
       if (resultado.success) {
         alert("✅ Minuta guardada y tareas asignadas con éxito.");
-        // Opcional: Limpiar el formulario o redirigir
-        window.location.reload(); 
+        if (onSuccess) {
+          onSuccess(); // 📡 Enviamos la señal al Tablero para cerrar todo
+        } else {
+          window.location.reload(); 
+        }
       } else {
         throw new Error(resultado.error);
       }
@@ -168,9 +171,10 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
 
   const pendientesSemana = tasks.filter(t => {
     const esEstaSemana = t.FechaEntrega >= lunes && t.FechaEntrega <= domingo;
-    const noEstaCumplida = t.Estado !== 'Cumplida';
+    // 🛡️ REGLA DE LIMPIEZA VISUAL: Excluimos 'Realizada' para enfocar la toma de decisiones
+    const esPendiente = t.Estado !== 'Realizada' && t.Estado !== 'Cumplida';
     const cumpleFiltroPersona = filtroPersona ? t.EmailAsignado === filtroPersona : true;
-    return esEstaSemana && noEstaCumplida && cumpleFiltroPersona;
+    return esEstaSemana && esPendiente && cumpleFiltroPersona;
   });
 
   return (

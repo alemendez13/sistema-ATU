@@ -1,3 +1,4 @@
+// app/configuracion/page.tsx
 "use client";
 import React, { useState } from 'react';
 import { Users, BookOpen, UserPlus, ShieldCheck, Mail, Briefcase } from 'lucide-react';

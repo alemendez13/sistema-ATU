@@ -44,7 +44,7 @@ export default function Sidebar() {
     { id: 6, name: "Insumos e Inventario", icon: <Package size={18} />, href: "/inventarios" },
     { id: 7, name: "Cronograma Operativo", icon: <ClipboardList size={18} />, href: "/operacion/tareas" },
     { id: 8, name: "Reportes y Eficacia", icon: <BarChart3 size={18} />, href: "/finanzas" },
-    { id: 5, name: "Recursos Humanos", icon: <Users size={18} />, href: "/personal" },
+    { id: 5, name: "Recursos Humanos", icon: <Users size={18} />, href: "/rh" },
     { id: 2, name: "Metas / KPIs", icon: <Target size={18} />, href: "/planeacion" },
     { id: 3, name: "Gestión y Auditoría", icon: <GitBranch size={18} />, href: "/configuracion/auditoria" },
     { id: 1, name: "Configuración General", icon: <Settings size={18} />, href: "/configuracion" },

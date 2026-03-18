@@ -25,7 +25,9 @@ export async function GET() {
       let rolUsuario = (datos.rol || 'invitado').toLowerCase().trim();
 
       // Mapeo de transición (Opcional: convierte roles viejos a nuevos automáticamente)
+      // Traduce el lenguaje del Excel al lenguaje del Sistema
       if (rolUsuario === 'admin') rolUsuario = 'admin_general';
+      if (rolUsuario === 'coordinador') rolUsuario = 'coordinacion_admin';
       if (rolUsuario === 'recepcion') rolUsuario = 'atu';
 
       if (!rolesValidos.includes(rolUsuario)) {

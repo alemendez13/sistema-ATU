@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           
          <main 
             className="min-h-screen pt-20 pb-10 px-4 md:px-8 transition-all duration-300 ease-in-out"
-            style={{ paddingLeft: 'var(--sidebar-width, 256px)' }}
+            style={{ paddingLeft: 'var(--sidebar-width, 80px)' }}
           >
             {children}
           </main>
