@@ -8,13 +8,14 @@ import {
   ShieldCheck,  // Para Roles
   Scale,        // Para Fundamentos (Misión/Visión)
   ScanEye,      // Para FODA
-  Target        // Para OKRs
+  Target,       // Para OKRs
+  Activity      // 🧠 Para Inteligencia
 } from "lucide-react";
 
 export default function PlaneacionLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Definimos tus 5 sub-módulos estratégicos
+  // Definimos tus 6 sub-módulos estratégicos (Agregamos Inteligencia)
   const tabs = [
     { 
       name: "Introducción", 
@@ -41,6 +42,11 @@ export default function PlaneacionLayout({ children }: { children: React.ReactNo
       name: "Tablero OKR's", 
       href: "/planeacion/tablero-okr", 
       icon: <Target size={18} /> 
+    },
+    { 
+      name: "Inteligencia", 
+      href: "/planeacion/inteligencia", 
+      icon: <Activity size={18} /> 
     },
   ];
 

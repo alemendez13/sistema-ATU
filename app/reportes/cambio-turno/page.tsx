@@ -119,7 +119,9 @@ export default function CambioTurnoPage() {
         // 🩺 TRAZABILIDAD POR PROFESIONAL:
         ingresosDoctorMap[doctor] = (ingresosDoctorMap[doctor] || 0) + monto;
 
-        if (metodo && metodo.includes("Efectivo")) {
+        // 🛡️ REGLA SANSCE OS: Solo el "Efectivo" puro entra a la caja física.
+        // El "Efectivo PS" se registra como ingreso, pero no se suma al arqueo de la gaveta.
+        if (metodo === "Efectivo") {
             efectivo += monto;
         }
       });

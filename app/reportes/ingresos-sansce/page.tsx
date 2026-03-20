@@ -7,9 +7,11 @@ import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency, cleanPrice, formatDate } from "../../../lib/utils";
-import { addDoc, serverTimestamp } from "@/lib/firebase-guard"; // Asegúrate de tener addDoc
+import { addDoc, serverTimestamp } from "@/lib/firebase-guard"; 
+import { useAuth } from "../../../hooks/useAuth"; // 🔐 Importamos el vigilante de identidad
 
 export default function ReporteIngresosPage() {
+  const { user } = useAuth() as any; // 👤 Obtenemos al usuario activo para la firma de cierre
   // Estado para la fecha (por defecto HOY)
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
   const [ingresos, setIngresos] = useState<any[]>([]); // Producción del día
@@ -61,9 +63,10 @@ export default function ReporteIngresosPage() {
                   tpvCredBAN: sumarPorMetodo(todosLosCobros, 'TPV Cred BAN'),
                   tpvDebBAN: sumarPorMetodo(todosLosCobros, 'TPV Deb BAN'),
                   tpvCredMP: sumarPorMetodo(todosLosCobros, 'TPV Cred MP'),
-                  tpvDebMP: sumarPorMetodo(todosLosCobros, 'TPV DebMP'),
+                  tpvDebMP: sumarPorMetodo(todosLosCobros, 'TPV Deb MP'), // 🛠️ Corregido: Espacio agregado para cuadre exacto
               },
-              cerradoPor: "Admin SANSCE" 
+              // 🖋️ TRAZABILIDAD SAGRADA: Identificamos quién selló la caja legalmente
+              cerradoPor: user?.email || "Usuario Desconocido" 
           });
           toast.success("✅ Caja cerrada y guardada con éxito.");
       } catch (error) {

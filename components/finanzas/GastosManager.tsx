@@ -3,20 +3,22 @@
 import { useState, useEffect } from "react";
 import { collection, addDoc, query, orderBy, onSnapshot, where, serverTimestamp, doc, updateDoc } from "@/lib/firebase-guard";
 import { db } from "../../lib/firebase";
+import { useAuth } from "../../hooks/useAuth"; // 🔐 Importamos el vigilante de identidad
 
-// 🔧 CORRECCIÓN DE ERRORES: Definimos los campos nuevos para que VS Code no se queje
 interface Gasto {
   id: string;
   concepto: string;
   monto: number;
   autorizadoPor: string;
+  elaboradoPor?: string;       // 🖋️ Nuevo: Campo para el sello digital inalterable
   fecha: any;
-  tipo?: "Ingreso" | "Salida"; // Soluciona el error del switch
-  validado?: boolean;          // Nuevo: Para el Check del Supervisor
-  validadoPor?: string;        // Nuevo: Quién aprobó
+  tipo?: "Ingreso" | "Salida"; 
+  validado?: boolean;          
+  validadoPor?: string;        
 }
 
 export default function GastosManager() {
+  const { user } = useAuth() as any; // 👤 Obtenemos al usuario activo
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [tipo, setTipo] = useState<"Ingreso" | "Salida">("Salida"); // Nuevo Switch
   const [concepto, setConcepto] = useState("");
@@ -54,8 +56,10 @@ export default function GastosManager() {
         concepto,
         monto: Number(monto),
         autorizadoPor,
+        // 🛡️ SELLO DIGITAL SANSCE: Captura el email de quien opera el sistema
+        elaboradoPor: user?.email || "Usuario Desconocido", 
         fecha: serverTimestamp(),
-        tipo: tipo // ✅ Ahora guardamos si es Ingreso o Salida
+        tipo: tipo 
       });
 
       // Feedback visual diferente según el tipo
@@ -255,10 +259,11 @@ export default function GastosManager() {
                                           </span>
                                         )}
                                     </p>
-                                    <div className="flex items-center gap-2 text-[10px] uppercase font-bold text-slate-400">
-                                        <span>👤 {g.autorizadoPor}</span>
+                                    <div className="flex flex-wrap items-center gap-2 text-[9px] uppercase font-bold text-slate-400">
+                                        <span title="Responsable físico">👤 {g.autorizadoPor}</span>
+                                        <span className="text-blue-400 font-black" title="Sello digital del operador">🖋️ {g.elaboradoPor || 'Histórico'}</span>
                                         <span>•</span>
-                                        <span>🕒 {g.fecha?.seconds ? new Date(g.fecha.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}</span>
+                                        <span>🕒 {g.fecha?.seconds ? new Date(g.fecha.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: true}) : '--:--'}</span>
                                     </div>
                                 </div>
                             </div>

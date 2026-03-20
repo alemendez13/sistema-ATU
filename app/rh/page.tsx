@@ -1,3 +1,4 @@
+// app/rh/page.tsx
 import React from 'react';
 import Link from 'next/link';
 import { Clock, Users, AlertTriangle, ShieldCheck } from 'lucide-react';

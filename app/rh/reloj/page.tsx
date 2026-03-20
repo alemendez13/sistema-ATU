@@ -4,8 +4,6 @@
 import React, { useState, useEffect, useRef } from 'react'; // ✅ Agregamos useRef
 import { Clock, UserCheck, LogIn, LogOut, ShieldCheck, Camera } from 'lucide-react'; 
 import { useRouter } from 'next/navigation';
-import { storage } from '@/lib/firebase'; // ✅ Acceso a la nube (Storage)
-import { ref, uploadString, getDownloadURL } from 'firebase/storage'; // ✅ Herramientas de subida
 import { registrarAsistenciaAction } from '@/lib/actions'; // ✅ Acción del servidor
 
 export default function RelojChecadorPage() {
@@ -68,16 +66,13 @@ export default function RelojChecadorPage() {
       // Convertimos a JPG comprimido (60%) para ahorro radical de almacenamiento
       const photoBase64 = canvas.toDataURL('image/jpeg', 0.6);
 
-      // 2. DEPÓSITO EN LA NUBE (Firebase Storage)
-      const fileName = `asistencias/${new Date().toISOString().split('T')[0]}/${pin}-${tipo}-${Date.now()}.jpg`;
-      const storageRef = ref(storage, fileName);
-      
-      await uploadString(storageRef, photoBase64, 'data_url');
-      const photoUrl = await getDownloadURL(storageRef);
-
-      // 3. REGISTRO OFICIAL (SANSCE OS Server Action)
-      // Nota: Asegúrese de tener la función registrarAsistenciaAction en lib/actions.ts
-      const result = await registrarAsistenciaAction(pin, tipo, photoUrl);
+      // 2. REGISTRO OFICIAL (SANSCE OS Server Action)
+      // 🛡️ SANSCE PROTOCOL: Ya no subimos a Storage. Enviamos solo el PIN y Tipo.
+      // La validación biométrica se procesa en memoria volátil si es necesario.
+      // 🛡️ PROTOCOLO BIOMÉTRICO SANSCE:
+      // Enviamos la captura 'volátil' (photoBase64) al servidor. 
+      // No genera gasto de Storage porque viaja como dato, no como archivo.
+      const result = await registrarAsistenciaAction(pin, tipo, photoBase64);
 
       if (result.success) {
         setStatus('success');

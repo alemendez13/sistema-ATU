@@ -1,3 +1,4 @@
+/* components/ModalReserva.tsx */
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, deleteDoc, doc } from "@/lib/firebase-guard";

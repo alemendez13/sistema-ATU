@@ -12,7 +12,21 @@ import { Pencil, XCircle } from 'lucide-react'; // Nuevos iconos para edición
 import { toast } from 'sonner';
 import CerebroConocimientoISO from './conocimiento/page'; 
 
+import { storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { Camera, Image as ImageIcon } from 'lucide-react';
+
 export default function CentroDeMando() {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
   const [activeTab, setActiveTab] = useState<'usuarios' | 'conocimiento'>('usuarios');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null); // 👈 Controla quién estamos editando
@@ -64,20 +78,43 @@ export default function CentroDeMando() {
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     
-    const data = {
+    // 🛡️ GESTIÓN DE IDENTIDAD SANSCE
+    const email = editingUser ? editingUser.email : formData.get('email') as string;
+    
+    const data: any = {
       nombre: formData.get('nombre') as string,
-      email: formData.get('email') as string,
+      email: email,
       rol: formData.get('rol') as any,
       especialidad: formData.get('especialidad') as string,
+      pin: formData.get('pin') as string,
     };
 
-    // 🧠 LÓGICA HÍBRIDA: ¿Estamos editando o creando?
+    // 📸 PROCESAMIENTO DE PATRÓN BIOMÉTRICO (Firebase Storage)
+    if (selectedFile) {
+      try {
+        // Creamos una ruta única por usuario basada en su email
+        const fileRef = ref(storage, `fotos_maestras/${email}`);
+        await uploadBytes(fileRef, selectedFile);
+        data.fotoMaestraUrl = await getDownloadURL(fileRef);
+      } catch (uploadError) {
+        toast.error("Error crítico al subir la Foto Maestra a la nube");
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    // 🧠 SINCRONIZACIÓN HÍBRIDA
     const result = editingUser 
       ? await updateSANSCEUser(editingUser.uid, data)
       : await createSANSCEUser(data);
     
     if (result.success) {
       toast.success(editingUser ? "Datos actualizados" : "Usuario creado correctamente");
+      
+      // 🧼 LIMPIEZA SANSCE: Borramos el rastro de la foto anterior
+      setSelectedFile(null); // Vacía el archivo de la memoria
+      setPreviewUrl(null);   // Quita la imagen del círculo de vista previa
+      
       setEditingUser(null); // Salimos del modo edición
       (e.target as HTMLFormElement).reset();
       fetchUsers(); // Refrescamos la tabla
@@ -171,6 +208,20 @@ export default function CentroDeMando() {
                     <label className="text-xs font-black uppercase text-slate-400 ml-1">Especialidad / Área</label>
                     <input name="especialidad" defaultValue={editingUser?.especialidad} className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Ej. Ginecología" />
                   </div>
+                  <div>
+                    <label className="text-xs font-black uppercase text-slate-400 ml-1">PIN de Asistencia (4 dígitos)</label>
+                    <input 
+                      name="pin" 
+                      type="text" 
+                      maxLength={4} 
+                      pattern="\d{4}"
+                      defaultValue={editingUser?.pin} 
+                      required 
+                      className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                      placeholder="Ej. 1234" 
+                    />
+                    <p className="text-[9px] text-slate-400 mt-1 ml-1">Este PIN será usado por el colaborador en la Tablet de acceso.</p>
+                  </div>
                   <button 
                     type="submit" 
                     disabled={isSubmitting}
@@ -178,6 +229,28 @@ export default function CentroDeMando() {
                   >
                     {isSubmitting ? "Sincronizando..." : editingUser ? "Guardar Cambios" : "Dar de Alta y Generar Acceso"}
                   </button>
+                  <div className="p-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                    <label className="text-xs font-black uppercase text-slate-400 block mb-3">Foto Maestra (Patrón Biométrico)</label>
+                    
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-slate-200 overflow-hidden border-2 border-white shadow-sm flex items-center justify-center">
+                        {previewUrl || editingUser?.fotoMaestraUrl ? (
+                          <img src={previewUrl || editingUser?.fotoMaestraUrl} className="w-full h-full object-cover" alt="Preview" />
+                        ) : (
+                          <Camera className="text-slate-400" size={24} />
+                        )}
+                      </div>
+                      
+                      <div className="flex-1">
+                        <label className="cursor-pointer bg-white border border-slate-200 px-4 py-2 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all flex items-center gap-2 w-fit">
+                          <ImageIcon size={14} />
+                          {previewUrl || editingUser?.fotoMaestraUrl ? 'Cambiar Foto' : 'Subir Foto Oficial'}
+                          <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
+                        </label>
+                        <p className="text-[9px] text-slate-400 mt-2 italic leading-tight">Use una foto de frente, con buena luz y fondo claro para garantizar el match.</p>
+                      </div>
+                    </div>
+                  </div>
                 </form>
               </div>
             </div>

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Button from "../../../../components/ui/Button"; // Ajusta ruta si es necesario
 import { agendarCitaGoogle } from "../../../../lib/actions"; 
-import { descontarStockPEPS } from "../../../../lib/inventoryController";
+import { descontarStockPEPS, verificarStock } from "../../../../lib/inventoryController";
 import { Descuento } from "../../../../types";
 import { generateFolio, cleanPrice } from "@/lib/utils"; 
 import { useAuth } from "@/hooks/useAuth";
@@ -271,6 +271,17 @@ export default function VentaForm({ pacienteId, servicios, medicos, descuentos }
     setLoading(true);
 
     try {
+      // 🛡️ PRE-VERIFICACIÓN SANSCE: Validamos stock de TODO el carrito antes de procesar
+      for (const item of carrito) {
+        if (item.tipo === "Producto" && item.requiereStock) {
+          const stockCheck = await verificarStock(item.servicioSku, 1, ubicacionVenta as any);
+          if (!stockCheck.suficiente) {
+            toast.error(`❌ Stock insuficiente de ${item.servicioNombre} en ${ubicacionVenta}.`);
+            setLoading(false);
+            return; // Detenemos todo el proceso para evitar ventas parciales
+          }
+        }
+      }
       // 1. Obtención de datos del paciente (Una sola lectura para todo el lote)
       const pDoc = await getDoc(doc(db, "pacientes", pacienteId));
       let pNombre = "Desconocido";

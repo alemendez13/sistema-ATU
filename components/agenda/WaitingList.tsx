@@ -1,3 +1,4 @@
+/* components/agenda/WaitingList.tsx */
 "use client";
 import { useState, useEffect } from "react";
 // Importamos 'limit' para proteger la cuota

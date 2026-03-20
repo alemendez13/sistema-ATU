@@ -6,31 +6,23 @@ import { doc, getDoc, collection, query, where, getDocs, orderBy } from "@/lib/f
 import { db } from "../../../lib/firebase";
 // Ajusta esta importación si tus tipos están en otro lado, según tu estructura es correcto:
 import { Paciente, Operacion } from "../../../types"; 
-import { getDescuentosAction } from "../../../lib/actions"; // ✅ Ahora usamos el puente seguro
+import { getDescuentosAction } from "../../../lib/actions"; 
+// 🛡️ Blindaje SANSCE: Importamos las funciones que VSC no encontraba
+import { formatDate, cleanPrice, calculateAge } from "../../../lib/utils"; 
 import Link from "next/link";
 import DownloadReciboButton from "../../../components/pdf/DownloadReciboButton";
 import PatientActions from "../../../components/pacientes/PatientActions";
 import { toast } from "sonner"; 
 
-// --- HELPERS (Conservados igual) ---
-function calcularEdad(fechaNacimiento?: string) {
-  if (!fechaNacimiento) return "?";
-  const hoy = new Date();
-  const cumpleanos = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - cumpleanos.getFullYear();
-  const mes = hoy.getMonth() - cumpleanos.getMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < cumpleanos.getDate())) {
-    edad--;
-  }
-  return edad >= 0 ? edad : "?";
-}
+// --- HELPERS (Ahora centralizados en utils.ts) ---
 
 function serializarPaciente(data: any): Paciente {
   return {
     ...data,
-    folioExpediente: data.folioExpediente || null,
-    fechaNacimiento: typeof data.fechaNacimiento === 'string' ? data.fechaNacimiento : data.fechaNacimiento?.toDate?.().toISOString() || null,
-    fechaRegistro: data.fechaRegistro?.toDate?.().toISOString() || null,
+    // 🛡️ Blindaje SANSCE: formatDate detecta si es objeto o texto y entrega un formato ISO limpio
+    fechaNacimiento: formatDate(data.fechaNacimiento, 'iso'),
+    fechaRegistro: formatDate(data.fechaRegistro, 'iso'),
+    folioExpediente: data.folioExpediente || "S/F",
     datosFiscales: data.datosFiscales || null
   };
 }
@@ -81,13 +73,12 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
           return {
               id: d.id,
               ...data,
-              // Normalizamos la fecha de registro para que siempre tenga .seconds
-              fecha: data.fecha?.seconds ? { seconds: data.fecha.seconds } : (data.fecha?.toDate ? { seconds: data.fecha.toDate().getTime() / 1000 } : null),
-              // Aseguramos que fechaCita se mantenga como string puro
-              fechaCita: typeof data.fechaCita === 'string' ? data.fechaCita : null,
-              monto: data.monto,
+              // 🛡️ Blindaje SANSCE: Usamos la librería central para normalizar
+              fecha: data.fecha, 
+              fechaCita: formatDate(data.fechaCita, 'iso'), // Forzamos AAAA-MM-DD
+              monto: Number(cleanPrice(data.monto))
           };
-        }) as any[]; // Usamos any[] temporalmente para silenciar el error de VSC mientras estabilizamos
+        }) as any[];
         
         setHistorial(historialData);
 
@@ -129,7 +120,8 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
   }
 
   // --- VARIABLES DERIVADAS ---
-  const edadReal = calcularEdad(datos.fechaNacimiento);
+  // 🛡️ Blindaje SANSCE: Usamos la función oficial importada de utils.ts
+  const edadReal = calculateAge(datos.fechaNacimiento);
   const labelStyle = "text-xs font-bold text-slate-400 uppercase";
   const valueStyle = "text-slate-700 font-medium";
   const sectionTitle = "text-lg font-bold text-slate-800 border-b pb-2 mb-4";

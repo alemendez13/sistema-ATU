@@ -40,7 +40,12 @@ export default function InventoryManager({ productosIniciales }: InventoryProps)
   // 2. Guardar nuevo lote (Entrada de Almacén)
   const handleGuardar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!skuSeleccionado || !cantidad) return;
+    
+    // 🛡️ VALIDACIÓN SANSCE: Evita entradas vacías o en cero que falsean el patrimonio
+    if (!skuSeleccionado || !cantidad || Number(cantidad) <= 0) {
+      alert("⚠️ Error: La cantidad debe ser mayor a cero.");
+      return;
+    }
 
     setLoading(true);
     try {

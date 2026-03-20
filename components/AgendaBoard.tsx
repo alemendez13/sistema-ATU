@@ -227,22 +227,27 @@ export default function AgendaBoard({ medicos, servicios, descuentos, plantillas
       setIsDetailOpen(true);
   };
 
-  // 🆕 FUNCIÓN PARA INICIAR EDICIÓN
+  // 🆕 FUNCIÓN PARA INICIAR EDICIÓN (SANSCE OS: Blindaje Anti-Zombies)
   const handleEditarCita = (cita: any) => {
-      setIsDetailOpen(false); // Cerramos el detalle
+      setIsDetailOpen(false); 
       
-      const medico = medicos.find(m => m.id === cita.doctorId);
+      const medicoActual = medicos.find(m => m.id === cita.doctorId);
       
-      // Configuramos el slot con los datos actuales
       setSelectedSlot({
-          doctor: medico,
+          doctor: medicoActual,
           hora: cita.hora,
           fecha: cita.fecha,
           prefilledName: cita.paciente, 
       });
       
-      setCitaParaEditar(cita); // Guardamos la referencia
-      setIsModalOpen(true);    // Abrimos el formulario
+      // 🛡️ TRAZABILIDAD SAGRADA: Adjuntamos el Calendar ID actual de la fuente de verdad (Google Sheets)
+      // Esto asegura que si cambiamos de médico, el sistema sepa de qué calendario BORRAR el evento viejo.
+      setCitaParaEditar({
+          ...cita,
+          doctorCalendarId: medicoActual?.calendarId 
+      }); 
+
+      setIsModalOpen(true);    
   };
 
   return (

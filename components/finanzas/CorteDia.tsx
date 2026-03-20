@@ -138,20 +138,25 @@ export default function CorteDia() {
     console.warn("⚠️ ALERTA SANSCE: Hay montos en banco sin método específico: $", diferenciaAuditoria);
   }
 
-  // El balance de caja física usa el Efectivo Total (Recepción + PS)
-  const balanceCaja = efectivoTotal + sumaInyecciones - sumaGastosReales;
+  // 🛡️ INDEPENDENCIA SANSCE: Calculamos los saldos por separado (Sin mezclarlos)
+  const saldoCajaChica = sumaInyecciones - sumaGastosReales;
+  const efectivoVentas = efectivoTotal; // (Recepción + PS)
 
   if (loading) return <div className="p-4 text-center text-slate-400">Calculando corte...</div>;
 
   return (
     <div className="space-y-4 mb-8">
       
-      {/* 1. RESUMEN EJECUTIVO (EL ARQUEO SIEMPRE VISIBLE) */}
+      {/* 1. RESUMEN EJECUTIVO (VENTAS VS OPERACIÓN SEPARADOS) */}
       <div className="bg-slate-900 p-6 rounded-2xl shadow-xl text-white flex flex-col md:flex-row justify-between items-center border-b-4 border-blue-600">
         <div className="flex flex-col md:flex-row items-center gap-6">
+          <div className="border-r border-white/10 pr-6">
+            <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">Efectivo Ventas (Caja A)</p>
+            <p className="text-4xl font-black text-emerald-50">${efectivoVentas.toFixed(2)}</p>
+          </div>
           <div>
-            <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Efectivo Total en Físico</p>
-            <p className="text-4xl font-black">${balanceCaja.toFixed(2)}</p>
+            <p className="text-[10px] font-black text-orange-400 uppercase tracking-[0.2em] mb-1">Saldo Caja Chica (Caja B)</p>
+            <p className="text-4xl font-black text-orange-50">${saldoCajaChica.toFixed(2)}</p>
           </div>
           
           {/* BOTÓN DE CONTROL DE VISIBILIDAD */}

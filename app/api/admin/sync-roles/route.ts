@@ -2,8 +2,23 @@
 import { NextResponse } from 'next/server';
 import { db, auth } from 'lib/firebase-admin'; 
 
+import { cookies } from 'next/headers';
+
 export async function GET() {
   try {
+    // 🛡️ CERROJO DE SEGURIDAD SANSCE
+    const cookieStore = cookies();
+    const tokenValue = cookieStore.get('token')?.value;
+
+    if (!tokenValue) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+    // Decodificamos el rol directamente del token para no gastar lecturas de base de datos
+    const base64Url = tokenValue.split('.')[1];
+    const payload = JSON.parse(atob(base64Url));
+    
+    if (payload.rol !== 'admin_general' && payload.rol !== 'admin') {
+      return NextResponse.json({ error: "Acceso restringido solo a Dirección" }, { status: 403 });
+    }
     // 1. UNIFICACIÓN SANSCE: Ahora leemos de la colección maestra de roles
     const usersSnapshot = await db.collection('usuarios_roles').get();
     

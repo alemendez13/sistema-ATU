@@ -4,7 +4,17 @@ import { NextResponse } from 'next/server';
 // Si tu archivo se llama "googleSheets.js" (JavaScript), esto funcionará perfecto.
 import { getControlDocumental } from '@/lib/googleSheets'; 
 
+import { cookies } from 'next/headers';
+
 export async function GET() {
+  const cookieStore = cookies();
+  const token = cookieStore.get('token');
+
+  // 🛡️ FILTRO DE SEGURIDAD SANSCE: Solo personal autenticado puede leer manuales
+  if (!token) {
+    return NextResponse.json({ error: "Acceso denegado. Inicie sesión." }, { status: 401 });
+  }
+
   try {
     // 1. Llamamos a la función que conecta con Google Sheets (que agregaste en lib/googleSheets.js)
     const data = await getControlDocumental();
