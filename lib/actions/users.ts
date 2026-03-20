@@ -20,6 +20,7 @@ export async function createSANSCEUser(formData: {
   nombre: string;
   rol: 'admin_general' | 'coordinacion_admin' | 'atu' | 'medico_renta' | 'profesional_salud';
   especialidad?: string;
+  pin: string; // 👈 NUEVO: Campo PIN obligatorio
 }) {
   try {
     const temporaryPassword = generateRandomPassword();
@@ -40,11 +41,12 @@ export async function createSANSCEUser(formData: {
       profesional_salud: ["view_agenda", "clinical_record_full", "view_own_kpis"]
     };
 
-    // 3. Guardar en Firestore (Colección usuarios_roles para coherencia con tu sistema actual)
+    // 3. Guardar en Firestore (Colección usuarios_roles)
     await db.collection("usuarios_roles").doc(userRecord.uid).set({
       email: formData.email,
       nombre: formData.nombre,
       rol: formData.rol,
+      pin: formData.pin, // 👈 REGISTRO: Guardamos el PIN en la ficha del empleado
       especialidad: formData.especialidad || "N/A",
       permisos: defaultPermissions[formData.rol] || [],
       fechaCreacion: new Date().toISOString(),
@@ -152,21 +154,6 @@ export async function migrateUsersFromSheet() {
         updated++;
       }
 
-      // 1. GESTIÓN EN FIREBASE AUTH
-      if (!authUser) {
-        const tempPass = generateRandomPassword();
-        const newUser = await auth.createUser({
-          email: sUser.email,
-          password: tempPass,
-          displayName: sUser.nombre,
-        });
-        uid = newUser.uid;
-        console.log(`📦 Migración: Nuevo acceso para ${sUser.email} | Pass: ${tempPass}`);
-        created++;
-      } else {
-        updated++;
-      }
-
       // 2. GESTIÓN DE PERMISOS (Firestore)
       const defaultPermissions = {
         admin_general: ["all"],
@@ -208,6 +195,8 @@ export async function updateSANSCEUser(uid: string, data: {
   nombre: string;
   rol: 'admin_general' | 'coordinacion_admin' | 'atu' | 'medico_renta' | 'profesional_salud';
   especialidad: string;
+  pin: string;
+  fotoMaestraUrl?: string; // 👈 BIOMETRÍA: Recibimos el enlace al patrón oficial
 }) {
   try {
     // 1. Actualizar Nombre en Firebase Auth
@@ -225,13 +214,20 @@ export async function updateSANSCEUser(uid: string, data: {
     };
 
     // 3. Actualizar Perfil en Firestore
-    await db.collection("usuarios_roles").doc(uid).update({
+    const updatePayload: any = {
       nombre: data.nombre,
       rol: data.rol,
+      pin: data.pin,
       especialidad: data.especialidad,
       permisos: defaultPermissions[data.rol] || [],
       ultimaModificacion: new Date().toISOString()
-    });
+    };
+
+    // 🛡️ REGLA SANSCE: Solo actualizamos la foto si se envía una nueva.
+    // Esto evita que al editar el nombre se borre accidentalmente el patrón biométrico.
+    if (data.fotoMaestraUrl) updatePayload.fotoMaestraUrl = data.fotoMaestraUrl;
+
+    await db.collection("usuarios_roles").doc(uid).update(updatePayload);
 
     revalidatePath("/configuracion");
     return { success: true, message: "Usuario actualizado correctamente" };

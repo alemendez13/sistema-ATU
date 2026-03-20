@@ -6,19 +6,21 @@ import { jwtVerify } from 'jose';
 
 // --- MAPA DE ACCESOS (Alineado estrictamente al PDF CONTROL_DOCUMENTAL_RBAC) ---
 const ROLE_ACCESS: Record<string, string[]> = {
-  // CONTROL TOTAL: Solo para el mando más alto (SANSCE OS v2).
+  // RECURSOS HUMANOS: Acceso al Reloj Checador, Expedientes e Incidencias.
+  '/personal': ['admin_general', 'coordinacion_admin', 'atu'],
+
+  // CONTROL TOTAL: Configuración del Sistema.
   '/configuracion': ['admin_general'],
   
-  // GESTIÓN INTEGRAL: Reportes Financieros, Procesos y Eficacia.
-  // Se unifican permisos y se otorga acceso explícito al rol 'atu'.
+  // GESTIÓN INTEGRAL: Finanzas y Reportes.
   '/reportes': ['admin_general', 'coordinacion_admin', 'atu'],
   '/finanzas': ['admin_general', 'coordinacion_admin', 'atu'], 
   
-  // OPERACIÓN CLÍNICA: Acceso para todo el personal operativo.
+  // OPERACIÓN CLÍNICA: Agenda y Directorio.
   '/agenda': ['admin_general', 'coordinacion_admin', 'atu', 'medico_renta', 'profesional_salud'],
   '/pacientes': ['admin_general', 'coordinacion_admin', 'atu', 'profesional_salud'],
   
-  // ÁREA MÉDICA: Exclusivo para clínicos (incluye Admin Gral por supervisión).
+  // ÁREA MÉDICA E INVENTARIOS.
   '/expedientes': ['admin_general', 'medico_renta', 'profesional_salud'],
   '/inventarios': ['admin_general', 'coordinacion_admin', 'profesional_salud', 'atu'],
 };
