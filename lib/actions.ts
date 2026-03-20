@@ -1097,31 +1097,30 @@ export async function registrarAsistenciaAction(pin: string, tipo: 'Entrada' | '
             }
         }
 
-        // 2. PREVENCIÓN DE DUPLICIDAD (Gobernanza de Nómina)
-        // Generamos un ID de fecha (YYYY-MM-DD) para la búsqueda
-        const hoyId = new Date().toISOString().split('T')[0];
-        
-        const registroPrevio = await dbAdmin.collection("asistencias")
-                                           .where("email", "==", userEmail)
-                                           .where("tipo", "==", tipo)
-                                           .where("fechaId", "==", hoyId)
-                                           .limit(1)
-                                           .get();
+        // 🛡️ RELOJ ATÓMICO SANSCE (Sincronización Mexico City)
+        const d = new Date();
+        const hoyId = d.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }); 
+        const horaLocal = d.toLocaleTimeString('es-MX', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            hour12: true, 
+            timeZone: 'America/Mexico_City' 
+        });
 
-        if (!registroPrevio.empty) {
-            return { 
-                success: false, 
-                error: `Ya registraste tu ${tipo} el día de hoy (${registroPrevio.docs[0].data().hora}).` 
-            };
+        // 1. REFERENCIA ÚNICA (Se declara una sola vez para evitar error 2451)
+        const asistenciaRef = dbAdmin.collection("asistencia_logs").doc(`${userEmail}_${hoyId}`);
+        const registroDoc = await asistenciaRef.get();
+
+        // 2. PREVENCIÓN DE DUPLICIDAD
+        if (registroDoc.exists) {
+            const dataActual = registroDoc.data();
+            if ((tipo === 'Entrada' && dataActual?.horaEntrada) || (tipo === 'Salida' && dataActual?.horaSalida)) {
+                const horaYaRegistrada = tipo === 'Entrada' ? dataActual.horaEntrada : dataActual.horaSalida;
+                return { success: false, error: `Ya registraste tu ${tipo} hoy a las ${horaYaRegistrada}.` };
+            }
         }
 
-        // 3. REGISTRO DE TRANSACCIÓN (Trazabilidad Sagrada)
-        const d = new Date();
-        const horaLocal = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
-
-        // 🛡️ ESTRUCTURA SANSCE: Registro Único por Día (Eficiencia de Costos)
-        const asistenciaRef = dbAdmin.collection("asistencia_logs").doc(`${userEmail}_${hoyId}`);
-        
+        // 3. PREPARACIÓN DE DATOS CONSOLIDADOS
         const datosRegistro: any = {
             nombre: nombreColaborador,
             email: userEmail,
