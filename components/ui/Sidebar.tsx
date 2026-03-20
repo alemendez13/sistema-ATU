@@ -29,8 +29,18 @@ export default function Sidebar() {
     root.style.setProperty('--sidebar-width', width);
   }, [isCollapsed]);
 
-  // 🔒 Regla de seguridad
-  if (pathname === "/login" || pathname.startsWith("/portal")) return null;
+  // 🔒 REGLA DE BLINDAJE SANSCE (Modo Kiosko):
+  // Detectamos si la terminal es el Reloj Checador para Tablet.
+  const isKioskMode = pathname === "/rh/reloj";
+
+  useEffect(() => {
+    // Si es modo Kiosko, forzamos el ancho a 0px para que el contenido use toda la pantalla.
+    if (isKioskMode) {
+      document.documentElement.style.setProperty('--sidebar-width', '0px');
+    }
+  }, [isKioskMode]);
+
+  if (pathname === "/login" || pathname.startsWith("/portal") || isKioskMode) return null;
 
   // Función para alternar el sidebar
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);

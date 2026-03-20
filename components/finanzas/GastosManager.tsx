@@ -1,4 +1,4 @@
-//components/finanzas/GaastosManager.tsx
+//components/finanzas/GastosManager.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { collection, addDoc, query, orderBy, onSnapshot, where, serverTimestamp, doc, updateDoc } from "@/lib/firebase-guard";

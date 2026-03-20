@@ -20,8 +20,11 @@ export default function Navbar() {
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // 🔒 REGLA DE SEGURIDAD (Misma lógica original):
-  if (pathname.startsWith("/portal") || pathname === "/login") {
+  // 🔒 REGLA DE BLINDAJE SANSCE (Modo Kiosko):
+  // Si la ruta es el Reloj Checador, eliminamos el Navbar para maximizar el área del sensor.
+  const isKioskMode = pathname === "/rh/reloj";
+
+  if (pathname.startsWith("/portal") || pathname === "/login" || isKioskMode) {
     return null;
   }
 
