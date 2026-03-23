@@ -1406,3 +1406,44 @@ export async function solicitarAprobacionGastoAction(datos: {
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * 🚀 ACCIÓN: OBTENER TAREAS OPERATIVAS (DASHBOARD)
+ * Recupera el listado granular de tareas para la Torre de Control.
+ */
+export const fetchTareasDashboardAction = unstable_cache(
+  async () => {
+    try {
+      const { GoogleSpreadsheet } = await import('google-spreadsheet');
+      const { JWT } = await import('google-auth-library');
+
+      const auth = new JWT({
+        email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      });
+
+      const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+      await doc.loadInfo();
+
+      const sheet = doc.sheetsByTitle['OPERACION_TAREAS'];
+      const rows = await sheet.getRows();
+
+      // Mapeo Quirúrgico: Traducimos de Google Sheets a formato Dashboard
+      return rows.map(r => ({
+        id: r.get('ID_Tarea'),
+        descripcion: r.get('Descripcion'),
+        responsable: r.get('EmailAsignado')?.split('@')[0] || 'Sin asignar',
+        fechaEntrega: r.get('FechaEntrega'),
+        estado: r.get('Estado') || 'Pendiente',
+        prioridad: r.get('Prioridad') || 'Media',
+        proyecto: r.get('Proyecto') || 'General'
+      }));
+    } catch (error) {
+      console.error("❌ Error recuperando Tareas para Dashboard:", error);
+      return [];
+    }
+  },
+  ['op-tareas-dashboard-v1'],
+  { tags: ['op-tareas-v1'], revalidate: 3600 } 
+);
