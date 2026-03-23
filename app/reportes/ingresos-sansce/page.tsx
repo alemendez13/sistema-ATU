@@ -1,17 +1,18 @@
 /* app/reportes/ingresos-sansce/page.tsx */
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react"; // 🟢 Agregamos Suspense
 import { collection, query, where, getDocs, orderBy, doc, getDoc, limit } from "@/lib/firebase-guard"; 
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation"; // 🆕 Importamos el detector de URL
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { formatCurrency, cleanPrice, formatDate } from "../../../lib/utils";
 import { addDoc, serverTimestamp } from "@/lib/firebase-guard"; 
-import { useAuth } from "../../../hooks/useAuth"; // 🔐 Importamos el vigilante de identidad
+import { useAuth } from "../../../hooks/useAuth";
 
-export default function ReporteIngresosPage() {
+// 🟢 Renombramos para proteger la lógica de cierre y agrupación
+function IngresosContent() {
   const { user } = useAuth() as any; 
   const searchParams = useSearchParams(); // 🛰️ Activamos el radar de origen
 
@@ -555,5 +556,18 @@ export default function ReporteIngresosPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+// 🟢 Función principal que exporta el reporte con su Sala de Espera
+export default function ReporteIngresosPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 font-medium italic">Generando reporte de ingresos y cartera...</p>
+      </div>
+    }>
+      <IngresosContent />
+    </Suspense>
   );
 }

@@ -73,10 +73,12 @@ export default function TaskListView({ tasks, loadingId, onToggleStatus, history
               {tareasAgrupadas[nombreProyecto]
                 .sort((a: any, b: any) => new Date(a.FechaEntrega || '9999-12-31').getTime() - new Date(b.FechaEntrega || '9999-12-31').getTime())
                 .map((tarea: any) => {
-                  // 🧠 SANSCE OS: Motor de estados terminales
+                  // 🧠 SANSCE OS: Motor de estados terminales y urgencia
+                  const hoyStr = new Date().toLocaleDateString('sv-SE');
                   const isFinished = tarea.Estado === 'Realizada' || tarea.Estado === 'Cumplida';
                   const isCancelled = tarea.Estado === 'Cancelada';
                   const isTerminal = isFinished || isCancelled;
+                  const esVencida = !isTerminal && tarea.FechaEntrega && tarea.FechaEntrega < hoyStr;
                   const esArrastre = fechaReferencia && tarea.FechaInicio === fechaReferencia && !isTerminal;
                   
                   return (
@@ -84,12 +86,14 @@ export default function TaskListView({ tasks, loadingId, onToggleStatus, history
                       key={tarea.ID_Tarea}
                       className={`group relative flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 rounded-2xl border bg-white shadow-sm hover:shadow-md transition-all border-l-8 ${
                       isCancelled
-                        ? 'opacity-60 border-rose-200 bg-rose-50/30' // 🌹 Estilo Rojo Ceniza
+                        ? 'opacity-60 border-rose-200 bg-rose-50/30' 
                         : isFinished 
                           ? 'opacity-40 grayscale border-slate-100 bg-slate-50/50' 
-                          : esArrastre
-                            ? 'border-red-500 shadow-red-100 ring-1 ring-red-100' 
-                            : 'border-blue-500 shadow-blue-50'
+                          : esVencida
+                            ? 'border-red-600 bg-red-50/50 ring-2 ring-red-200 shadow-lg shadow-red-100' // 🚨 ALERTA ROJA: Tarea Vencida
+                            : esArrastre
+                              ? 'border-red-400 shadow-red-50 ring-1 ring-red-50' 
+                              : 'border-blue-500 shadow-blue-50'
                     }`}
                     >
                       <div className="flex-1 space-y-2">
@@ -122,6 +126,13 @@ export default function TaskListView({ tasks, loadingId, onToggleStatus, history
                           {tarea.Prioridad === 'Alta' ? '⚡ CRÍTICA' : 
                            tarea.Prioridad === 'Baja' ? '🧊 BAJA' : '⭐ MEDIA'}
                         </span>
+
+                        {/* 🚨 SENSOR DE DESVIACIÓN: Contador de días de atraso */}
+                        {esVencida && (
+                          <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg bg-red-600 text-white border border-red-700 shadow-sm animate-pulse">
+                            ⚠️ ATRASADA POR {Math.floor((new Date(hoyStr).getTime() - new Date(tarea.FechaEntrega).getTime()) / (1000 * 60 * 60 * 24))} DÍAS
+                          </span>
+                        )}
 
                         <span className="text-[9px] text-slate-400 font-mono font-bold tracking-tighter bg-slate-50 px-2 py-1 rounded">
                           #{tarea.ID_Tarea?.split('-')[1]}

@@ -41,7 +41,9 @@ export default function TaskBoardClient({
     
     let cumpleUrgencia = true;
     if (fUrgencia !== 'all') {
-      const hoyStr = new Date().toISOString().split('T')[0];
+      // 🛡️ SANSCE CLOCK: Obtenemos la fecha exacta en la zona horaria local (MX)
+      const hoyStr = new Date().toLocaleDateString('sv-SE'); 
+      
       const esAtrasada = !isDone && t.FechaEntrega && t.FechaEntrega < hoyStr;
       const esParaHoy = !isDone && t.FechaEntrega === hoyStr;
       

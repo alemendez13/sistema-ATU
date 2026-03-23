@@ -1,3 +1,4 @@
+/* components/DashboardKPIs.tsx */
 "use client";
 import { useEffect, useState } from 'react';
 // 👇 ESTA ES LA ÚNICA LÍNEA QUE CAMBIA (Agregamos getCountFromServer y limit)

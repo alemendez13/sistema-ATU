@@ -146,6 +146,49 @@ export default function ExpedientePage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
+        {/* 📊 HOJA FRONTAL DE INTELIGENCIA (Módulo de Reportes Integrado) */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Visitas Totales</p>
+            <p className="text-2xl font-black text-blue-600">{historial.length}</p>
+            <p className="text-[10px] text-slate-400 mt-1">Registros en historial</p>
+          </div>
+          
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Inversión Total</p>
+            <p className="text-2xl font-black text-slate-800">
+              ${historial.reduce((acc, curr) => acc + (Number(curr.monto) || 0), 0).toLocaleString()}
+            </p>
+            <p className="text-[10px] text-emerald-600 mt-1 font-medium">Facturación acumulada</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Última Atención</p>
+            <p className="text-lg font-bold text-slate-700">
+              {historial[0]?.fechaCita ? historial[0].fechaCita.split('-').reverse().join('/') : 'Sin registro'}
+            </p>
+            <p className="text-[10px] text-slate-400 mt-1">Fecha del servicio más reciente</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estatus de Cobro</p>
+            <div className="flex items-center gap-2 mt-1">
+              {historial.some(p => p.estatus !== 'Pagado') ? (
+                <>
+                  <span className="h-3 w-3 rounded-full bg-amber-500 animate-pulse"></span>
+                  <p className="text-lg font-bold text-amber-600">Pendientes</p>
+                </>
+              ) : (
+                <>
+                  <span className="h-3 w-3 rounded-full bg-emerald-500"></span>
+                  <p className="text-lg font-bold text-emerald-600">Al día</p>
+                </>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">Validación de saldos en tiempo real</p>
+          </div>
+        </div>
+
         {/* TARJETA PRINCIPAL */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 mb-8 flex flex-col lg:flex-row gap-8 items-start">
             

@@ -171,11 +171,18 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
   const domingo = domingoDate.toISOString().split('T')[0];
 
   const pendientesSemana = tasks.filter(t => {
+    // 🛡️ SANSCE RADAR: Filtro de estados terminales (Limpieza de ruido)
+    const isTerminal = t.Estado === 'Realizada' || t.Estado === 'Cumplida' || t.Estado === 'Cancelada';
+    if (isTerminal) return false;
+
+    // Sincronización con el "Reloj de la Reunión"
+    const esVencida = t.FechaEntrega && t.FechaEntrega < datos.fecha; 
     const esEstaSemana = t.FechaEntrega >= lunes && t.FechaEntrega <= domingo;
-    // 🛡️ REGLA DE LIMPIEZA VISUAL: Excluimos 'Realizada' para enfocar la toma de decisiones
-    const esPendiente = t.Estado !== 'Realizada' && t.Estado !== 'Cumplida';
+    
     const cumpleFiltroPersona = filtroPersona ? t.EmailAsignado === filtroPersona : true;
-    return esEstaSemana && esPendiente && cumpleFiltroPersona;
+
+    // El radar ahora captura TODO lo vencido (sin límite de fecha) + lo programado para esta semana
+    return (esVencida || esEstaSemana) && cumpleFiltroPersona;
   });
 
   return (
@@ -387,7 +394,8 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in slide-in-from-top-2 duration-300">
             {pendientesSemana.length > 0 ? pendientesSemana.map((tarea, idx) => {
               
-            // 🛡️ DETECTOR DE ARRASTRE: ¿Esta tarea nació en la minuta anterior?
+            // 🛡️ SANSCE RADAR: Definición de variables de estado para visualización
+            const esVencida = tarea.FechaEntrega && tarea.FechaEntrega < datos.fecha; 
             const esArrastre = minutaPrevia && tarea.FechaInicio === minutaPrevia.Fecha;
 
             return (
@@ -410,15 +418,22 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
                   }
                 }}
                 className={`p-3 bg-white border rounded-xl cursor-pointer transition-all group flex justify-between items-center ${
-                  esArrastre 
-                    ? 'border-red-500 shadow-md shadow-red-50' 
-                    : 'border-blue-100 hover:border-blue-400'
+                  esVencida
+                    ? 'border-red-600 bg-red-50/50 ring-2 ring-red-100 shadow-lg shadow-red-50' // 🚨 ALERTA MÁXIMA: Vencida
+                    : esArrastre 
+                      ? 'border-red-400 shadow-md shadow-red-50' 
+                      : 'border-blue-100 hover:border-blue-400'
                 }`}
               >
                 <div className="flex flex-col">
                   <div className="flex items-center gap-1">
-                    {esArrastre && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded-sm font-black animate-pulse">ARRASTRE</span>}
-                    <span className={`text-[10px] font-bold leading-tight ${esArrastre ? 'text-red-700' : 'text-slate-700 group-hover:text-blue-700'}`}>
+                    {esVencida && (
+                      <span className="text-[8px] bg-red-700 text-white px-1.5 py-0.5 rounded-sm font-black animate-pulse uppercase">
+                        ⚠️ ATRASADA {Math.floor((new Date(datos.fecha).getTime() - new Date(tarea.FechaEntrega).getTime()) / (1000 * 60 * 60 * 24))} DÍAS
+                      </span>
+                    )}
+                    {esArrastre && !esVencida && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded-sm font-black animate-pulse">ARRASTRE</span>}
+                    <span className={`text-[10px] font-bold leading-tight ${esVencida ? 'text-red-900' : esArrastre ? 'text-red-700' : 'text-slate-700 group-hover:text-blue-700'}`}>
                       {tarea.Descripcion}
                     </span>
                   </div>

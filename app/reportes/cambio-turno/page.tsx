@@ -1,17 +1,18 @@
 // ARCHIVO: app/reportes/cambio-turno/page.tsx
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react"; // 🟢 Agregamos Suspense
 import { collection, query, where, getDocs, addDoc, serverTimestamp, Timestamp } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase"; 
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import { toast } from "sonner";
-import { useRouter, useSearchParams } from "next/navigation"; // 🆕 Agregamos useSearchParams
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { cleanPrice, formatCurrency } from "../../../lib/utils";
+import { cleanPrice } from "../../../lib/utils";
 import { getMedicosAction } from "../../../lib/actions";
-import { useAuth } from "../../../hooks/useAuth"; // 🔐 Importamos el vigilante de identidad
+import { useAuth } from "../../../hooks/useAuth";
 
-export default function CambioTurnoPage() {
+// 🟢 Renombramos a "Content" para envolverlo en la zona de espera
+function CambioTurnoContent() {
   const { user } = useAuth() as any; 
   const router = useRouter();
   const searchParams = useSearchParams(); // 🛰️ Detectamos el origen
@@ -516,5 +517,18 @@ export default function CambioTurnoPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+// 🟢 Función principal que exporta el reporte con su Sala de Espera
+export default function CambioTurnoPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 font-medium italic">Iniciando auditoría de turno...</p>
+      </div>
+    }>
+      <CambioTurnoContent />
+    </Suspense>
   );
 }

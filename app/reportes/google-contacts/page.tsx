@@ -1,14 +1,15 @@
 /* app/reportes/google-contacts/page.tsx */
 "use client";
-import { useState } from "react";
+import { useState, Suspense } from "react"; // 🟢 Agregamos Suspense para la "espera"
 import { collection, query, where, getDocs, orderBy, limit } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation"; // 🆕 Importamos detector de URL
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
-export default function GoogleContactsPage() {
+// 🟢 Renombramos la función para poder envolverla después
+function GoogleContactsContent() {
   const searchParams = useSearchParams(); // 🛰️ Activamos radar de origen
 
   // 🧠 Lógica de Retorno Inteligente (SANSCE OS):
@@ -196,5 +197,18 @@ export default function GoogleContactsPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+// 🟢 Función principal que exportamos al sistema con "Sala de Espera"
+export default function GoogleContactsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 font-medium italic">Cargando exportador de contactos...</p>
+      </div>
+    }>
+      <GoogleContactsContent />
+    </Suspense>
   );
 }

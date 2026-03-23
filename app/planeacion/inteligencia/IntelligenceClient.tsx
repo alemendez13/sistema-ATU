@@ -1,7 +1,7 @@
 //app/planeacion/inteligencia/IntelligenceClient.tsx
 "use client";
 
-import React, { useState, useEffect } from "react"; // 🆕 Agregamos useEffect
+import React, { useState, useEffect, Suspense } from "react"; // 🟢 Agregamos Suspense
 import Link from "next/link";
 import { useSearchParams } from "next/navigation"; // 🆕 Importamos el lector de URL
 import { motion, AnimatePresence } from "framer-motion";
@@ -36,7 +36,7 @@ interface IntelligenceProps {
   checklist: any;
 }
 
-export default function IntelligenceClient({ okrData, cronograma, checklist }: IntelligenceProps) {
+function IntelligenceContent({ okrData, cronograma, checklist }: IntelligenceProps) {
   const searchParams = useSearchParams(); // 🛰️ Activamos el radar de URL
   
   const [expanded, setExpanded] = useState<{ [key: string]: boolean }>({
@@ -321,5 +321,19 @@ export default function IntelligenceClient({ okrData, cronograma, checklist }: I
       </section>
 
     </div>
+  );
+}
+
+// 🟢 Función principal que exporta el Centro de Inteligencia con su Sala de Espera
+export default function IntelligenceClient(props: IntelligenceProps) {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center p-20 bg-white/5 rounded-[2.5rem] border border-white/10">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+        <p className="text-slate-400 italic">Sincronizando cuadrantes de inteligencia estratégica...</p>
+      </div>
+    }>
+      <IntelligenceContent {...props} />
+    </Suspense>
   );
 }

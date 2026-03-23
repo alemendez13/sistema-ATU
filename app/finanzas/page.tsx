@@ -162,10 +162,22 @@ const totalListaActual = pendientes.reduce((acc, op) => {
               <p className="text-slate-500 text-sm">Corte del día y registro de movimientos.</p>
             </div>
             
-            <div className="flex gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
-              <Link href="/finanzas" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md">💰 Caja</Link>
-              <Link href="/reportes" className="text-slate-600 hover:bg-slate-100 px-4 py-2 rounded-lg text-xs font-bold transition-all">📈 Reportes</Link>
-              <Link href="/finanzas/gastos" className="text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-xs font-bold transition-all">💸 Gastos</Link>
+            <div className="flex flex-wrap gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+              {/* Accesos Directos Operativos - SANSCE OS */}
+              <Link href="/finanzas" className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase shadow-md transition-all border border-transparent">💰 Caja</Link>
+              
+              <div className="h-6 w-[1px] bg-slate-200 self-center mx-1" />
+
+              <Link href="/reportes/cambio-turno" className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-blue-100">🔄 Turno</Link>
+              <Link href="/reportes/ingresos-sansce" className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-blue-100">🏥 Sansce</Link>
+              <Link href="/reportes/ingresos-medicos" className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-blue-100">👨‍⚕️ Prof.</Link>
+              <Link href="/reportes/caja-chica" className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-blue-100">💸 Chica</Link>
+              <Link href="/reportes/conciliacion-lab" className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-blue-100">🧪 Lab</Link>
+              <Link href="/reportes/archivo-muerto" className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-blue-100">🗄️ Archivo</Link>
+
+              <div className="h-6 w-[1px] bg-slate-200 self-center mx-1" />
+
+              <Link href="/finanzas/gastos" className="text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-transparent hover:border-red-100">💸 Gastos</Link>
             </div>
           </header>
 

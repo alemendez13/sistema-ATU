@@ -1,14 +1,15 @@
 /* app/reportes/hoja-frontal/page.tsx */
 "use client";
-import { useState } from "react";
+import { useState, Suspense } from "react"; // 🟢 Agregamos Suspense
 import { collection, query, where, getDocs, limit } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import DownloadHojaFrontalButton from "../../../components/pdf/DownloadHojaFrontalButton";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation"; // 🆕 Importamos detector de URL
+import { useSearchParams } from "next/navigation";
 
-export default function HojaFrontalPage() {
+// 🟢 Renombramos a "Content" para proteger la generación de expedientes
+function HojaFrontalContent() {
   const searchParams = useSearchParams(); // 🛰️ Activamos radar de origen
 
   // 🧠 Lógica de Retorno Inteligente:
@@ -107,5 +108,18 @@ export default function HojaFrontalPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+// 🟢 Función principal que exporta la Hoja Frontal con su zona de protección
+export default function HojaFrontalPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 font-medium italic">Accediendo al archivo digital de pacientes...</p>
+      </div>
+    }>
+      <HojaFrontalContent />
+    </Suspense>
   );
 }

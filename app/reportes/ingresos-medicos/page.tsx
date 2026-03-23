@@ -1,18 +1,19 @@
 /* app/reportes/ingresos-medico/page.tsx */
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react"; // 🟢 Agregamos Suspense
 import { collection, query, where, getDocs, orderBy, getDoc, doc } from "@/lib/firebase-guard"; 
 import { db } from "../../../lib/firebase";
 import { getMedicosAction, enviarCorteMedicoAction } from "../../../lib/actions";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation"; // 🆕 Importamos detector de origen
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { LiquidacionMedicoPDF } from '../../../components/documents/LiquidacionMedicoPDF';
 import { cleanPrice } from "../../../lib/utils";
 
-export default function ReporteIngresosMedicos() {
+// 🟢 Renombramos a "Content" para proteger el cálculo de liquidaciones
+function IngresosMedicosContent() {
   const searchParams = useSearchParams(); // 🛰️ Activamos radar de origen
 
   // 🧠 Lógica de Retorno Inteligente:
@@ -419,5 +420,18 @@ export default function ReporteIngresosMedicos() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+// 🟢 Función principal que exporta el reporte con su Sala de Espera
+export default function ReporteIngresosMedicos() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 font-medium italic">Preparando panel de liquidación de profesionales...</p>
+      </div>
+    }>
+      <IngresosMedicosContent />
+    </Suspense>
   );
 }

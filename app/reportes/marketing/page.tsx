@@ -1,18 +1,18 @@
 /* app/reportes/marketing/page.tsx */
 "use client";
-import { useState } from "react"; // Quitamos useEffect
+import { useState, Suspense } from "react"; // 🟢 Agregamos Suspense
 import { collection, query, where, getDocs, orderBy, limit } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation"; // 🆕 Importamos el radar de navegación
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-// Colores para la gráfica
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
 
-export default function ReporteMarketingPage() {
+// 🟢 Renombramos a "Content" para proteger el análisis de marketing
+function MarketingContent() {
   const searchParams = useSearchParams(); // 🛰️ Activamos detección de origen
 
   // 🧠 Lógica de Retorno Inteligente (SANSCE OS):
@@ -255,5 +255,18 @@ export default function ReporteMarketingPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+// 🟢 Función principal que exporta el reporte con su zona de protección
+export default function ReporteMarketingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 font-medium italic">Analizando efectividad de canales de marketing...</p>
+      </div>
+    }>
+      <MarketingContent />
+    </Suspense>
   );
 }

@@ -1,17 +1,18 @@
 /* app/reportes/radar/page.tsx */
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react"; // 🟢 Agregamos Suspense
 import { collection, query, where, getDocs, orderBy, getDoc, doc, limit } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation"; // 🆕 Importamos detector de origen
+import { useSearchParams } from "next/navigation";
 import WhatsAppButton from "../../../components/ui/WhatsAppButton";
 import { toast } from "sonner";
 import { getMensajesConfigAction } from "../../../lib/actions"; 
 import { parseWhatsAppTemplate } from "../../../lib/utils"; 
 
-export default function RadarPage() {
+// 🟢 Renombramos para proteger la inteligencia del Radar
+function RadarContent() {
   const searchParams = useSearchParams(); // 🛰️ Activamos radar de origen
 
   // 🧠 Lógica de Retorno Inteligente (SANSCE OS):
@@ -234,5 +235,18 @@ export default function RadarPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+// 🟢 Función principal que exporta el Radar con su zona de protección
+export default function RadarPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 font-medium italic">Sincronizando radar de pacientes...</p>
+      </div>
+    }>
+      <RadarContent />
+    </Suspense>
   );
 }

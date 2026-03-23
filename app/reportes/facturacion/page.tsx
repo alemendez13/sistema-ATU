@@ -1,17 +1,17 @@
 /* app/reportes/facturacion/page.tsx */
 "use client";
-import { useState } from "react";
+import { useState, Suspense } from "react"; // 🟢 Agregamos Suspense
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, updateDoc } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation"; // 🆕 Importamos detector de URL
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
-// 👇 CONFIGURACIÓN: CAMBIA ESTO POR EL LINK REAL DE TU SISTEMA DE FACTURACIÓN
 const URL_PORTAL_FACTURACION = "https://portal.facturacion.com/login"; 
 
-export default function ReporteFacturacionPage() {
+// 🟢 Renombramos para proteger el contenido
+function FacturacionContent() {
   const searchParams = useSearchParams(); // 🛰️ Activamos radar de origen
 
   // 🧠 Lógica de Retorno Inteligente (SANSCE OS):
@@ -237,5 +237,18 @@ export default function ReporteFacturacionPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+// 🟢 Función principal con Sala de Espera
+export default function ReporteFacturacionPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 font-medium italic">Accediendo al panel de facturación...</p>
+      </div>
+    }>
+      <FacturacionContent />
+    </Suspense>
   );
 }

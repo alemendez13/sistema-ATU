@@ -1,15 +1,16 @@
 // ARCHIVO: app/reportes/caja-chica/page.tsx
 "use client";
-import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, orderBy, Timestamp } from "@/lib/firebase-guard";
+import { useState, useEffect, Suspense } from "react"; // 🟢 Agregamos Suspense (Sala de espera)
+import { collection, query, where, getDocs, orderBy } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
-import { useSearchParams } from "next/navigation"; // 🆕 Importamos el radar de URL
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { formatDate, formatCurrency, cleanPrice } from "../../../lib/utils";
+import { formatDate, cleanPrice } from "../../../lib/utils";
 
-export default function ReporteCajaChicaPage() {
+// 🟢 Renombramos a "Content" para poder envolverlo después
+function CajaChicaContent() {
   const searchParams = useSearchParams(); // 🛰️ Detectamos el origen de la visita
 
   // 🧠 Lógica de Memoria SANSCE:
@@ -226,5 +227,18 @@ export default function ReporteCajaChicaPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+// 🟢 Esta es la nueva función principal que Netlify buscará
+export default function ReporteCajaChicaPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 font-medium italic">Preparando reporte de caja...</p>
+      </div>
+    }>
+      <CajaChicaContent />
+    </Suspense>
   );
 }

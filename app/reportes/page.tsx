@@ -3,6 +3,8 @@
 import ProtectedRoute from "../../components/ProtectedRoute";
 import Link from "next/link";
 import { toast } from "sonner";
+// 🛰️ SANSCE OS: Inyección del motor de cobranza en vivo
+import CorteDia from "../../components/finanzas/CorteDia";
 
 // Definimos la lista de reportes solicitados
 const reportesMenu = [
@@ -37,48 +39,28 @@ export default function PanelReportesPage() {
               <p className="text-slate-500 text-sm">Módulo 8: Auditoría y Estrategia.</p>
             </div>
             
-            <div className="flex gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
-              <Link href="/finanzas" className="text-slate-600 hover:bg-slate-100 px-4 py-2 rounded-lg text-xs font-bold transition-all">💰 Caja Principal</Link>
-              <Link href="/reportes" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md">📈 Reportes e Inteligencia</Link>
-              <Link href="/finanzas/gastos" className="text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-xs font-bold transition-all">💸 Gastos</Link>
+            <div className="flex flex-wrap gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+              {/* Accesos Directos Operativos - SANSCE OS */}
+              <Link href="/finanzas" className="text-slate-600 hover:bg-slate-100 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-transparent hover:border-slate-200">💰 Caja</Link>
+              
+              <div className="h-6 w-[1px] bg-slate-200 self-center mx-1" /> {/* Separador visual */}
+
+              <Link href="/reportes/cambio-turno" className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-blue-100">🔄 Turno</Link>
+              <Link href="/reportes/ingresos-sansce" className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-blue-100">🏥 Sansce</Link>
+              <Link href="/reportes/ingresos-medicos" className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-blue-100">👨‍⚕️ Prof.</Link>
+              <Link href="/reportes/caja-chica" className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-blue-100">💸 Chica</Link>
+              <Link href="/reportes/conciliacion-lab" className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-blue-100">🧪 Lab</Link>
+              <Link href="/reportes/archivo-muerto" className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-blue-100">🗄️ Archivo</Link>
+
+              <div className="h-6 w-[1px] bg-slate-200 self-center mx-1" /> {/* Separador visual */}
+
+              <Link href="/finanzas/gastos" className="text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all border border-transparent hover:border-red-100">💸 Gastos</Link>
             </div>
           </div>
           
-          {/* Grid de Reportes */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {reportesMenu.map((repo) => (
-              <Link 
-                key={repo.id} 
-                href={repo.ruta}
-                onClick={(e) => handleClick(e, repo)}
-                className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-300 transition-all group flex flex-col h-full relative overflow-hidden"
-              >
-                {/* Etiqueta especial para el Radar */}
-                {repo.id === 'k' && (
-                    <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">
-                        NUEVO
-                    </div>
-                )}
-
-                <div className="flex justify-between items-start mb-4">
-                  <span className="text-4xl bg-slate-50 p-3 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                    {repo.icono}
-                  </span>
-                  <span className="text-xs font-bold text-slate-300">#{repo.id.toUpperCase()}</span>
-                </div>
-                
-                <h3 className="font-bold text-slate-800 text-lg mb-2 group-hover:text-blue-600 transition-colors">
-                  {repo.titulo}
-                </h3>
-                <p className="text-sm text-slate-500 flex-1">
-                  {repo.desc}
-                </p>
-                
-                <div className="mt-4 pt-4 border-t border-slate-50 text-xs font-bold text-blue-600 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  Acceder al reporte <span>→</span>
-                </div>
-              </Link>
-            ))}
+          {/* Dashboard Operativo - Monitor de Cobranza en Tiempo Real */}
+          <div className="animate-in fade-in zoom-in-95 duration-700">
+            <CorteDia />
           </div>
 
           {/* Sección de KPIs Rápidos */}

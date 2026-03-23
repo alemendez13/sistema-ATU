@@ -1,6 +1,7 @@
 /* app/api/admin/sync-roles/route.ts */
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
-import { db, auth } from 'lib/firebase-admin'; 
+import { db, auth } from 'lib/firebase-admin';
 
 import { cookies } from 'next/headers';
 

@@ -1,4 +1,5 @@
 /* app/reportes/cotizacion-lab/page.tsx */
+import { Suspense } from 'react'; // 🟢 Agregamos la zona de espera
 import { getLaboratorios, getMedicos } from "../../../lib/googleSheets"; 
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import ClientCotizador from "./ClientCotizador"; 
@@ -29,7 +30,14 @@ export default async function CotizadorPage() {
 
   return (
     <ProtectedRoute>
-       <ClientCotizador catalogo={catalogo} medicos={medicos} />
+      {/* 🟢 Creamos la sala de espera para el radar de URL y buscador */}
+      <Suspense fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <p className="text-slate-500 font-medium italic">Preparando cotizador de laboratorio...</p>
+        </div>
+      }>
+        <ClientCotizador catalogo={catalogo} medicos={medicos} />
+      </Suspense>
     </ProtectedRoute>
   );
 }
