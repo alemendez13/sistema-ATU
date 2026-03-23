@@ -4,13 +4,22 @@ import { useState, useEffect } from "react";
 import { PDFDownloadLink } from "@react-pdf/renderer"; 
 import CotizacionLabPDF from "../../../components/documents/CotizacionLabPDF";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation"; // 🆕 Importamos el detector de URL
 import { collection, query, where, getDocs, limit } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
 import { cleanPrice } from "../../../lib/utils";
 
 export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[], medicos: any[] }) {
+  const searchParams = useSearchParams(); // 🛰️ Activamos radar de origen
+
+  // 🧠 Lógica de Retorno Inteligente (SANSCE OS):
+  const isFromInteligencia = searchParams.get('from') === 'inteligencia';
+  const backRoute = isFromInteligencia 
+    ? "/planeacion/inteligencia?tab=reportes" 
+    : "/pacientes"; // Mantenemos el destino original para el personal operativo
+
   // Estados
-  const [pacienteInput, setPacienteInput] = useState(""); 
+  const [pacienteInput, setPacienteInput] = useState("");
   const [medicoInput, setMedicoInput] = useState("");     
   const [resultadosPacientes, setResultadosPacientes] = useState<any[]>([]);
   const [busquedaEstudio, setBusquedaEstudio] = useState("");
@@ -87,7 +96,7 @@ export default function ClientCotizador({ catalogo, medicos }: { catalogo: any[]
         {/* IZQUIERDA: DATOS */}
         <div className="space-y-6">
             <div className="flex items-center gap-4">
-                <Link href="/pacientes" className="text-2xl text-slate-400 hover:text-blue-600">←</Link>
+                <Link href={backRoute} className="text-2xl text-slate-400 hover:text-blue-600">←</Link>
                 <h1 className="text-2xl font-bold text-slate-800">Cotizador de Laboratorio</h1>
             </div>
 

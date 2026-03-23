@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import { collection, addDoc, query, orderBy, onSnapshot, where, serverTimestamp, doc, updateDoc } from "@/lib/firebase-guard";
 import { db } from "../../lib/firebase";
-import { useAuth } from "../../hooks/useAuth"; // 🔐 Importamos el vigilante de identidad
+import { useAuth } from "../../hooks/useAuth"; 
+import { solicitarAprobacionGastoAction } from "../../lib/actions"; // 🚀 Acción de correo
+import { toast } from "sonner"; // 🎨 Estética SANSCE
 
 interface Gasto {
   id: string;
@@ -80,33 +82,32 @@ export default function GastosManager() {
     }
   };
 
-  // 👮 Lógica de Supervisor: Validar todo lo visible
+  // 👮 Lógica SANSCE OS: Solicitar Firma Digital a Dirección
   const handleValidarDia = async () => {
-    // Filtramos solo lo que NO está validado aún
     const pendientes = gastos.filter(g => !g.validado);
     
-    if (pendientes.length === 0) return alert("✅ Todo el corte ya está validado.");
-    
-    // Simulación de seguridad (Surgical Mode: simple y funcional)
-    const clave = prompt("🔐 SUPERVISOR: Ingrese su firma o clave para aprobar el corte:");
-    if (!clave) return;
+    if (pendientes.length === 0) return toast.info("Todo el corte ya ha sido validado.");
+
+    if (!confirm(`Se enviará un correo de aprobación a Alejandra Méndez por un saldo neto de $${balanceDia.toFixed(2)}. ¿Continuar?`)) return;
 
     setLoading(true);
     try {
-      // Actualizamos uno por uno (Loop seguro, son pocos registros por día)
-      const promesas = pendientes.map(g => {
-        const ref = doc(db, "gastos", g.id);
-        return updateDoc(ref, {
-          validado: true,
-          validadoPor: clave
-        });
+      const res = await solicitarAprobacionGastoAction({
+        solicitadoPor: user?.email || "Usuario Desconocido",
+        montoNeto: balanceDia,
+        inyecciones: totalIngresos,
+        gastos: totalGastos,
+        conteoMovimientos: pendientes.length
       });
-      
-      await Promise.all(promesas);
-      alert(`✅ Se han validado ${pendientes.length} movimientos exitosamente.`);
+
+      if (res.success) {
+        toast.success("📧 Solicitud enviada. Esperando aprobación de Dirección.");
+      } else {
+        toast.error("Error al enviar: " + res.error);
+      }
     } catch (error) {
       console.error(error);
-      alert("Error al validar el corte.");
+      toast.error("Fallo en la comunicación con el servidor de correo.");
     } finally {
       setLoading(false);
     }

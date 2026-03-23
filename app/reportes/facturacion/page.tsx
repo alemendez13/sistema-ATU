@@ -5,12 +5,21 @@ import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, updateD
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation"; // 🆕 Importamos detector de URL
 import { toast } from "sonner";
 
 // 👇 CONFIGURACIÓN: CAMBIA ESTO POR EL LINK REAL DE TU SISTEMA DE FACTURACIÓN
 const URL_PORTAL_FACTURACION = "https://portal.facturacion.com/login"; 
 
 export default function ReporteFacturacionPage() {
+  const searchParams = useSearchParams(); // 🛰️ Activamos radar de origen
+
+  // 🧠 Lógica de Retorno Inteligente (SANSCE OS):
+  const isFromInteligencia = searchParams.get('from') === 'inteligencia';
+  const backRoute = isFromInteligencia 
+    ? "/planeacion/inteligencia?tab=reportes" 
+    : "/pacientes"; // Regreso por defecto para personal de administración
+
   // Fechas por defecto: Mes actual
   const date = new Date();
   const primerDia = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
@@ -108,8 +117,8 @@ export default function ReporteFacturacionPage() {
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
             <div className="flex items-center gap-4">
-                <Link href="/pacientes" className="text-slate-400 hover:text-blue-600 font-bold text-2xl">←</Link>
-                <div>
+            <Link href={backRoute} className="text-slate-400 hover:text-blue-600 font-bold text-2xl">←</Link>
+            <div>
                     <h1 className="text-3xl font-bold text-slate-900">Control de Facturación</h1>
                     <p className="text-slate-500">Gestión de solicitudes de factura de pacientes.</p>
                 </div>

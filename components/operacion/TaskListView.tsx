@@ -113,6 +113,16 @@ export default function TaskListView({ tasks, loadingId, onToggleStatus, history
                           ● {tarea.Estado || 'Pendiente'}
                         </span>
 
+                        {/* 🔥 SEMÁFORO DE PRIORIDAD ESTRATÉGICA */}
+                        <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border shadow-sm ${
+                          tarea.Prioridad === 'Alta' ? 'bg-rose-600 text-white border-rose-700' :
+                          tarea.Prioridad === 'Baja' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                          'bg-amber-100 text-amber-700 border-amber-200' // Media por defecto
+                        }`}>
+                          {tarea.Prioridad === 'Alta' ? '⚡ CRÍTICA' : 
+                           tarea.Prioridad === 'Baja' ? '🧊 BAJA' : '⭐ MEDIA'}
+                        </span>
+
                         <span className="text-[9px] text-slate-400 font-mono font-bold tracking-tighter bg-slate-50 px-2 py-1 rounded">
                           #{tarea.ID_Tarea?.split('-')[1]}
                         </span>

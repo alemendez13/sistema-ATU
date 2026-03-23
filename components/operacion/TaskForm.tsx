@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation'; // 🚀 Conector de actualización silenciosa
-import { List, User, Calendar, Save, Loader2, Briefcase } from 'lucide-react';
+import { List, User, Calendar, Save, Loader2, Briefcase, Zap } from 'lucide-react';
 import { saveSingleTaskAction } from '@/lib/actions';
 
 interface TaskFormProps {
@@ -92,6 +92,23 @@ export default function TaskForm({ personal, onSuccess, defaultProject, defaultH
                     </option>
                 );
             })}
+          </select>
+        </div>
+
+        {/* 2.5 PRIORIDAD ESTRATÉGICA SANSCE */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+            <Zap size={14} className="text-amber-500" /> Prioridad Estratégica
+          </label>
+          <select 
+            name="prioridad"
+            required
+            defaultValue="Media"
+            className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer shadow-sm"
+          >
+            <option value="Baja">🔵 BAJA (Operativa)</option>
+            <option value="Media">🟡 MEDIA (Táctica)</option>
+            <option value="Alta">🔴 ALTA (Crítica)</option>
           </select>
         </div>
 

@@ -4,11 +4,20 @@ import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, orderBy, Timestamp } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
+import { useSearchParams } from "next/navigation"; // 🆕 Importamos el radar de URL
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatDate, formatCurrency, cleanPrice } from "../../../lib/utils";
 
 export default function ReporteCajaChicaPage() {
+  const searchParams = useSearchParams(); // 🛰️ Detectamos el origen de la visita
+
+  // 🧠 Lógica de Memoria SANSCE:
+  const isFromInteligencia = searchParams.get('from') === 'inteligencia';
+  const backRoute = isFromInteligencia 
+    ? "/planeacion/inteligencia?tab=reportes" 
+    : "/reportes";
+
   // Por defecto, mostramos el mes actual completo
   const date = new Date();
   const primerDia = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
@@ -91,7 +100,7 @@ export default function ReporteCajaChicaPage() {
           
           {/* Header */}
           <div className="flex items-center gap-4 mb-6">
-            <Link href="/reportes" className="text-slate-500 hover:text-blue-600 font-bold text-xl">
+            <Link href={backRoute} className="text-slate-500 hover:text-blue-600 font-bold text-xl">
               ←
             </Link>
             <div>

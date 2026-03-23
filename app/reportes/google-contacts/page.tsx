@@ -5,9 +5,18 @@ import { collection, query, where, getDocs, orderBy, limit } from "@/lib/firebas
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation"; // 🆕 Importamos detector de URL
 import { toast } from "sonner";
 
 export default function GoogleContactsPage() {
+  const searchParams = useSearchParams(); // 🛰️ Activamos radar de origen
+
+  // 🧠 Lógica de Retorno Inteligente (SANSCE OS):
+  const isFromInteligencia = searchParams.get('from') === 'inteligencia';
+  const backRoute = isFromInteligencia 
+    ? "/planeacion/inteligencia?tab=reportes" 
+    : "/reportes";
+
   // Fechas por defecto: Mes actual
   const date = new Date();
   const primerDia = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
@@ -109,7 +118,7 @@ export default function GoogleContactsPage() {
         <div className="max-w-4xl mx-auto">
           
           <div className="flex items-center gap-4 mb-8">
-            <Link href="/reportes" className="text-slate-400 hover:text-blue-600 font-bold text-2xl">←</Link>
+            <Link href={backRoute} className="text-slate-400 hover:text-blue-600 font-bold text-2xl">←</Link>
             <div>
                 <h1 className="text-3xl font-bold text-slate-900">Respaldo Google Contacts</h1>
                 <p className="text-slate-500">Exporta pacientes nuevos para sincronizar con tu celular.</p>

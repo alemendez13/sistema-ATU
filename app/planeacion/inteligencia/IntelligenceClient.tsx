@@ -1,7 +1,9 @@
 //app/planeacion/inteligencia/IntelligenceClient.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // 🆕 Agregamos useEffect
+import Link from "next/link";
+import { useSearchParams } from "next/navigation"; // 🆕 Importamos el lector de URL
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   TrendingUp, 
@@ -9,8 +11,24 @@ import {
   Activity, 
   ChevronDown, 
   ChevronUp, 
-  CheckCircle2 
+  CheckCircle2,
+  FileText, // Icono para la sección de reportes
+  ArrowRight
 } from "lucide-react";
+
+// --- MIGRACIÓN: LISTA DE REPORTES ESTRATÉGICOS SANSCE ---
+const reportesMenu = [
+  { id: 'b', titulo: "Cambio de Turno", icono: "🔄", ruta: "/reportes/cambio-turno", desc: "Bitácora de novedades" },
+  { id: 'c', titulo: "Ingresos SANSCE", icono: "🏥", ruta: "/reportes/ingresos-sansce", desc: "Reporte diario global" },
+  { id: 'd', titulo: "Ingresos Profesionales", icono: "👨‍⚕️", ruta: "/reportes/ingresos-medicos", desc: "Esquema de renta/comisión" },
+  { id: 'e', titulo: "Caja Chica", icono: "💸", ruta: "/reportes/caja-chica", desc: "Control de gastos menores" },
+  { id: 'f', titulo: "Origen Pacientes", icono: "📢", ruta: "/reportes/marketing", desc: "Reporte semanal marketing" },
+  { id: 'h', titulo: "Conciliación Lab", icono: "🤝", ruta: "/reportes/conciliacion-lab", desc: "Cruce mensual de estudios" },
+  { id: 'i', titulo: "Corte Factura Global", icono: "🧾", ruta: "/reportes/factura-global", desc: "Cierre de mes fiscal" },
+  { id: 'j', titulo: "Archivo Muerto", icono: "🗄️", ruta: "/reportes/archivo-muerto", desc: "Expedientes inactivos" },
+  { id: 'k', titulo: "Radar Estratégico", icono: "📡", ruta: "/reportes/radar", desc: "Retención y pacientes en riesgo" },
+  { id: 'm', titulo: "Respaldo Google", icono: "☁️", ruta: "/reportes/google-contacts", desc: "Exportar a contactos.google.com" },
+];
 
 interface IntelligenceProps {
   okrData: any;
@@ -19,12 +37,22 @@ interface IntelligenceProps {
 }
 
 export default function IntelligenceClient({ okrData, cronograma, checklist }: IntelligenceProps) {
-  // Protocolo "Clean Start": Todos los cuadrantes cerrados por defecto
+  const searchParams = useSearchParams(); // 🛰️ Activamos el radar de URL
+  
   const [expanded, setExpanded] = useState<{ [key: string]: boolean }>({
     radar: false,
     brujula: false,
     pulso: false,
+    reportes: false,
   });
+
+  // 🧠 Lógica de Memoria: Si venimos de un reporte, abrimos el cuadrante automáticamente
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'reportes') {
+      setExpanded(prev => ({ ...prev, reportes: true }));
+    }
+  }, [searchParams]);
 
   const toggleSection = (section: string) => {
     setExpanded((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -233,6 +261,59 @@ export default function IntelligenceClient({ okrData, cronograma, checklist }: I
                     <p className="text-sm italic text-center">No se han registrado actividades de cumplimiento para la jornada de hoy.</p>
                   </div>
                 )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
+
+      {/* 📊 CUADRANTE 4: CENTRO DE REPORTES (INTELIGENCIA DOCUMENTAL) */}
+      <section className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden backdrop-blur-sm">
+        <button 
+          onClick={() => toggleSection('reportes')}
+          className="w-full flex items-center justify-between p-8 text-left hover:bg-white/5 transition-all"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-400/20 rounded-2xl text-blue-300">
+              <FileText size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Centro de Reportes</h2>
+              <p className="text-sm text-slate-400">Acceso a Bitácoras y Análisis Operativo</p>
+            </div>
+          </div>
+          {expanded.reportes ? <ChevronUp className="text-slate-400" /> : <ChevronDown className="text-slate-400" />}
+        </button>
+
+        <AnimatePresence>
+          {expanded.reportes && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="px-8 pb-8"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+                {reportesMenu.map((rep) => (
+                  <Link 
+                    key={rep.id} 
+                    href={`${rep.ruta}?from=inteligencia`}
+                    className="group flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-sansce-brand/20 hover:border-sansce-brand/30 transition-all duration-300"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl group-hover:scale-125 transition-transform duration-300">{rep.icono}</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-white/90 group-hover:text-white transition-colors">
+                          {rep.titulo}
+                        </span>
+                        <span className="text-[10px] text-slate-500 uppercase tracking-tighter">
+                          {rep.desc}
+                        </span>
+                      </div>
+                    </div>
+                    <ArrowRight size={16} className="text-slate-600 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                  </Link>
+                ))}
               </div>
             </motion.div>
           )}

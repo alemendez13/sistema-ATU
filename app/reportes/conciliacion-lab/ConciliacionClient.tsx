@@ -4,6 +4,7 @@ import { useState } from "react";
 import { collection, query, where, getDocs, orderBy, limit, startAfter } from "@/lib/firebase-guard";
 import { db } from "../../../lib/firebase"; 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation"; // 🆕 Importamos el radar de URL
 import { toast } from "sonner";
 import Button from "../../../components/ui/Button";
 
@@ -21,6 +22,14 @@ interface ReporteItem {
 }
 
 export default function ConciliacionClient({ catalogo }: { catalogo: any[] }) {
+  const searchParams = useSearchParams(); // 🛰️ Detectamos origen
+  
+  // 🧠 Lógica de Memoria SANSCE OS:
+  const isFromInteligencia = searchParams.get('from') === 'inteligencia';
+  const backRoute = isFromInteligencia 
+    ? "/planeacion/inteligencia?tab=reportes" 
+    : "/reportes";
+
   const date = new Date();
   const primerDia = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
   const ultimoDia = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -151,7 +160,7 @@ export default function ConciliacionClient({ catalogo }: { catalogo: any[] }) {
       <div className="max-w-6xl mx-auto">
         
         <div className="flex items-center gap-4 mb-8">
-            <Link href="/reportes" className="text-slate-400 hover:text-blue-600 text-2xl font-bold">←</Link>
+            <Link href={backRoute} className="text-slate-400 hover:text-blue-600 text-2xl font-bold">←</Link>
             <div>
                 <h1 className="text-2xl font-bold text-slate-900">Conciliación de Laboratorio</h1>
                 <p className="text-slate-500">Auditoría de costos con proveedor externo</p>

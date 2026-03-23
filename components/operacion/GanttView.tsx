@@ -355,10 +355,20 @@ export default function GanttView({ hitos, tasks = [], onAddActivity, onAddTask 
                             />
 
                             <div className="flex-1 min-w-0">
-                              <p className="text-[10px] text-slate-600 font-medium whitespace-normal break-words leading-tight">
-                                {tarea.Descripcion}
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="text-[10px] text-slate-600 font-bold whitespace-normal break-words leading-tight">
+                                  {tarea.Descripcion}
+                                </p>
+                                {tarea.Prioridad === 'Alta' && (
+                                  <span className="text-[7px] bg-rose-600 text-white px-1.5 py-0.5 rounded font-black animate-pulse shadow-sm">
+                                    ALTA
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[8px] text-slate-400 italic uppercase tracking-tighter">
+                                👤 {tarea.EmailAsignado?.split('@')[0]} 
+                                {tarea.Prioridad === 'Baja' && <span className="ml-2 text-blue-400 opacity-60">• Prioridad Baja</span>}
                               </p>
-                              <p className="text-[8px] text-slate-400 italic mt-1 uppercase tracking-tighter">👤 {tarea.EmailAsignado?.split('@')[0]}</p>
                             </div>
                           </div>
 

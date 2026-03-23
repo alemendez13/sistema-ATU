@@ -5,12 +5,21 @@ import { collection, query, where, getDocs, orderBy, getDoc, doc, limit } from "
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation"; // 🆕 Importamos detector de origen
 import WhatsAppButton from "../../../components/ui/WhatsAppButton";
 import { toast } from "sonner";
 import { getMensajesConfigAction } from "../../../lib/actions"; 
 import { parseWhatsAppTemplate } from "../../../lib/utils"; 
 
 export default function RadarPage() {
+  const searchParams = useSearchParams(); // 🛰️ Activamos radar de origen
+
+  // 🧠 Lógica de Retorno Inteligente (SANSCE OS):
+  const isFromInteligencia = searchParams.get('from') === 'inteligencia';
+  const backRoute = isFromInteligencia 
+    ? "/planeacion/inteligencia?tab=reportes" 
+    : "/reportes";
+
   const [pendientes, setPendientes] = useState<any[]>([]);
   const [deudores, setDeudores] = useState<any[]>([]);
   const [perdidos, setPerdidos] = useState<any[]>([]); 
@@ -135,7 +144,7 @@ export default function RadarPage() {
             {/* ENCABEZADO */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex items-center gap-4">
-                    <Link href="/reportes" className="text-2xl text-slate-400 hover:text-blue-600 transition-colors">←</Link>
+                    <Link href={backRoute} className="text-2xl text-slate-400 hover:text-blue-600 transition-colors">←</Link>
                     <div>
                         <h1 className="text-3xl font-bold text-slate-900">Radar Estratégico</h1>
                         <p className="text-slate-500 text-sm">Fugas de pacientes y oportunidades de cobro.</p>

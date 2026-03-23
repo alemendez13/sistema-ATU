@@ -5,13 +5,21 @@ import { collection, query, where, getDocs, orderBy, doc, getDoc, limit } from "
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation"; // 🆕 Importamos el detector de URL
 import { toast } from "sonner";
 import { formatCurrency, cleanPrice, formatDate } from "../../../lib/utils";
 import { addDoc, serverTimestamp } from "@/lib/firebase-guard"; 
 import { useAuth } from "../../../hooks/useAuth"; // 🔐 Importamos el vigilante de identidad
 
 export default function ReporteIngresosPage() {
-  const { user } = useAuth() as any; // 👤 Obtenemos al usuario activo para la firma de cierre
+  const { user } = useAuth() as any; 
+  const searchParams = useSearchParams(); // 🛰️ Activamos el radar de origen
+
+  // 🧠 Lógica de Retorno Inteligente:
+  const isFromInteligencia = searchParams.get('from') === 'inteligencia';
+  const backRoute = isFromInteligencia 
+    ? "/planeacion/inteligencia?tab=reportes" 
+    : "/reportes";
   // Estado para la fecha (por defecto HOY)
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
   const [ingresos, setIngresos] = useState<any[]>([]); // Producción del día
@@ -279,7 +287,7 @@ export default function ReporteIngresosPage() {
           
           {/* Header de Navegación */}
           <div className="flex items-center gap-4 mb-6">
-            <Link href="/reportes" className="text-slate-500 hover:text-blue-600 font-bold text-xl">
+            <Link href={backRoute} className="text-slate-500 hover:text-blue-600 font-bold text-xl">
               ←
             </Link>
             <div>

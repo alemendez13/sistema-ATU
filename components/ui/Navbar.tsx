@@ -1,3 +1,4 @@
+// components/ui/Navbar.tsx
 "use client";
 
 import { useState } from "react";
@@ -21,16 +22,32 @@ export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // 🔒 REGLA DE BLINDAJE SANSCE (Modo Kiosko):
-  // Si la ruta es el Reloj Checador, eliminamos el Navbar para maximizar el área del sensor.
   const isKioskMode = pathname === "/rh/reloj";
 
   if (pathname.startsWith("/portal") || pathname === "/login" || isKioskMode) {
     return null;
   }
 
-  // 🧠 LIMPIEZA SANSCE: Eliminamos menuItems y variables no usadas para evitar errores de VS Code
+  // 🗺️ MAPA DE MÓDULOS (Sincronizado con Sidebar para coherencia visual)
+  const menuItems = [
+    { name: "Inicio", href: "/" },
+    { name: "Agenda Médica", href: "/agenda" },
+    { name: "Directorio Clínico", href: "/pacientes" },
+    { name: "Expediente Digital", href: "/expedientes" },
+    { name: "Insumos e Inventario", href: "/inventarios" },
+    { name: "Cronograma Operativo", href: "/operacion/tareas" },
+    { name: "Reportes y Eficacia", href: "/finanzas" },
+    { name: "Recursos Humanos", href: "/rh" },
+    { name: "Metas / KPIs", href: "/planeacion" },
+    { name: "Gestión y Auditoría", href: "/configuracion/auditoria" },
+    { name: "Configuración General", href: "/configuracion" },
+  ];
 
-  // Función de Cerrar Sesión MEJORADA
+  // 🧠 LÓGICA DE CONTEXTO: Detecta en qué módulo estamos comparando la URL actual
+  const currentModule = menuItems.find(item => 
+    pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
+  );
+
   const handleLogout = async () => {
     try {
       document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
@@ -46,9 +63,16 @@ export default function Navbar() {
 
   return (
     <nav 
-      className="fixed top-0 right-0 z-30 bg-sansce-surface/80 backdrop-blur-md border-b border-sansce-border shadow-premium h-16 px-6 md:px-10 transition-all duration-300 ease-in-out flex items-center justify-end"
+      className="fixed top-0 right-0 z-30 bg-sansce-surface/80 backdrop-blur-md border-b border-sansce-border shadow-premium h-16 px-6 md:px-10 transition-all duration-300 ease-in-out flex items-center justify-between"
       style={{ left: 'var(--sidebar-width, 256px)' }}
     >
+      {/* 📍 INDICADOR DE CONTEXTO (Aparece junto al logo del Sidebar) */}
+      <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-500">
+        <div className="h-2 w-2 rounded-full bg-sansce-brand animate-pulse" />
+        <h1 className="text-[11px] md:text-xs font-black text-sansce-text uppercase tracking-[0.2em]">
+          {currentModule?.name || "Panel de Control"}
+        </h1>
+      </div>
       
       {/* CONTENEDOR DE USUARIO PREMIUM */}
       <div className="flex items-center gap-6">

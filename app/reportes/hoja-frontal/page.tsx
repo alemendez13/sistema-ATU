@@ -6,8 +6,17 @@ import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import DownloadHojaFrontalButton from "../../../components/pdf/DownloadHojaFrontalButton";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation"; // 🆕 Importamos detector de URL
 
 export default function HojaFrontalPage() {
+  const searchParams = useSearchParams(); // 🛰️ Activamos radar de origen
+
+  // 🧠 Lógica de Retorno Inteligente:
+  const isFromInteligencia = searchParams.get('from') === 'inteligencia';
+  const backRoute = isFromInteligencia 
+    ? "/planeacion/inteligencia?tab=reportes" 
+    : "/pacientes"; // Regreso por defecto para el personal de archivo
+
   const [busqueda, setBusqueda] = useState("");
   const [paciente, setPaciente] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -49,8 +58,8 @@ export default function HojaFrontalPage() {
         <div className="max-w-4xl mx-auto">
             
             <div className="flex items-center gap-4 mb-8">
-                <Link href="/pacientes" className="text-slate-400 hover:text-blue-600 text-2xl font-bold">←</Link>
-                <div>
+              <Link href={backRoute} className="text-slate-400 hover:text-blue-600 text-2xl font-bold">←</Link>
+              <div>
                     <h1 className="text-2xl font-bold text-slate-900">Hoja Frontal de Expediente</h1>
                     <p className="text-slate-500">Generación de carátula para archivo físico</p>
                 </div>

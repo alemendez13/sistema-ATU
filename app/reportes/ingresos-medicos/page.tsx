@@ -6,12 +6,21 @@ import { db } from "../../../lib/firebase";
 import { getMedicosAction, enviarCorteMedicoAction } from "../../../lib/actions";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation"; // 🆕 Importamos detector de origen
 import { toast } from "sonner";
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { LiquidacionMedicoPDF } from '../../../components/documents/LiquidacionMedicoPDF';
 import { cleanPrice } from "../../../lib/utils";
 
 export default function ReporteIngresosMedicos() {
+  const searchParams = useSearchParams(); // 🛰️ Activamos radar de origen
+
+  // 🧠 Lógica de Retorno Inteligente:
+  const isFromInteligencia = searchParams.get('from') === 'inteligencia';
+  const backRoute = isFromInteligencia 
+    ? "/planeacion/inteligencia?tab=reportes" 
+    : "/reportes";
+
   const [medicos, setMedicos] = useState<any[]>([]);
   // Usamos ID porque es más seguro que el nombre (evita errores si hay dos Juanes)
   const [medicoId, setMedicoId] = useState(""); 
@@ -235,7 +244,7 @@ export default function ReporteIngresosMedicos() {
         <div className="max-w-6xl mx-auto">
           
           <div className="flex items-center gap-4 mb-6">
-            <Link href="/reportes" className="text-slate-500 hover:text-blue-600 font-bold text-xl">←</Link>
+            <Link href={backRoute} className="text-slate-500 hover:text-blue-600 font-bold text-xl">←</Link>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Liquidación de Profesionales</h1>
               <p className="text-sm text-slate-500">Cálculo de nómina variable y validación</p>

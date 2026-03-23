@@ -5,6 +5,7 @@ import { collection, query, where, getDocs, orderBy, limit } from "@/lib/firebas
 import { db } from "../../../lib/firebase";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation"; // 🆕 Importamos el radar de navegación
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -12,6 +13,14 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
 
 export default function ReporteMarketingPage() {
+  const searchParams = useSearchParams(); // 🛰️ Activamos detección de origen
+
+  // 🧠 Lógica de Retorno Inteligente (SANSCE OS):
+  const isFromInteligencia = searchParams.get('from') === 'inteligencia';
+  const backRoute = isFromInteligencia 
+    ? "/planeacion/inteligencia?tab=reportes" 
+    : "/reportes";
+
   // Fechas por defecto: Mes actual
   const date = new Date();
   const primerDia = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
@@ -108,7 +117,7 @@ export default function ReporteMarketingPage() {
           
           {/* Header */}
           <div className="flex items-center gap-4 mb-6">
-            <Link href="/reportes" className="text-slate-500 hover:text-blue-600 font-bold text-xl">
+            <Link href={backRoute} className="text-slate-500 hover:text-blue-600 font-bold text-xl">
               ←
             </Link>
             <div>

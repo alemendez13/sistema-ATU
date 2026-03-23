@@ -5,15 +5,22 @@ import { collection, query, where, getDocs, addDoc, serverTimestamp, Timestamp }
 import { db } from "../../../lib/firebase"; 
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation"; // 🆕 Agregamos useSearchParams
 import Link from "next/link";
 import { cleanPrice, formatCurrency } from "../../../lib/utils";
 import { getMedicosAction } from "../../../lib/actions";
 import { useAuth } from "../../../hooks/useAuth"; // 🔐 Importamos el vigilante de identidad
 
 export default function CambioTurnoPage() {
-  const { user } = useAuth() as any; // 👤 Obtenemos al usuario activo
+  const { user } = useAuth() as any; 
   const router = useRouter();
+  const searchParams = useSearchParams(); // 🛰️ Detectamos el origen
+  
+  // 🧠 Lógica de Retorno Inteligente:
+  const isFromInteligencia = searchParams.get('from') === 'inteligencia';
+  const backRoute = isFromInteligencia 
+    ? "/planeacion/inteligencia?tab=reportes" 
+    : "/reportes";
   const [loading, setLoading] = useState(true);
   const [procesandoCierre, setProcesandoCierre] = useState(false);
 
@@ -261,7 +268,7 @@ export default function CambioTurnoPage() {
             {/* HEADER CON BOTÓN DE REGRESO (Restaurado) */}
             <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-4">
-                    <Link href="/reportes" className="text-2xl text-slate-400 hover:text-blue-600 transition-colors">←</Link>
+                    <Link href={backRoute} className="text-2xl text-slate-400 hover:text-blue-600 transition-colors">←</Link>
                     <div>
                         <h1 className="text-3xl font-bold text-slate-800">Cierre de Turno</h1>
                         <p className="text-slate-500">Auditoría operativa y entrega de valores.</p>

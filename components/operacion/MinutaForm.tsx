@@ -81,6 +81,7 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
     setCompromisos([...compromisos, { 
       idTarea: idUnico,
       descripcion: '', 
+      prioridad: 'Media', // 🚀 NUEVO: Valor inicial equilibrado
       responsable: '', 
       fechaInicio: datos.fecha, 
       fechaEntrega: '', 
@@ -397,6 +398,7 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
                     setCompromisos([...compromisos, { 
                       idTarea: tarea.ID_Tarea,
                       descripcion: tarea.Descripcion, 
+                      prioridad: tarea.Prioridad || 'Media', // 🚀 NUEVO: Mantiene la prioridad si ya existe
                       responsable: tarea.EmailAsignado, 
                       fechaInicio: tarea.FechaInicio, 
                       fechaEntrega: tarea.FechaEntrega, 
@@ -510,6 +512,23 @@ export default function MinutaForm({ personal, hitos = [], tasks = [], history =
                   >
                     <option value="">Asignar a...</option>
                     {personal.map(p => <option key={p.id} value={p.email}>{p.nombre}</option>)}
+                  </select>
+                </div>
+
+                {/* 🚀 NUEVO: SELECTOR DE PRIORIDAD ESTRATÉGICA SANSCE */}
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Prioridad</label>
+                  <select
+                    className={`w-full bg-transparent text-sm font-bold outline-none border-b border-slate-200 focus:border-blue-500 ${
+                      tarea.prioridad === 'Alta' ? 'text-rose-600' : 
+                      tarea.prioridad === 'Baja' ? 'text-blue-500' : 'text-amber-600'
+                    }`}
+                    value={tarea.prioridad || 'Media'}
+                    onChange={(e) => handleTareaChange(index, 'prioridad', e.target.value)}
+                  >
+                    <option value="Baja">🔵 Baja (Operativa)</option>
+                    <option value="Media">🟡 Media (Táctica)</option>
+                    <option value="Alta">🔴 Alta (Crítica)</option>
                   </select>
                 </div>
 
