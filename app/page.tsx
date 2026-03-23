@@ -9,7 +9,7 @@ import { ChevronDown, ChevronUp, LayoutGrid, Target, ListTodo, Clock, User } fro
 import { useAuth } from "../hooks/useAuth";
 // ➕ Consolidamos importaciones de acciones y agregamos las de Checklist
 import { 
-  fetchCronogramaAction, 
+  fetchTareasDashboardAction, // 🚀 Nueva conexión a Tareas Reales
   fetchOkrDataAction, 
   fetchDashboardChecklistAction, 
   saveChecklistAction 
@@ -39,9 +39,9 @@ export default function Home() {
       try {
         // 🚀 Carga Triple en Paralelo Real (Cronograma + OKRs + Checklist)
         const [tasksData, okrData, checklistData] = await Promise.all([
-          fetchCronogramaAction(),
+          fetchTareasDashboardAction(), // 🎯 Cambiamos Hitos por Tareas Operativas
           fetchOkrDataAction(userEmail),
-          fetchDashboardChecklistAction(userEmail) // ➕ Carga real desde Sheets
+          fetchDashboardChecklistAction(userEmail) 
         ]);
         
         setTasks(tasksData || []);
@@ -109,29 +109,50 @@ export default function Home() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {tasks.length > 0 ? (
-                    tasks.map((task, idx) => (
-                      <div key={idx} className="p-4 rounded-2xl bg-white border border-sansce-border hover:shadow-md transition-shadow group">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter ${
-                            task.estado === 'Completado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            {task.estado}
-                          </span>
-                          <span className="text-[10px] text-sansce-muted font-medium flex items-center gap-1">
-                            <Clock size={10} /> {task.fechaFin}
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-semibold text-sansce-text group-hover:text-sansce-brand transition-colors line-clamp-2">
-                          {task.actividad}
-                        </h4>
-                        <div className="mt-3 flex items-center gap-2 pt-3 border-t border-slate-50">
-                          <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-sansce-brand">
-                            <User size={12} />
+                    tasks
+                      .filter(t => t.estado !== 'Completado' && t.estado !== 'Realizada' && t.estado !== 'Cancelada')
+                      .map((task, idx) => {
+                      // 🛡️ SANSCE DASHBOARD RADAR: Sincronización de alertas de tiempo (Operativo)
+                      const hoyStr = new Date().toLocaleDateString('sv-SE');
+                      const isTerminal = task.estado === 'Completado' || task.estado === 'Realizada' || task.estado === 'Cancelada';
+                      const esVencida = !isTerminal && task.fechaEntrega && task.fechaEntrega < hoyStr;
+
+                      return (
+                        <div key={idx} className={`p-4 rounded-2xl border transition-all group hover:shadow-md ${
+                          esVencida 
+                            ? 'bg-red-50/50 border-red-500 shadow-lg shadow-red-100 ring-1 ring-red-200' 
+                            : 'bg-white border-sansce-border'
+                        }`}>
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex flex-col gap-1">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter w-fit ${
+                                task.estado === 'Completado' || task.estado === 'Realizada' ? 'bg-emerald-100 text-emerald-700' : 
+                                esVencida ? 'bg-red-600 text-white animate-pulse' : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {esVencida ? '⚠️ Vencida' : task.estado}
+                              </span>
+                              {esVencida && (
+                                <span className="text-[9px] font-black text-red-600 uppercase tracking-tighter">
+                                  {Math.floor((new Date(hoyStr).getTime() - new Date(task.fechaEntrega).getTime()) / (1000 * 60 * 60 * 24))} días de atraso
+                                </span>
+                              )}
+                            </div>
+                            <span className={`text-[10px] font-medium flex items-center gap-1 ${esVencida ? 'text-red-700 font-bold' : 'text-sansce-muted'}`}>
+                              <Clock size={10} /> {task.fechaEntrega}
+                            </span>
                           </div>
-                          <span className="text-xs text-sansce-muted truncate">{task.responsable}</span>
+                          <h4 className={`text-sm font-semibold transition-colors line-clamp-2 ${esVencida ? 'text-red-900' : 'text-sansce-text group-hover:text-sansce-brand'}`}>
+                            {task.descripcion}
+                          </h4>
+                          <div className="mt-3 flex items-center gap-2 pt-3 border-t border-slate-50">
+                            <div className={`h-6 w-6 rounded-full flex items-center justify-center ${esVencida ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-sansce-brand'}`}>
+                              <User size={12} />
+                            </div>
+                            <span className={`text-xs truncate ${esVencida ? 'text-red-800 font-medium' : 'text-sansce-muted'}`}>{task.responsable}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <p className="p-4 text-sansce-muted text-sm italic">No hay tareas pendientes en el cronograma actual.</p>
                   )}
