@@ -401,9 +401,10 @@ export async function saveMinutaCompletaAction(datosMinuta: {
             const dataToSave = {
                 ID_Tarea: idBusqueda || generateTaskId(),
                 Descripcion: tarea.descripcion,
+                Prioridad: (tarea as any).prioridad || 'Media', // 🚀 NUEVO: Captura estratégica desde Minuta
                 EmailAsignado: tarea.responsable,
-                FechaInicio: tarea.fechaInicio, // 📅 Guardado Nativo YYYY-MM-DD
-                FechaEntrega: tarea.fechaEntrega, // 📅 Guardado Nativo YYYY-MM-DD
+                FechaInicio: tarea.fechaInicio, 
+                FechaEntrega: tarea.fechaEntrega, 
                 Estado: (tarea as any).estado || 'Pendiente',
                 ID_Hito: tarea.idHito || 'Gral',
                 Area: tarea.area,
@@ -658,10 +659,11 @@ export async function saveSingleTaskAction(formData: FormData) {
       return `${day}/${m}/${y}`;
     };
 
-    // Captura de datos con trazabilidad descendente y formato unificado
+    // Captura de datos con trazabilidad descendente y prioridad estratégica
     await sheet.addRow({
       ID_Tarea: generateTaskId(),
       Descripcion: String(formData.get('descripcion') ?? ''),
+      Prioridad: String(formData.get('prioridad') ?? 'Media'), // 🚀 NUEVO: Alta, Media o Baja
       EmailAsignado: String(formData.get('responsable') ?? ''),
       FechaInicio: toSanceDate(formData.get('fecha_inicio')),
       FechaEntrega: toSanceDate(formData.get('fecha_entrega')),
@@ -986,11 +988,9 @@ export async function saveOkrElementAction(type: 'OBJ' | 'KR' | 'KPI', data: any
         // 4. Escritura y Refresco de Caché (Doble Refuerzo SANSCE)
         await sheet.addRow(rowData);
         
-        revalidateTag('okr-data-v1'); // 👈 Ya funciona porque lo pusimos en la línea 4 del archivo
+        revalidateTag('okr-data-v1');
         revalidatePath('/planeacion/tablero-okr'); 
         revalidatePath('/planeacion/tablero-okr', 'page'); 
-
-        return { success: true, id: generatedId };
 
         return { success: true, id: generatedId };
     } catch (error: any) {
@@ -1326,5 +1326,83 @@ async function compararRostrosSANSCE(imagenTablet: string, urlMaestra: string): 
     } catch (error) {
         console.error("❌ Fallo crítico en Algoritmo de Visión:", error);
         return 0; // Ante la duda, seguridad total: no hay match.
+    }
+}
+
+
+/**
+ * 🚀 ACCIÓN: SOLICITAR APROBACIÓN DE CAJA CHICA (DIRECCIÓN)
+ * Envía un correo ejecutivo a Alejandra Méndez con un botón de aprobación rápida.
+ */
+export async function solicitarAprobacionGastoAction(datos: {
+    solicitadoPor: string;
+    montoNeto: number;
+    inyecciones: number;
+    gastos: number;
+    conteoMovimientos: number;
+}) {
+    const EMAIL_DIRECCION = "alejandra.mendez@sansce.com";
+
+    try {
+        const tokenValidacion = uuidv4(); // Llave única de seguridad
+
+        // 1. Registramos la solicitud en Firebase para esperar la firma
+        await addDoc(collection(db, "validaciones_gastos"), {
+            solicitadoPor: datos.solicitadoPor,
+            montoNeto: datos.montoNeto,
+            inyecciones: datos.inyecciones,
+            gastos: datos.gastos,
+            token: tokenValidacion,
+            estatus: "Pendiente",
+            creadoEn: serverTimestamp()
+        });
+
+        // 2. Configuramos el motor de correo
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS }
+        });
+
+        const enlaceAprobacion = `https://sistema-sansce.netlify.app/validar-gasto/${tokenValidacion}`;
+
+        // 3. Diseño del Correo (Elegante y directo)
+        const htmlContent = `
+        <div style="font-family: sans-serif; max-width: 500px; margin: auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+            <div style="background-color: #f59e0b; padding: 30px; text-align: center; color: white;">
+                <span style="font-size: 40px;">🟠</span>
+                <h2 style="margin:10px 0 0 0; text-transform: uppercase; letter-spacing: 2px;">Cierre de Caja Chica</h2>
+                <p style="opacity: 0.9; margin: 5px 0;">Solicitud de Validación</p>
+            </div>
+            <div style="padding: 30px; background-color: white;">
+                <p style="color: #64748b; font-size: 14px;">Hola, <strong>Alejandra</strong>. Se ha generado un nuevo corte de gastos operativos hoy:</p>
+                <div style="background-color: #fffbeb; border: 1px solid #fef3c7; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                    <p style="margin: 0; color: #92400e; font-size: 12px; font-bold; text-transform: uppercase;">Saldo Neto en Caja:</p>
+                    <p style="margin: 5px 0 15px 0; color: #1e293b; font-size: 32px; font-weight: 900;">$${datos.montoNeto.toFixed(2)}</p>
+                    <p style="margin: 4px 0; font-size: 13px; color: #059669;">➕ Inyecciones: $${datos.inyecciones.toFixed(2)}</p>
+                    <p style="margin: 4px 0; font-size: 13px; color: #dc2626;">➖ Gastos: $${datos.gastos.toFixed(2)}</p>
+                </div>
+                <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 25px;">
+                    Reportado por: ${datos.solicitadoPor}
+                </p>
+                <div style="text-align: center;">
+                    <a href="${enlaceAprobacion}" style="background-color: #1e293b; color: white; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+                        ✅ APROBAR CORTE AHORA
+                    </a>
+                </div>
+            </div>
+        </div>
+        `;
+
+        await transporter.sendMail({
+            from: '"SANSCE OS" <no-reply@sansce.com>',
+            to: EMAIL_DIRECCION,
+            subject: `⚠️ Aprobación Requerida: Caja Chica ($${datos.montoNeto.toFixed(2)})`,
+            html: htmlContent,
+        });
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error en flujo de aprobación:", error);
+        return { success: false, error: error.message };
     }
 }
