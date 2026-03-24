@@ -4,19 +4,22 @@ import ProtectedRoute from "../components/ProtectedRoute";
 // 🩺 Importación de iconos necesaria al inicio del archivo
   import { TrendingUp, Calendar, Users, CheckCircle2, ArrowUpRight } from "lucide-react";
 
-import { useState, useEffect } from "react"; // ➕ Agregamos useEffect
+import { useState, useEffect } from "react"; 
 import { ChevronDown, ChevronUp, LayoutGrid, Target, ListTodo, Clock, User } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-// ➕ Consolidamos importaciones de acciones y agregamos las de Checklist
+import { useRouter } from "next/navigation"; // 🧭 Importamos el GPS del sistema
+// ➕ Consolidamos importaciones de acciones
 import { 
-  fetchTareasDashboardAction, // 🚀 Nueva conexión a Tareas Reales
+  fetchTareasDashboardAction, 
   fetchOkrDataAction, 
   fetchDashboardChecklistAction, 
   saveChecklistAction 
 } from "@/lib/actions";
 
 export default function Home() {
-  // Estados de Interfaz (Configurados para iniciar contraídos/ocultos)
+  const router = useRouter(); // 🏎️ Inicializamos el motor de navegación
+  
+  // Estados de Interfaz
   const [showTasks, setShowTasks] = useState(false);
   const [showGoals, setShowGoals] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
@@ -26,27 +29,38 @@ export default function Home() {
   
   const [tasks, setTasks] = useState<any[]>([]);
   const [goals, setGoals] = useState<any[]>([]);
-  const [checklist, setChecklist] = useState<any[]>([]); // ➕ Nuevo estado para el Checklist
+  const [checklist, setChecklist] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Verificación de seguridad para evitar errores de lectura nula
-    const userEmail = user?.email;
-    if (!userEmail) return;
+    if (!user) return;
 
     async function loadDashboardData() {
+      const userEmail = user?.email; // 📧 Definimos la identidad para las funciones de abajo
+      if (!userEmail) return;
+
       setLoading(true);
       try {
-        // 🚀 Carga Triple en Paralelo Real (Cronograma + OKRs + Checklist)
+        // 🛡️ FILTRO SANSCE: Identificamos el rol antes de cargar datos sensibles
+        const tokenResult = await user.getIdTokenResult();
+        const userRole = tokenResult.claims.rol;
+
+        if (userRole === 'reloj_checador') {
+          console.log("🚀 Tablet detectada: Redirigiendo a Reloj Checador...");
+          router.push('/personal'); // 🏃‍♂️ Salto automático
+          return; // Detenemos la ejecución: no cargamos tareas ni metas
+        }
+
+        /// 🚀 Carga Triple en Paralelo (Cronograma + OKRs + Checklist)
         const [tasksData, okrData, checklistData] = await Promise.all([
-          fetchTareasDashboardAction(), // 🎯 Cambiamos Hitos por Tareas Operativas
+          fetchTareasDashboardAction(), 
           fetchOkrDataAction(userEmail),
           fetchDashboardChecklistAction(userEmail) 
         ]);
         
         setTasks(tasksData || []);
         setGoals(okrData || []);
-        setChecklist(checklistData || []); // ➕ Datos vivos
+        setChecklist(checklistData || []);
 
       } catch (error) {
         console.error("Error en sincronización SANSCE:", error);
@@ -55,7 +69,7 @@ export default function Home() {
       }
     }
     loadDashboardData();
-  }, [user?.email]);
+  }, [user]);
 
   // Estilo común para las tarjetas tipo "Burbuja"
   const bubbleStyle = "bg-white/80 backdrop-blur-md rounded-[2rem] border border-sansce-border shadow-premium overflow-hidden transition-all duration-500 ease-in-out";
