@@ -18,7 +18,7 @@ function generateRandomPassword() {
 export async function createSANSCEUser(formData: {
   email: string;
   nombre: string;
-  rol: 'admin_general' | 'coordinacion_admin' | 'atu' | 'medico_renta' | 'profesional_salud';
+  rol: 'admin_general' | 'coordinacion_admin' | 'atu' | 'medico_renta' | 'profesional_salud' | 'reloj_checador';
   especialidad?: string;
   pin: string; // 👈 NUEVO: Campo PIN obligatorio
 }) {
@@ -38,7 +38,8 @@ export async function createSANSCEUser(formData: {
       coordinacion_admin: ["view_reports", "manage_agenda", "view_kpis"],
       atu: ["manage_agenda", "process_payments", "fill_checklists"],
       medico_renta: ["view_own_agenda", "clinical_record_write"],
-      profesional_salud: ["view_agenda", "clinical_record_full", "view_own_kpis"]
+      profesional_salud: ["view_agenda", "clinical_record_full", "view_own_kpis"],
+      reloj_checador: ["clock_in_out_only"]
     };
 
     // 3. Guardar en Firestore (Colección usuarios_roles)
@@ -193,7 +194,7 @@ export async function migrateUsersFromSheet() {
  */
 export async function updateSANSCEUser(uid: string, data: {
   nombre: string;
-  rol: 'admin_general' | 'coordinacion_admin' | 'atu' | 'medico_renta' | 'profesional_salud';
+  rol: 'admin_general' | 'coordinacion_admin' | 'atu' | 'medico_renta' | 'profesional_salud' | 'reloj_checador';
   especialidad: string;
   pin: string;
   fotoMaestraUrl?: string; // 👈 BIOMETRÍA: Recibimos el enlace al patrón oficial
@@ -210,7 +211,8 @@ export async function updateSANSCEUser(uid: string, data: {
       coordinacion_admin: ["view_reports", "manage_agenda", "view_kpis"],
       atu: ["manage_agenda", "process_payments", "fill_checklists"],
       medico_renta: ["view_own_agenda", "clinical_record_write"],
-      profesional_salud: ["view_agenda", "clinical_record_full", "view_own_kpis"]
+      profesional_salud: ["view_agenda", "clinical_record_full", "view_own_kpis"],
+      reloj_checador: ["clock_in_out_only"]
     };
 
     // 3. Actualizar Perfil en Firestore
