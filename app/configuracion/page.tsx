@@ -201,6 +201,7 @@ export default function CentroDeMando() {
                       <option value="medico_renta">Médico (Renta)</option>
                       <option value="profesional_salud">Profesional Salud (Nómina)</option>
                       <option value="coordinacion_admin">Coordinación Administrativa</option>
+                      <option value="reloj_checador">Reloj Checador (Solo Tablet)</option>
                       <option value="admin_general">Admin General (Acceso Total)</option>
                     </select>
                   </div>
