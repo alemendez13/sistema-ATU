@@ -7,7 +7,7 @@ import { jwtVerify } from 'jose';
 // --- MAPA DE ACCESOS (Alineado estrictamente al PDF CONTROL_DOCUMENTAL_RBAC) ---
 const ROLE_ACCESS: Record<string, string[]> = {
   // RECURSOS HUMANOS: Acceso al Reloj Checador, Expedientes e Incidencias.
-  '/personal': ['admin_general', 'coordinacion_admin', 'atu'],
+  '/personal': ['admin_general', 'coordinacion_admin', 'atu', 'reloj_checador'],
 
   // CONTROL TOTAL: Configuración del Sistema.
   '/configuracion': ['admin_general'],
@@ -29,14 +29,15 @@ export async function middleware(request: NextRequest) {
   const tokenCookie = request.cookies.get('token'); 
   const { pathname } = request.nextUrl;
 
-  // 1. ZONA LIBRE (Archivos estáticos, API, Login, Portal Paciente)
+  // 1. ZONA LIBRE (Archivos estáticos, API, Login, Portal Paciente, Aprobación de Gastos)
   if (
     pathname.startsWith('/_next') || 
     pathname.startsWith('/api') || 
     pathname.startsWith('/static') || 
     pathname.includes('.') || 
     pathname === '/login' ||
-    pathname.startsWith('/portal') 
+    pathname.startsWith('/portal') ||
+    pathname.startsWith('/validar-gasto') // 🎟️ Pase VIP SANSCE: Aprobación vía Email
   ) {
     return NextResponse.next();
   }
