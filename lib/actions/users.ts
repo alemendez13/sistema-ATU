@@ -124,15 +124,17 @@ export async function migrateUsersFromSheet() {
       }
 
       // 🧠 CLASIFICACIÓN DINÁMICA DE ROLES SANSCE
-      type ValidRoles = 'admin_general' | 'coordinacion_admin' | 'atu' | 'profesional_salud' | 'medico_renta';
+      type ValidRoles = 'admin_general' | 'coordinacion_admin' | 'atu' | 'profesional_salud' | 'medico_renta' | 'reloj_checador';
       let finalRol: ValidRoles = 'atu';
-      const rawRol = (sUser.rol || "").toLowerCase();
+      const rawRol = (sUser.rol || "").toLowerCase().trim();
       const equipo = sUser.equipoId; 
 
-      if (rawRol === 'admin') {
+      if (rawRol === 'admin' || rawRol === 'admin_general') {
         finalRol = 'admin_general'; 
-      } else if (rawRol === 'coordinador') {
+      } else if (rawRol === 'coordinador' || rawRol === 'coordinacion_admin') {
         finalRol = 'coordinacion_admin';
+      } else if (rawRol === 'reloj' || rawRol === 'reloj_checador') {
+        finalRol = 'reloj_checador'; // 👈 Identificación proactiva
       } else {
         finalRol = (equipo === 'Cli') ? 'profesional_salud' : 'atu';
       }
@@ -161,7 +163,8 @@ export async function migrateUsersFromSheet() {
         coordinacion_admin: ["view_reports", "manage_agenda", "view_kpis"],
         atu: ["manage_agenda", "process_payments", "fill_checklists"],
         profesional_salud: ["view_agenda", "clinical_record_full", "view_own_kpis"],
-        medico_renta: ["view_own_agenda", "clinical_record_write"]
+        medico_renta: ["view_own_agenda", "clinical_record_write"],
+        reloj_checador: ["clock_in_out_only"] // 👈 Blindaje de permisos en migración
       };
 
       await db.collection("usuarios_roles").doc(uid).set({
@@ -170,10 +173,11 @@ export async function migrateUsersFromSheet() {
         rol: finalRol,
         especialidad: (equipo === 'Cli') ? "Clínica" : "Administración",
         permisos: defaultPermissions[finalRol] || [],
-        fechaCreacion: new Date().toISOString(),
+        // 🛡️ REGLA SANSCE: No sobreescribimos la fecha si el usuario ya existe
+        ultimaSincronizacion: new Date().toISOString(), 
         estatus: "activo",
         fuente: "migracion_sheets_v1"
-      });
+      }, { merge: true }); // 👈 CLAVE: Fusiona los datos sin borrar los campos ocultos (como el PIN)
     }
 
     revalidatePath("/configuracion");

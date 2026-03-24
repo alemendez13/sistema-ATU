@@ -1447,3 +1447,51 @@ export const fetchTareasDashboardAction = unstable_cache(
   ['op-tareas-dashboard-v1'],
   { tags: ['op-tareas-v1'], revalidate: 3600 } 
 );
+
+/**
+ * 🚀 ACCIÓN V4: MOTOR DE GESTIÓN JERÁRQUICA (Gobernanza 4.0)
+ * Recupera todas las tareas con la estructura de 4 niveles para el nuevo Cronograma, Lista y Minuta.
+ * Mantiene Costo Firebase $0.00 al usar Google Sheets API.
+ */
+export const fetchTareasV4Action = unstable_cache(
+  async () => {
+    try {
+      const { GoogleSpreadsheet } = await import('google-spreadsheet');
+      const { JWT } = await import('google-auth-library');
+
+      const auth = new JWT({
+        email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      });
+
+      const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+      await doc.loadInfo();
+
+      const sheet = doc.sheetsByTitle['OPERACION_TAREAS'];
+      const rows = await sheet.getRows();
+
+      // Mapeo Quirúrgico V4: Captura de los 4 niveles de jerarquía y metadatos de acción
+      return rows.map(r => ({
+        id: r.get('ID_Tarea'),
+        descripcion: r.get('Descripcion'),
+        responsable: r.get('EmailAsignado')?.split('@')[0] || 'Sin asignar',
+        emailCompleto: r.get('EmailAsignado'),
+        fechaInicio: r.get('FechaInicio'),
+        fechaEntrega: r.get('FechaEntrega'),
+        estado: r.get('Estado') || 'Pendiente',
+        fase: r.get('Fase') || 'Planificación y diseño', // Nivel 2: Fases fijas
+        actividad: r.get('Actividad') || 'General',       // Nivel 3: Agrupador
+        proyecto: r.get('Proyecto') || 'Sin Proyecto',   // Nivel 1: Raíz
+        prioridad: r.get('Prioridad') || 'Media',
+        observaciones: r.get('Observaciones') || '',      // Para el historial de burbuja
+        area: r.get('Area') || 'Operaciones'
+      }));
+    } catch (error) {
+      console.error("❌ Error en fetchTareasV4Action:", error);
+      return []; // Retorno seguro para evitar pantalla blanca
+    }
+  },
+  ['op-tareas-v4-cache'],
+  { tags: ['op-tareas-v1'], revalidate: 60 } // Actualización rápida cada 60 segundos
+);
