@@ -16,6 +16,7 @@ export interface TaskV4 {
   id: string;
   descripcion: string;
   responsable: string;
+  fechaInicio: string;    // 📅 NUEVO: Habilita el inicio de la barra en el Gantt
   fechaEntrega: string;
   estado: string;
   fase: string;
@@ -32,7 +33,11 @@ export interface TaskV4 {
 export const buildHierarchicalTree = (tasks: TaskV4[]) => {
   const tree: any = {};
 
-  tasks.forEach((task) => {
+  // 🛡️ FILTRO DE SEGURIDAD SANSCE: Solo procesamos tareas activas.
+  // Las tareas "Descartadas" permanecen en el Excel pero se omiten en el renderizado.
+  const activeTasks = tasks.filter(t => t.estado !== 'Descartada');
+
+  activeTasks.forEach((task) => {
     const { proyecto, fase, actividad } = task;
 
     // Nivel 1: Proyecto

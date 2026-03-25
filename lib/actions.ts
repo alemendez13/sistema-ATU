@@ -1107,8 +1107,8 @@ export async function registrarAsistenciaAction(pin: string, tipo: 'Entrada' | '
             timeZone: 'America/Mexico_City' 
         });
 
-        // 1. REFERENCIA ÚNICA (Se declara una sola vez para evitar error 2451)
-        const asistenciaRef = dbAdmin.collection("asistencia_logs").doc(`${userEmail}_${hoyId}`);
+        // 1. REFERENCIA ÚNICA (Alineada con Reglas de Seguridad SANSCE)
+        const asistenciaRef = dbAdmin.collection("asistencia").doc(`${userEmail}_${hoyId}`);
         const registroDoc = await asistenciaRef.get();
 
         // 2. PREVENCIÓN DE DUPLICIDAD
