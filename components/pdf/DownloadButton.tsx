@@ -1,3 +1,5 @@
+/* components/pdf/DownloadButton.tsx */
+
 "use client";
 import { pdf } from "@react-pdf/renderer";
 import CartaResponsivaPDF from "@/components/documents/CartaResponsivaPDF";
