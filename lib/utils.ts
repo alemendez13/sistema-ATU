@@ -1,3 +1,25 @@
+
+/**
+ * 🎨 SANSCE THEME BRIDGE (SSOT)
+ * Fuente única de verdad para la identidad visual.
+ * Alimenta tanto Tailwind (UI) como el Inyectador de Emails.
+ */
+export const SANSCE_THEME = {
+  colors: {
+    brand: '#1E40AF',   // Azul SANSCE Oficial
+    teal: '#2D7A78',    // Teal SANSCE (Clínico)
+    ash: '#8B4343',     // Rojo Ceniza (Estados críticos)
+    bg: '#F8FAF8',      // Fondo General
+    surface: '#FFFFFF', // Superficies
+    text: '#0F172A',    // Texto Principal
+    muted: '#64748B',   // Texto Secundario
+    border: '#E2E8F0',  // Bordes
+  },
+  radius: {
+    surgical: '40px',   // 2.5rem estandarizado (Equivale a su rounded-surgical)
+  }
+} as const;
+
 /**lib/utils.ts
  * 🛠️ UTILERÍAS CENTRALIZADAS SANSCE v2.0
  * SSOT (Single Source of Truth) para lógica transversal.

@@ -45,6 +45,10 @@ export async function GET() {
       if (rolUsuario === 'admin') rolUsuario = 'admin_general';
       if (rolUsuario === 'coordinador') rolUsuario = 'coordinacion_admin';
       if (rolUsuario === 'recepcion') rolUsuario = 'atu';
+      if (rolUsuario === 'recepcion' || rolUsuario === 'rh') rolUsuario = 'atu';
+      
+      // Pase VIP para la cuenta maestra de la Tablet
+      if (datos.email === 'recepcionsansce@gmail.com') rolUsuario = 'atu';
 
       if (!rolesValidos.includes(rolUsuario)) {
         rolUsuario = 'invitado'; 
