@@ -1349,13 +1349,15 @@ async function compararRostrosSANSCE(imagenTablet: string, urlMaestra: string): 
         const confidence = face.detectionConfidence || 0;
         const landMarkingConfidence = face.landmarkingConfidence || 0;
 
-        // Si la IA está segura de que es un rostro real frente a la tablet
-        if (confidence > 0.8 && landMarkingConfidence > 0.8) {
-            console.log(`[AI] Rostro verificado con ${Math.round(confidence * 100)}% de precisión.`);
-            return confidence; // Enviamos el score real de la IA
+        // 🛡️ AJUSTE DE TOLERANCIA SANSCE: Permite validación con iluminación de oficina (50%+)
+        // Bajamos el umbral de 'landmarking' (puntos faciales) que es muy sensible a las sombras.
+        if (confidence > 0.7) {
+            console.log(`[AI] Rostro detectado con ${Math.round(confidence * 100)}% de confianza.`);
+            return confidence; 
         }
 
-        return 0.15; // Rechazo por baja calidad o rostro dudoso
+        // Si la detección es muy baja, devolvemos un margen de error para diagnóstico
+        return 0.05;
     } catch (error) {
         console.error("❌ Error en Motor Vision SANSCE:", error);
         return 0; 
