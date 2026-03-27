@@ -18,7 +18,7 @@ function generateRandomPassword() {
 export async function createSANSCEUser(formData: {
   email: string;
   nombre: string;
-  rol: 'admin_general' | 'coordinacion_admin' | 'atu' | 'medico_renta' | 'profesional_salud' | 'reloj_checador';
+  rol: 'admin_general' | 'coordinacion_admin' | 'atu' | 'medico_renta' | 'profesional_salud';
   especialidad?: string;
   pin: string; // 👈 NUEVO: Campo PIN obligatorio
 }) {
@@ -38,8 +38,7 @@ export async function createSANSCEUser(formData: {
       coordinacion_admin: ["view_reports", "manage_agenda", "view_kpis"],
       atu: ["manage_agenda", "process_payments", "fill_checklists"],
       medico_renta: ["view_own_agenda", "clinical_record_write"],
-      profesional_salud: ["view_agenda", "clinical_record_full", "view_own_kpis"],
-      reloj_checador: ["clock_in_out_only"]
+      profesional_salud: ["view_agenda", "clinical_record_full", "view_own_kpis"]
     };
 
     // 3. Guardar en Firestore (Colección usuarios_roles)
@@ -124,17 +123,15 @@ export async function migrateUsersFromSheet() {
       }
 
       // 🧠 CLASIFICACIÓN DINÁMICA DE ROLES SANSCE
-      type ValidRoles = 'admin_general' | 'coordinacion_admin' | 'atu' | 'profesional_salud' | 'medico_renta' | 'reloj_checador';
+      type ValidRoles = 'admin_general' | 'coordinacion_admin' | 'atu' | 'profesional_salud' | 'medico_renta';
       let finalRol: ValidRoles = 'atu';
-      const rawRol = (sUser.rol || "").toLowerCase().trim();
+      const rawRol = (sUser.rol || "").toLowerCase();
       const equipo = sUser.equipoId; 
 
-      if (rawRol === 'admin' || rawRol === 'admin_general') {
+      if (rawRol === 'admin') {
         finalRol = 'admin_general'; 
-      } else if (rawRol === 'coordinador' || rawRol === 'coordinacion_admin') {
+      } else if (rawRol === 'coordinador') {
         finalRol = 'coordinacion_admin';
-      } else if (rawRol === 'reloj' || rawRol === 'reloj_checador') {
-        finalRol = 'reloj_checador'; // 👈 Identificación proactiva
       } else {
         finalRol = (equipo === 'Cli') ? 'profesional_salud' : 'atu';
       }
@@ -163,8 +160,7 @@ export async function migrateUsersFromSheet() {
         coordinacion_admin: ["view_reports", "manage_agenda", "view_kpis"],
         atu: ["manage_agenda", "process_payments", "fill_checklists"],
         profesional_salud: ["view_agenda", "clinical_record_full", "view_own_kpis"],
-        medico_renta: ["view_own_agenda", "clinical_record_write"],
-        reloj_checador: ["clock_in_out_only"] // 👈 Blindaje de permisos en migración
+        medico_renta: ["view_own_agenda", "clinical_record_write"]
       };
 
       await db.collection("usuarios_roles").doc(uid).set({
@@ -173,11 +169,10 @@ export async function migrateUsersFromSheet() {
         rol: finalRol,
         especialidad: (equipo === 'Cli') ? "Clínica" : "Administración",
         permisos: defaultPermissions[finalRol] || [],
-        // 🛡️ REGLA SANSCE: No sobreescribimos la fecha si el usuario ya existe
-        ultimaSincronizacion: new Date().toISOString(), 
+        fechaCreacion: new Date().toISOString(),
         estatus: "activo",
         fuente: "migracion_sheets_v1"
-      }, { merge: true }); // 👈 CLAVE: Fusiona los datos sin borrar los campos ocultos (como el PIN)
+      });
     }
 
     revalidatePath("/configuracion");
@@ -198,7 +193,7 @@ export async function migrateUsersFromSheet() {
  */
 export async function updateSANSCEUser(uid: string, data: {
   nombre: string;
-  rol: 'admin_general' | 'coordinacion_admin' | 'atu' | 'medico_renta' | 'profesional_salud' | 'reloj_checador';
+  rol: 'admin_general' | 'coordinacion_admin' | 'atu' | 'medico_renta' | 'profesional_salud';
   especialidad: string;
   pin: string;
   fotoMaestraUrl?: string; // 👈 BIOMETRÍA: Recibimos el enlace al patrón oficial
@@ -215,8 +210,7 @@ export async function updateSANSCEUser(uid: string, data: {
       coordinacion_admin: ["view_reports", "manage_agenda", "view_kpis"],
       atu: ["manage_agenda", "process_payments", "fill_checklists"],
       medico_renta: ["view_own_agenda", "clinical_record_write"],
-      profesional_salud: ["view_agenda", "clinical_record_full", "view_own_kpis"],
-      reloj_checador: ["clock_in_out_only"]
+      profesional_salud: ["view_agenda", "clinical_record_full", "view_own_kpis"]
     };
 
     // 3. Actualizar Perfil en Firestore

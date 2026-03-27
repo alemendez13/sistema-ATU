@@ -7,10 +7,32 @@
   body {
     @apply bg-sansce-bg text-sansce-text antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Eliminamos el resaltado azul genérico de los navegadores */
+    -webkit-tap-highlight-color: transparent;
   }
 
   h1, h2, h3, h4 {
     @apply text-sansce-text font-semibold tracking-tight;
+  }
+
+  /* Estandarización de Interacción Quirúrgica */
+  :focus-visible {
+    @apply outline-none ring-2 ring-sansce-brand ring-offset-2 ring-offset-sansce-bg;
+  }
+
+  ::selection {
+    @apply bg-sansce-brand/10 text-sansce-brand;
+  }
+}
+
+@layer components {
+  /* Clase maestra para botones y contenedores SANSCE */
+  .sansce-card {
+    @apply bg-sansce-surface border border-sansce-border rounded-surgical shadow-premium;
+  }
+  
+  .btn-primary {
+    @apply bg-sansce-brand text-white px-6 py-2 rounded-surgical hover:opacity-90 transition-all active:scale-95 font-medium;
   }
 }
 

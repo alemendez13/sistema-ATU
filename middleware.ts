@@ -7,7 +7,7 @@ import { jwtVerify } from 'jose';
 // --- MAPA DE ACCESOS (Alineado estrictamente al PDF CONTROL_DOCUMENTAL_RBAC) ---
 const ROLE_ACCESS: Record<string, string[]> = {
   // RECURSOS HUMANOS: Acceso al Reloj Checador, Expedientes e Incidencias.
-  '/personal': ['admin_general', 'coordinacion_admin', 'atu', 'reloj_checador'],
+  '/personal': ['admin_general', 'coordinacion_admin', 'atu'],
 
   // CONTROL TOTAL: Configuración del Sistema.
   '/configuracion': ['admin_general'],

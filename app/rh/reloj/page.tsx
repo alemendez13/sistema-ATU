@@ -10,20 +10,24 @@ export default function RelojChecadorPage() {
   const [pin, setPin] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [mensaje, setMensaje] = useState('');
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  // 🛡️ SANSCE FIX: Seguro de Hardware para evitar registros sin foto
+  const [isCameraReady, setIsCameraReady] = useState(false);
   
-  // 🛡️ REFS SANSCE: Control directo de hardware (Video y Captura)
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // 🔋 MOTOR DE CÁMARA: Activación segura al cargar la página
   useEffect(() => {
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { facingMode: 'user', width: 400, height: 300 } 
         });
-        if (videoRef.current) videoRef.current.srcObject = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          // Avisamos al sistema que el "ojo" está abierto
+          setIsCameraReady(true);
+        }
       } catch (err) {
         console.error("Acceso a cámara denegado:", err);
         setMensaje("Error: Verifique permisos de cámara en la tablet.");
@@ -104,10 +108,10 @@ export default function RelojChecadorPage() {
         </div>
         <div className="text-right">
           <h2 className="text-2xl font-light text-slate-800 tracking-tight">
-            {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {currentTime ? currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--'}
           </h2>
           <p className="text-[10px] text-slate-400 uppercase tracking-tighter">
-            {currentTime.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}
+            {currentTime ? currentTime.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Sincronizando...'}
           </p>
         </div>
       </div>
@@ -167,11 +171,11 @@ export default function RelojChecadorPage() {
           <div className="h-16 flex items-center justify-center text-[#2563eb]"><ShieldCheck className="w-6 h-6 opacity-20" /></div>
         </div>
 
-        {/* Acciones de Nómina */}
+        {/* Acciones de Nómina (SANSCE Protocol: Seguro de Cámara Activado) */}
         <div className="grid grid-cols-2 gap-4">
           <button
             onClick={() => handleRegistro('Entrada')}
-            disabled={pin.length < 4 || status === 'loading'}
+            disabled={pin.length < 4 || status === 'loading' || !isCameraReady}
             className="flex flex-col items-center justify-center gap-2 py-4 rounded-2xl bg-[#2563eb] text-white font-medium hover:bg-blue-700 disabled:opacity-50 transition-all"
           >
             <LogIn className="w-5 h-5" />
@@ -179,7 +183,7 @@ export default function RelojChecadorPage() {
           </button>
           <button
             onClick={() => handleRegistro('Salida')}
-            disabled={pin.length < 4 || status === 'loading'}
+            disabled={pin.length < 4 || status === 'loading' || !isCameraReady}
             className="flex flex-col items-center justify-center gap-2 py-4 rounded-2xl border-2 border-[#2563eb] text-[#2563eb] font-medium hover:bg-blue-50 disabled:opacity-50 transition-all"
           >
             <LogOut className="w-5 h-5" />

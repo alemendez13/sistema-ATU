@@ -30,8 +30,7 @@ export async function GET() {
       'coordinacion_admin', 
       'atu', 
       'medico_renta', 
-      'profesional_salud',
-      'reloj_checador'
+      'profesional_salud'
     ];
 
     for (const doc of usersSnapshot.docs) {
