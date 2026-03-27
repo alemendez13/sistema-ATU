@@ -23,6 +23,19 @@ export async function createSANSCEUser(formData: {
   pin: string; // 👈 NUEVO: Campo PIN obligatorio
 }) {
   try {
+    // 🛡️ FILTRO DE UNICIDAD SANSCE: Verificamos que el PIN no exista antes de proceder
+    const pinCheck = await db.collection("usuarios_roles")
+                             .where("pin", "==", formData.pin)
+                             .limit(1)
+                             .get();
+
+    if (!pinCheck.empty) {
+      return { 
+        success: false, 
+        error: "Seguridad de Identidad: Este PIN ya está asignado a otro colaborador. Elija uno diferente." 
+      };
+    }
+
     const temporaryPassword = generateRandomPassword();
 
     // 1. Crear en Firebase Auth
@@ -199,6 +212,20 @@ export async function updateSANSCEUser(uid: string, data: {
   fotoMaestraUrl?: string; // 👈 BIOMETRÍA: Recibimos el enlace al patrón oficial
 }) {
   try {
+    // 🛡️ FILTRO DE UNICIDAD SANSCE (Edición): Evitamos que al editar se duplique un PIN
+    const pinCheck = await db.collection("usuarios_roles")
+                             .where("pin", "==", data.pin)
+                             .limit(1)
+                             .get();
+
+    // Si el PIN existe pero pertenece a OTRO usuario (ID diferente), bloqueamos el cambio
+    if (!pinCheck.empty && pinCheck.docs[0].id !== uid) {
+      return { 
+        success: false, 
+        error: "Conflicto de Identidad: Este PIN ya está asignado a otro colaborador. No se puede duplicar." 
+      };
+    }
+
     // 1. Actualizar Nombre en Firebase Auth
     await auth.updateUser(uid, {
       displayName: data.nombre,
