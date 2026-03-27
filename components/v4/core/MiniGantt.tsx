@@ -60,16 +60,13 @@ export default function MiniGantt({ tasks }: { tasks: TaskV4[] }) {
         <div className="bg-white/30">
           {Object.keys(buildHierarchicalTree(tasks)).map((proyecto) => (
             <div key={proyecto + 'gantt'}>
-              {/* ESPACIADOR DE PROYECTO (Fijo 56px) */}
-              <div className="h-14 border-b border-sansce-border/20 bg-sansce-surface/30" />
+          {/* ESPACIADOR DE PROYECTO: Sincronizado con Header (56px) */}
+              <div style={{ height: 'var(--header-h)' }} className="border-b border-sansce-border/20 bg-sansce-surface/30 flex-shrink-0" />
               
               {expanded.includes(proyecto) && (
                 <div className="animate-in fade-in duration-500">
-                  {/* ESPACIADOR DE CABECERAS DE COLUMNA (Fijo 48px) */}
-                  <div className="h-12 border-b border-sansce-border/10 bg-white/50" />
-
-                  {/* 🚀 COMPENSADOR DE PADDING: Sincroniza el inicio con el p-4 del explorador */}
-                  <div className="h-4" />
+                  {/* CABECERA DE FASE: Sincronizada con Fila Operativa (48px) */}
+                  <div style={{ height: 'var(--horizon-y)' }} className="border-b border-sansce-border/10 bg-white/50 flex-shrink-0" />
 
                   {FASES_SANSCE.map((fase: string) => 
                     Object.keys(buildHierarchicalTree(tasks)[proyecto][fase]).map((actividad: string) => {
@@ -78,8 +75,8 @@ export default function MiniGantt({ tasks }: { tasks: TaskV4[] }) {
 
                       return (
                         <div key={actividad + 'gantt-group'} className="animate-in zoom-in-95 duration-200">
-                          {/* 🏷️ ESPACIADOR DE ACTIVIDAD: Sincronizado con la etiqueta de texto y su gap */}
-                          <div className="h-8 mb-4" />
+                          {/* ESPACIADOR DE ACTIVIDAD: Sincronizado con Fila Operativa (48px) */}
+                          <div style={{ height: 'var(--horizon-y)' }} className="border-b border-sansce-border/5 flex-shrink-0" />
                           
                           {buildHierarchicalTree(tasks)[proyecto][fase][actividad].map((tarea: TaskV4) => {
                             const start = parseISO(tarea.fechaInicio || tarea.fechaEntrega);
@@ -87,7 +84,11 @@ export default function MiniGantt({ tasks }: { tasks: TaskV4[] }) {
                             const isTaskExpanded = expanded.includes(tarea.id);
 
                             return (
-                              <div key={tarea.id} className={`${isTaskExpanded ? 'h-auto py-12' : 'h-[100px] mb-4'} relative border-b border-sansce-border/30 flex items-center transition-all duration-300`}>
+                              <div 
+                                key={tarea.id} 
+                                style={{ height: isTaskExpanded ? 'auto' : 'var(--horizon-y)' }}
+                                className={`relative border-b border-sansce-border/30 flex items-center transition-all duration-300 flex-shrink-0 ${isTaskExpanded ? 'py-8' : ''}`}
+                              >    
                                 {meses.map(mes => (
                                   <div key={mes.nombre} className="flex-1 min-w-[200px] border-r border-sansce-border/10 relative h-full min-h-[60px]">
                                     {(isWithinInterval(start, { start: mes.inicio, end: mes.fin }) || 

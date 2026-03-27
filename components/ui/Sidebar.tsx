@@ -22,30 +22,27 @@ export default function Sidebar() {
     setIsCollapsed(true);
   }, [pathname]);
 
-  // 3. 🧠 EFECTO DE ARQUITECTURA: Sincroniza el ancho con el resto del sistema
+  // 3. 🧠 EFECTO DE ARQUITECTURA: Sincronización con el Esqueleto Central
   useEffect(() => {
     const root = document.documentElement;
-    const width = isCollapsed ? "80px" : "256px";
-    root.style.setProperty('--sidebar-width', width);
+    // Usamos las variables definidas en globals.css para mantener la integridad
+    const width = isCollapsed ? "var(--sidebar-w)" : "var(--sidebar-w-expanded)";
+    root.style.setProperty('--sidebar-w', width);
   }, [isCollapsed]);
 
   // 🔒 REGLA DE BLINDAJE SANSCE (Modo Kiosko):
-  // Detectamos si la terminal es el Reloj Checador para Tablet.
   const isKioskMode = pathname === "/rh/reloj";
 
   useEffect(() => {
-    // Si es modo Kiosko, forzamos el ancho a 0px para que el contenido use toda la pantalla.
     if (isKioskMode) {
-      document.documentElement.style.setProperty('--sidebar-width', '0px');
+      document.documentElement.style.setProperty('--sidebar-w', '0px');
     }
   }, [isKioskMode]);
 
-  if (pathname === "/login" || pathname.startsWith("/portal") || isKioskMode) return null;
+  if (pathname === "/login" || pathname.startsWith("/portal") || isKioskMode) return null;
 
-  // Función para alternar el sidebar
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
 
-  // Lista maestra de módulos (Restauración Quirúrgica v4.2)
   const menuItems = [
     { id: 0, name: "Inicio", icon: <LayoutDashboard size={18} />, href: "/" },
     { id: 10, name: "Agenda Médica", icon: <Calendar size={18} />, href: "/agenda" },
@@ -66,12 +63,15 @@ export default function Sidebar() {
       onMouseEnter={() => setIsCollapsed(false)}
       onMouseLeave={() => setIsCollapsed(true)}
       className={`fixed left-0 top-0 h-full bg-sansce-surface border-r border-sansce-border z-50 flex flex-col shadow-premium transition-all duration-300 ease-in-out ${
-        isCollapsed ? "w-20" : "w-64"
+        isCollapsed ? "w-[var(--sidebar-w)]" : "w-[var(--sidebar-w-expanded)]"
       }`}
     >
 
-      {/* LOGO SANSCE */}
-      <div className="h-20 flex items-center justify-center border-b border-sansce-bg overflow-hidden">
+      {/* LOGO SANSCE: Alineado a la Línea de Horizonte (56px) */}
+      <div 
+        style={{ height: 'var(--header-h)' }} 
+        className="flex items-center justify-center border-b border-sansce-bg overflow-hidden flex-shrink-0"
+      >
          <Link href="/" className="transition-transform hover:scale-105 duration-200">
             <Image 
               src="/logo-sansce.png" 
