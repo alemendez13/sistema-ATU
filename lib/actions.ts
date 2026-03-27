@@ -7,7 +7,8 @@ import nodemailer from 'nodemailer';
 import { v4 as uuidv4 } from 'uuid';
 import { addDoc, collection, serverTimestamp, query, orderBy, limit, startAfter, getDocs, doc, getDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from './firebase'; // ✅ Restauramos el nombre original para no romper el resto del archivo
-import { db as dbAdmin } from './firebase-admin'; // ✅ Mantenemos el Admin con un nombre especial
+// 🛡️ IMPORTACIÓN MAESTRA SANSCE: Traemos la base de datos y la bodega de fotos con poder administrativo
+import { db as dbAdmin, storage as storageAdmin } from './firebase-admin';
 import { getMedicos, getMensajesWhatsApp, getCatalogos, getOkrDashboardData } from "./googleSheets";
 import { addMinutesToTime, generateTaskId, generateFolio, SANSCE_THEME } from './utils';
 
@@ -1320,10 +1321,25 @@ async function compararRostrosSANSCE(imagenTablet: string, urlMaestra: string): 
     try {
         if (!imagenTablet || !urlMaestra) return 0;
 
-        // 🛡️ PROTOCOLO DE IDENTIDAD SANSCE: Descargamos la foto oficial para comparar
-        const masterRes = await fetch(urlMaestra);
-        const masterBlob = await masterRes.arrayBuffer();
-        const masterBase64 = Buffer.from(masterBlob).toString('base64');
+        // 🛡️ ACCESO DIRECTO SANSCE: Bajamos la foto directo de la bodega, saltando bloqueos de internet
+        // Extraemos el email del usuario desde la URL para buscar el archivo original
+        const userEmail = urlMaestra.includes('fotos_maestras%2F') 
+            ? decodeURIComponent(urlMaestra.split('fotos_maestras%2F')[1].split('?')[0])
+            : null;
+
+        let masterBase64 = "";
+
+        if (userEmail) {
+            const bucket = storageAdmin.bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+            const file = bucket.file(`fotos_maestras/${userEmail}`);
+            const [content] = await file.download();
+            masterBase64 = content.toString('base64');
+        } else {
+            // Plan B: Si no es una ruta estándar, intentamos fetch tradicional (para URLs externas)
+            const masterRes = await fetch(urlMaestra);
+            const masterBlob = await masterRes.arrayBuffer();
+            masterBase64 = Buffer.from(masterBlob).toString('base64');
+        }
 
         const apiKey = process.env.GOOGLE_CLOUD_VISION_KEY;
         const visionUrl = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
