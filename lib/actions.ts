@@ -9,7 +9,7 @@ import { addDoc, collection, serverTimestamp, query, orderBy, limit, startAfter,
 import { db } from './firebase'; // ✅ Restauramos el nombre original para no romper el resto del archivo
 import { db as dbAdmin } from './firebase-admin'; // ✅ Mantenemos el Admin con un nombre especial
 import { getMedicos, getMensajesWhatsApp, getCatalogos, getOkrDashboardData } from "./googleSheets";
-import { addMinutesToTime, generateTaskId, generateFolio } from './utils';
+import { addMinutesToTime, generateTaskId, generateFolio, SANSCE_THEME } from './utils';
 
 // --- ACCIÓN 1: AGENDAR (Mantiene lógica original) ---
 export async function agendarCitaGoogle(cita: { 
@@ -185,10 +185,17 @@ export async function enviarCorteMedicoAction(datos: {
         // Ajusta esta URL a tu dominio real cuando hagas deploy
         const enlaceValidacion = `https://sistema-atu.netlify.app/validar-corte/${tokenValidacion}`;
         
-        // 🎨 TEMPLATE HTML ACTUALIZADO: Desglose de 4 Vías
+        // 🎨 INYECTADOR DE ESTILOS SANSCE (Gobernanza Estética)
+        const emailStyles = {
+            mainContainer: `font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid ${SANSCE_THEME.colors.border}; border-radius: 16px; overflow: hidden;`,
+            header: `background-color: ${SANSCE_THEME.colors.brand}; padding: 30px; text-align: center; color: white;`,
+            button: `background-color: ${SANSCE_THEME.colors.teal}; color: white; padding: 12px 24px; text-decoration: none; border-radius: ${SANSCE_THEME.radius.surgical}; font-weight: bold; display: inline-block;`,
+            accentBorder: `border-top: 2px solid ${SANSCE_THEME.colors.brand};`
+        };
+
         const htmlContent = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
-            <div style="background-color: #2563eb; padding: 20px; text-align: center; color: white;">
+        <div style="${emailStyles.mainContainer}">
+            <div style="${emailStyles.header}">
                 <h2 style="margin:0;">Corte de Caja: ${datos.periodo}</h2>
                 <p>Hola, Dr(a). ${datos.medicoNombre}</p>
             </div>
@@ -1409,27 +1416,40 @@ export async function solicitarAprobacionGastoAction(datos: {
 
         const enlaceAprobacion = `https://sistema-sansce.netlify.app/validar-gasto/${tokenValidacion}`;
 
-        // 3. Diseño del Correo (Elegante y directo)
+        // 🎨 INYECTADOR DE ESTILOS SANSCE (Gobernanza de Gastos)
+        const emailStyles = {
+            card: `font-family: sans-serif; max-width: 500px; margin: auto; border: 1px solid ${SANSCE_THEME.colors.border}; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);`,
+            header: `background-color: ${SANSCE_THEME.colors.brand}; padding: 30px; text-align: center; color: white;`,
+            amountBox: `background-color: ${SANSCE_THEME.colors.bg}; border: 1px solid ${SANSCE_THEME.colors.border}; padding: 20px; border-radius: 12px; margin: 20px 0;`,
+            button: `background-color: ${SANSCE_THEME.colors.text}; color: white; padding: 16px 32px; text-decoration: none; border-radius: ${SANSCE_THEME.radius.surgical}; font-weight: bold; display: inline-block; shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);`,
+            textSuccess: `color: ${SANSCE_THEME.colors.teal};`,
+            textDanger: `color: ${SANSCE_THEME.colors.ash};`
+        };
+
+        // 3. Diseño del Correo (Identidad Unificada SANSCE OS)
         const htmlContent = `
-        <div style="font-family: sans-serif; max-width: 500px; margin: auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-            <div style="background-color: #f59e0b; padding: 30px; text-align: center; color: white;">
-                <span style="font-size: 40px;">🟠</span>
+        <div style="${emailStyles.card}">
+            <div style="${emailStyles.header}">
+                <span style="font-size: 40px;">🏦</span>
                 <h2 style="margin:10px 0 0 0; text-transform: uppercase; letter-spacing: 2px;">Cierre de Caja Chica</h2>
                 <p style="opacity: 0.9; margin: 5px 0;">Solicitud de Validación</p>
             </div>
             <div style="padding: 30px; background-color: white;">
-                <p style="color: #64748b; font-size: 14px;">Hola, <strong>Alejandra</strong>. Se ha generado un nuevo corte de gastos operativos hoy:</p>
-                <div style="background-color: #fffbeb; border: 1px solid #fef3c7; padding: 20px; border-radius: 12px; margin: 20px 0;">
-                    <p style="margin: 0; color: #92400e; font-size: 12px; font-bold; text-transform: uppercase;">Saldo Neto en Caja:</p>
-                    <p style="margin: 5px 0 15px 0; color: #1e293b; font-size: 32px; font-weight: 900;">$${datos.montoNeto.toFixed(2)}</p>
-                    <p style="margin: 4px 0; font-size: 13px; color: #059669;">➕ Inyecciones: $${datos.inyecciones.toFixed(2)}</p>
-                    <p style="margin: 4px 0; font-size: 13px; color: #dc2626;">➖ Gastos: $${datos.gastos.toFixed(2)}</p>
+                <p style="color: ${SANSCE_THEME.colors.muted}; font-size: 14px;">Hola, <strong>Alejandra</strong>. Se ha generado un nuevo corte de gastos operativos hoy:</p>
+                
+                <div style="${emailStyles.amountBox}">
+                    <p style="margin: 0; color: ${SANSCE_THEME.colors.muted}; font-size: 11px; font-weight: bold; text-transform: uppercase;">Saldo Neto en Caja:</p>
+                    <p style="margin: 5px 0 15px 0; color: ${SANSCE_THEME.colors.text}; font-size: 32px; font-weight: 900;">$${datos.montoNeto.toLocaleString()}</p>
+                    <p style="margin: 4px 0; font-size: 13px; ${emailStyles.textSuccess}">➕ Inyecciones: $${datos.inyecciones.toLocaleString()}</p>
+                    <p style="margin: 4px 0; font-size: 13px; ${emailStyles.textDanger}">➖ Gastos: $${datos.gastos.toLocaleString()}</p>
                 </div>
-                <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 25px;">
+
+                <p style="font-size: 12px; color: ${SANSCE_THEME.colors.muted}; text-align: center; margin-bottom: 25px;">
                     Reportado por: ${datos.solicitadoPor}
                 </p>
+                
                 <div style="text-align: center;">
-                    <a href="${enlaceAprobacion}" style="background-color: #1e293b; color: white; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+                    <a href="${enlaceAprobacion}" style="${emailStyles.button}">
                         ✅ APROBAR CORTE AHORA
                     </a>
                 </div>

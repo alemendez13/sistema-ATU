@@ -39,5 +39,7 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 const auth = admin.auth();
+// 🛡️ CONEXIÓN SANSCE: Habilitamos el acceso del servidor a la bodega de fotos
+const storage = admin.storage(); 
 
-export { db, auth };
+export { db, auth, storage };
