@@ -1364,31 +1364,40 @@ async function compararRostrosSANSCE(imagenTablet: string, urlMaestra: string): 
             return 0.10;
         }
 
-        // 📐 COMPARADOR GEOMÉTRICO SANSCE (Fingerprint)
-        // Extraemos la proporción: (Distancia entre ojos / Distancia Nariz a Boca)
-        const getRatio = (f: any) => {
-            const landmarks = f.landmarks;
-            const eyeL = landmarks.find((l: any) => l.type === 'LEFT_EYE').position;
-            const eyeR = landmarks.find((l: any) => l.type === 'RIGHT_EYE').position;
-            const nose = landmarks.find((l: any) => l.type === 'NOSE_TIP').position;
-            const mouth = landmarks.find((l: any) => l.type === 'MOUTH_CENTER').position;
+        // 📐 MATRIZ DE IDENTIDAD SANSCE V2 (Fingerprint Multi-Punto)
+        const getGeometricSignature = (f: any) => {
+            const l = f.landmarks;
+            const findP = (t: string) => l.find((p: any) => p.type === t).position;
+            
+            const p = {
+                eyeL: findP('LEFT_EYE'), eyeR: findP('RIGHT_EYE'),
+                nose: findP('NOSE_TIP'), mouth: findP('MOUTH_CENTER')
+            };
 
-            const distEyes = Math.sqrt(Math.pow(eyeR.x - eyeL.x, 2) + Math.pow(eyeR.y - eyeL.y, 2));
-            const distNoseMouth = Math.sqrt(Math.pow(mouth.x - nose.x, 2) + Math.pow(mouth.y - nose.y, 2));
-            return distEyes / distNoseMouth;
+            const dist = (p1: any, p2: any) => Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+
+            // Creamos 3 ratios distintos para evitar falsos positivos
+            const r1 = dist(p.eyeL, p.eyeR) / dist(p.nose, p.mouth); // Ancho ojos / Alto cara
+            const r2 = dist(p.eyeL, p.eyeR) / dist(p.eyeL, p.mouth); // Ancho ojos / Diagonal cara
+            const r3 = dist(p.nose, p.mouth) / dist(p.eyeL, p.mouth); // Alto nariz-boca / Diagonal
+            
+            return [r1, r2, r3];
         };
 
-        const ratioTablet = getRatio(faceTablet);
-        const ratioMaster = getRatio(faceMaster);
+        const sigTablet = getGeometricSignature(faceTablet);
+        const sigMaster = getGeometricSignature(faceMaster);
 
-        // Calculemos la diferencia (Similitud de proporciones)
-        const diferencia = Math.abs(ratioTablet - ratioMaster);
-        const similitudIdentidad = Math.max(0, 1 - diferencia);
+        // Calculamos la diferencia promedio entre los 3 puntos
+        const diferencias = sigTablet.map((val, i) => Math.abs(val - sigMaster[i]));
+        const promedioDiferencia = diferencias.reduce((a, b) => a + b, 0) / 3;
+        
+        // Invertimos: a menor diferencia, mayor similitud.
+        const similitudIdentidad = Math.max(0, 1 - (promedioDiferencia * 2)); 
 
-        console.log(`[BIOMETRÍA] Similitud de Identidad: ${Math.round(similitudIdentidad * 100)}%`);
+        console.log(`[BIOMETRÍA] Firma Multi-Punto: ${Math.round(similitudIdentidad * 100)}%`);
 
-        // Solo si la cara es un humano real Y las proporciones coinciden
-        return faceTablet.detectionConfidence > 0.7 ? similitudIdentidad : 0;
+        // Umbral de Seguridad: Si la cara no es clara o la firma es muy distinta, rechazo total
+        return faceTablet.detectionConfidence > 0.75 ? similitudIdentidad : 0;
 
     } catch (error) {
         console.error("❌ Error en Motor de Identidad SANSCE:", error);

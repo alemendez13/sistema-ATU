@@ -20,6 +20,24 @@ export const SANSCE_THEME = {
   }
 } as const;
 
+/**
+ * 📧 SANSCE EMAIL STYLER
+ * Inyectador de estilos centralizado para correos electrónicos.
+ * Evita la fuga de identidad y asegura que cada pixel sea marca SANSCE.
+ */
+export const getEmailStyles = () => ({
+  card: `font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid ${SANSCE_THEME.colors.border}; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);`,
+  header: `background-color: ${SANSCE_THEME.colors.brand}; padding: 30px; text-align: center; color: white;`,
+  amountBox: `background-color: ${SANSCE_THEME.colors.bg}; border: 1px solid ${SANSCE_THEME.colors.border}; padding: 20px; border-radius: 12px; margin: 20px 0;`,
+  button: `background-color: ${SANSCE_THEME.colors.teal}; color: white; padding: 14px 28px; text-decoration: none; border-radius: ${SANSCE_THEME.radius.surgical}; font-weight: bold; display: inline-block;`,
+  textMuted: `color: ${SANSCE_THEME.colors.muted};`,
+  textText: `color: ${SANSCE_THEME.colors.text};`,
+  textSuccess: `color: ${SANSCE_THEME.colors.teal};`,
+  textDanger: `color: ${SANSCE_THEME.colors.ash};`,
+  tableHeader: `background-color: ${SANSCE_THEME.colors.bg}; color: ${SANSCE_THEME.colors.text};`,
+  tableRow: `border-bottom: 1px solid ${SANSCE_THEME.colors.border};`
+});
+
 /**lib/utils.ts
  * 🛠️ UTILERÍAS CENTRALIZADAS SANSCE v2.0
  * SSOT (Single Source of Truth) para lógica transversal.
