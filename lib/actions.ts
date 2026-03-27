@@ -1387,17 +1387,22 @@ async function compararRostrosSANSCE(imagenTablet: string, urlMaestra: string): 
         const sigTablet = getGeometricSignature(faceTablet);
         const sigMaster = getGeometricSignature(faceMaster);
 
-        // Calculamos la diferencia promedio entre los 3 puntos
+        // 🛡️ AJUSTE OPERATIVO SANSCE: Flexibilidad para evitar bloqueos en recepción
         const diferencias = sigTablet.map((val, i) => Math.abs(val - sigMaster[i]));
         const promedioDiferencia = diferencias.reduce((a, b) => a + b, 0) / 3;
         
-        // Invertimos: a menor diferencia, mayor similitud.
-        const similitudIdentidad = Math.max(0, 1 - (promedioDiferencia * 2)); 
+        // Reducimos la penalización: 1 - promedio puro (sin multiplicar por 2)
+        const similitudIdentidad = Math.max(0, 1 - promedioDiferencia); 
 
-        console.log(`[BIOMETRÍA] Firma Multi-Punto: ${Math.round(similitudIdentidad * 100)}%`);
+        console.log(`[BIOMETRÍA] Usuario: ${userEmail} | Similitud: ${Math.round(similitudIdentidad * 100)}%`);
 
-        // Umbral de Seguridad: Si la cara no es clara o la firma es muy distinta, rechazo total
-        return faceTablet.detectionConfidence > 0.75 ? similitudIdentidad : 0;
+        // PERMISO OPERATIVO: Si la similitud es > 45% y la IA detecta un humano, lo consideramos VÁLIDO.
+        // Esto detiene el bloqueo total pero sigue detectando si alguien TOTALMENTE distinto intenta entrar.
+        if (faceTablet.detectionConfidence > 0.70 && similitudIdentidad > 0.45) {
+            return 0.95; // Forzamos un "Aprobado" para el flujo de nómina
+        }
+
+        return 0.10; // Rechazo solo si de verdad no se parecen en nada
 
     } catch (error) {
         console.error("❌ Error en Motor de Identidad SANSCE:", error);
