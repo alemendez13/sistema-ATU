@@ -12,22 +12,25 @@ export default async function GestionV4Page() {
   return (
     <HierarchicalProvider initialTasks={tasks}>
       <div className="h-full flex flex-col">
-        {/* 🏛️ CABECERA ESTRATÉGICA SANSCE OS */}
-        <header className="bg-sansce-surface border-b border-sansce-border px-8 py-6 flex justify-between items-center shadow-sm">
-          <div>
-            <h1 className="text-2xl font-black text-sansce-text tracking-tight">
-              Torre de Control <span className="text-sansce-brand italic">v4.0</span>
+        {/* 🏛️ CABECERA ESTRATÉGICA SANSCE OS: Anclada a Línea de Horizonte (56px) */}
+        <header 
+          style={{ height: 'var(--header-h)' }}
+          className="bg-sansce-surface border-b border-sansce-border px-8 flex justify-between items-center shadow-sm flex-shrink-0"
+        >
+          <div className="flex flex-col justify-center">
+            <h1 className="text-lg font-black text-sansce-text tracking-tight leading-none">
+              Torre de Control <span className="text-sansce-brand italic text-sm">v4.0</span>
             </h1>
-            <p className="text-[10px] text-sansce-muted font-black uppercase tracking-[0.2em] mt-1">
+            <p className="text-[8px] text-sansce-muted font-black uppercase tracking-[0.2em] mt-0.5">
               Gobernanza Operativa • SANSCE OS
             </p>
           </div>
           
-          <div className="flex items-center space-x-6">
-             <div className="text-right border-l border-sansce-bg pl-6">
-                <p className="text-[9px] font-black text-sansce-muted uppercase tracking-widest mb-1">Estado de Red</p>
-                <p className="text-[11px] font-bold text-emerald-500 flex items-center justify-end bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2 animate-pulse" />
+          <div className="flex items-center space-x-6 h-full">
+             <div className="text-right border-l border-sansce-bg pl-6 flex flex-col justify-center">
+                <p className="text-[8px] font-black text-sansce-muted uppercase tracking-widest mb-0.5">Estado de Red</p>
+                <p className="text-[10px] font-bold text-emerald-500 flex items-center justify-end bg-emerald-50/50 px-2 py-0.5 rounded-full border border-emerald-100">
+                  <span className="w-1 h-1 bg-emerald-500 rounded-full mr-1.5 animate-pulse" />
                   Sincronizado
                 </p>
              </div>

@@ -37,15 +37,43 @@
 }
 
 :root {
-  --sidebar-width: 80px; /* 🧠 SANSCE OS: Iniciamos en modo clínico (contraído) */
+  /* Geometría Maestra SANSCE OS */
+  --sidebar-w: 80px;      /* Ancho contraído (Clínico) */
+  --sidebar-w-expanded: 260px; 
+  --header-h: 56px;       /* Línea de Horizonte: Cabeceras */
+  --horizon-y: 48px;      /* Línea de Horizonte: Filas Operativas */
+  
+  /* Efecto Refracción Uniforme */
+  --glass-blur: 12px;
+  --glass-opacity: 0.8;
 }
 
-/* Esta clase se aplicará al contenedor principal en el layout.
-  En pantallas grandes (md), empuja el contenido 260px a la derecha.
-*/
+@layer components {
+  /* Clase para asegurar la alineación perfecta entre Lista y Gantt */
+  .horizon-row {
+    height: var(--horizon-y);
+    @apply flex items-center border-b border-sansce-border overflow-hidden;
+  }
+
+  /* Glassmorphism Quirúrgico (Refracción uniforme) */
+  .sansce-glass {
+    @apply bg-sansce-surface/80 border border-white/20 shadow-premium;
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+  }
+
+  /* Modales y Paneles Flotantes */
+  .sansce-modal {
+    @apply sansce-glass rounded-surgical border-sansce-border p-6;
+    @apply shadow-2xl ring-1 ring-black/5;
+  }
+}
+
+/* Control de Layout dinámico */
 @media (min-width: 768px) {
   .with-sidebar {
-    padding-left: var(--sidebar-width) !important;
+    padding-left: var(--sidebar-w) !important;
+    transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 

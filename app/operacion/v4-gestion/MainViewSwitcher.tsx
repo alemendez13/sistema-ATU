@@ -40,10 +40,13 @@ export default function MainViewSwitcher() {
     <div className="h-full w-full overflow-hidden">
       {view === 'cronograma' ? (
         /* 🏛️ MATRIZ DE GOBERNANZA SANSCE: Estructura de Scroll Sincronizado Global */
-        <div className="h-full flex flex-col bg-white overflow-hidden">
+        <div className="h-full flex flex-col bg-sansce-bg overflow-hidden">
           
-          {/* CABECERA MAESTRA (Fija) */}
-          <div className="flex-none bg-sansce-surface border-b flex items-center justify-between px-6 h-[69px] z-50 shadow-sm">
+          {/* CABECERA MAESTRA (Fija): Anclada a la Geometría SANSCE */}
+          <div 
+            style={{ height: 'var(--header-h)' }}
+            className="flex-none sansce-glass border-b flex items-center justify-between px-6 z-50 shadow-sm"
+          >
             <span className="text-[10px] font-black text-sansce-muted uppercase tracking-[0.2em]">Torre de Control de Proyectos</span>
             <button 
               onClick={() => setShowGantt(!showGantt)}

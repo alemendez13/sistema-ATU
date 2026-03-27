@@ -1329,11 +1329,18 @@ async function compararRostrosSANSCE(imagenTablet: string, urlMaestra: string): 
         });
 
         const data = await response.json();
-        const face = data.responses[0]?.faceAnnotations?.[0];
+
+        // 🛡️ BLINDAJE SANSCE: Verificamos que la respuesta de Google sea válida antes de intentar leerla
+        if (!data.responses || data.responses.length === 0) {
+            console.error("❌ ERROR CRÍTICO API VISION:", data.error?.message || "Respuesta de Google malformada o vacía.");
+            return 0; // Devuelve 0 para indicar fallo técnico de conexión y evitar el colapso del sistema
+        }
+
+        const face = data.responses[0].faceAnnotations?.[0];
 
         if (!face) {
             console.warn("⚠️ No se detectó rostro humano en la captura.");
-            return 0.10; // Rechazo inmediato por ausencia de rostro
+            return 0.10; // Rechazo controlado por ausencia de rostro en la imagen
         }
 
         // 🧠 ALGORITMO DE CONFIANZA SANSCE:
