@@ -1313,53 +1313,62 @@ async function compararRostrosSANSCE(imagenTablet: string, urlMaestra: string): 
     try {
         if (!imagenTablet || !urlMaestra) return 0;
 
-        // 🛡️ PROTOCOLO SANSCE AI: Conexión con Google Cloud Vision API
-        // Analizamos la imagen de la tablet para verificar 'Liveness' y rasgos base.
+        // 🛡️ PROTOCOLO DE IDENTIDAD SANSCE: Descargamos la foto oficial para comparar
+        const masterRes = await fetch(urlMaestra);
+        const masterBlob = await masterRes.arrayBuffer();
+        const masterBase64 = Buffer.from(masterBlob).toString('base64');
+
         const apiKey = process.env.GOOGLE_CLOUD_VISION_KEY;
         const visionUrl = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
 
+        // 🧠 ANÁLISIS DUAL: Enviamos AMBAS fotos a la IA en un solo viaje (Ahorro de costos)
         const response = await fetch(visionUrl, {
             method: 'POST',
             body: JSON.stringify({
-                requests: [{
-                    image: { content: imagenTablet },
-                    features: [{ type: 'FACE_DETECTION', maxResults: 1 }]
-                }]
+                requests: [
+                    { image: { content: imagenTablet }, features: [{ type: 'FACE_DETECTION' }] },
+                    { image: { content: masterBase64 }, features: [{ type: 'FACE_DETECTION' }] }
+                ]
             })
         });
 
         const data = await response.json();
+        const faceTablet = data.responses[0]?.faceAnnotations?.[0];
+        const faceMaster = data.responses[1]?.faceAnnotations?.[0];
 
-        // 🛡️ BLINDAJE SANSCE: Verificamos que la respuesta de Google sea válida antes de intentar leerla
-        if (!data.responses || data.responses.length === 0) {
-            console.error("❌ ERROR CRÍTICO API VISION:", data.error?.message || "Respuesta de Google malformada o vacía.");
-            return 0; // Devuelve 0 para indicar fallo técnico de conexión y evitar el colapso del sistema
+        if (!faceTablet || !faceMaster) {
+            console.warn("⚠️ Fallo en detección: Una de las imágenes no tiene un rostro claro.");
+            return 0.10;
         }
 
-        const face = data.responses[0].faceAnnotations?.[0];
+        // 📐 COMPARADOR GEOMÉTRICO SANSCE (Fingerprint)
+        // Extraemos la proporción: (Distancia entre ojos / Distancia Nariz a Boca)
+        const getRatio = (f: any) => {
+            const landmarks = f.landmarks;
+            const eyeL = landmarks.find((l: any) => l.type === 'LEFT_EYE').position;
+            const eyeR = landmarks.find((l: any) => l.type === 'RIGHT_EYE').position;
+            const nose = landmarks.find((l: any) => l.type === 'NOSE_TIP').position;
+            const mouth = landmarks.find((l: any) => l.type === 'MOUTH_CENTER').position;
 
-        if (!face) {
-            console.warn("⚠️ No se detectó rostro humano en la captura.");
-            return 0.10; // Rechazo controlado por ausencia de rostro en la imagen
-        }
+            const distEyes = Math.sqrt(Math.pow(eyeR.x - eyeL.x, 2) + Math.pow(eyeR.y - eyeL.y, 2));
+            const distNoseMouth = Math.sqrt(Math.pow(mouth.x - nose.x, 2) + Math.pow(mouth.y - nose.y, 2));
+            return distEyes / distNoseMouth;
+        };
 
-        // 🧠 ALGORITMO DE CONFIANZA SANSCE:
-        // Verificamos que no sea una foto de otra foto (basado en ángulos de cabeza y alegría)
-        // y que la calidad de la detección sea alta (detección de rasgos > 0.8)
-        const confidence = face.detectionConfidence || 0;
-        const landMarkingConfidence = face.landmarkingConfidence || 0;
+        const ratioTablet = getRatio(faceTablet);
+        const ratioMaster = getRatio(faceMaster);
 
-        // 🛡️ AJUSTE DE TOLERANCIA SANSCE: Permite validación con iluminación de oficina (50%+)
-        // Bajamos el umbral de 'landmarking' (puntos faciales) que es muy sensible a las sombras.
-        if (confidence > 0.7) {
-            console.log(`[AI] Rostro detectado con ${Math.round(confidence * 100)}% de confianza.`);
-            return confidence; 
-        }
+        // Calculemos la diferencia (Similitud de proporciones)
+        const diferencia = Math.abs(ratioTablet - ratioMaster);
+        const similitudIdentidad = Math.max(0, 1 - diferencia);
 
-        // Si la detección es muy baja, devolvemos un margen de error para diagnóstico
-        return 0.05;
+        console.log(`[BIOMETRÍA] Similitud de Identidad: ${Math.round(similitudIdentidad * 100)}%`);
+
+        // Solo si la cara es un humano real Y las proporciones coinciden
+        return faceTablet.detectionConfidence > 0.7 ? similitudIdentidad : 0;
+
     } catch (error) {
-        console.error("❌ Error en Motor Vision SANSCE:", error);
+        console.error("❌ Error en Motor de Identidad SANSCE:", error);
         return 0; 
     }
 }
