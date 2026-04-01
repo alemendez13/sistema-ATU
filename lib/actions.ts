@@ -1589,3 +1589,167 @@ export const fetchTareasV4Action = unstable_cache(
   ['op-tareas-v4-cache'],
   { tags: ['op-tareas-v1'], revalidate: 60 } // Actualización rápida cada 60 segundos
 );
+
+/**
+ * 🚀 ACCIÓN: CREACIÓN DE PROYECTO ESTRATÉGICO (GOBERNANZA V4)
+ * Inyecta el registro raíz de un nuevo proyecto en OPERACION_TAREAS.
+ * Asegura la jerarquía: Proyecto (L1) -> Etapa (L2) -> Actividad (L3).
+ */
+export async function saveProjectAction(formData: FormData) {
+  try {
+    const { GoogleSpreadsheet } = await import('google-spreadsheet');
+    const { JWT } = await import('google-auth-library');
+
+    const auth = new JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+    await doc.loadInfo();
+
+    const sheet = doc.sheetsByTitle['OPERACION_TAREAS'];
+    
+    // 🛠️ FORMATEADOR SANSCE: Convierte YYYY-MM-DD a DD/MM/YYYY para Sheets
+    const toSanceDate = (d: any) => {
+      const s = String(d);
+      if (!s || !s.includes('-')) return s;
+      const [y, m, day] = s.split('-');
+      return `${day}/${m}/${y}`;
+    };
+
+    const nombreProyecto = String(formData.get('nombre_proyecto') ?? 'Nuevo Proyecto');
+
+    await sheet.addRow({
+      ID_Tarea: generateTaskId(),
+      Descripcion: `Hito de Inicio: ${nombreProyecto}`,
+      Prioridad: String(formData.get('prioridad') ?? 'Media'),
+      EmailAsignado: String(formData.get('responsable') ?? ''),
+      FechaInicio: toSanceDate(formData.get('fecha_inicio')),
+      FechaEntrega: toSanceDate(formData.get('fecha_compromiso')),
+      Estado: 'Pendiente',
+      Fase: String(formData.get('etapa') ?? 'Planificación y diseño'), // Nivel 2
+      Actividad: 'Definición General',                                 // Nivel 3
+      Proyecto: nombreProyecto,                                        // Nivel 1 (Raíz)
+      Area: 'Operaciones',
+      AsignadoPor: 'SANSCE OS (Gobernanza v4)'
+    });
+
+    // ⚡ SINCRONIZACIÓN: Limpiamos la caché de tareas v4 para reflejar el cambio
+    revalidateTag('op-tareas-v1');
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("❌ Error en saveProjectAction:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🚀 ACCIÓN: CREACIÓN DE TIPO DE ACTIVIDAD (NIVEL 3 - GOBERNANZA V4)
+ * Vincula cronológicamente un agrupador de tareas a un Proyecto y Etapa específicos.
+ */
+export async function saveActivityAction(formData: FormData) {
+  try {
+    const { GoogleSpreadsheet } = await import('google-spreadsheet');
+    const { JWT } = await import('google-auth-library');
+
+    const auth = new JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+    await doc.loadInfo();
+
+    const sheet = doc.sheetsByTitle['OPERACION_TAREAS'];
+    
+    const toSanceDate = (d: any) => {
+      const s = String(d);
+      if (!s || !s.includes('-')) return s;
+      const [y, m, day] = s.split('-');
+      return `${day}/${m}/${y}`;
+    };
+
+    const nombreActividad = String(formData.get('nombre_actividad') ?? 'Nueva Actividad');
+
+    await sheet.addRow({
+      ID_Tarea: generateTaskId(),
+      Descripcion: `Hito de Actividad: ${nombreActividad}`,
+      Prioridad: 'Media',
+      EmailAsignado: '', 
+      FechaInicio: toSanceDate(formData.get('fecha_inicio')),
+      FechaEntrega: toSanceDate(formData.get('fecha_compromiso')),
+      Estado: 'Pendiente',
+      Fase: String(formData.get('etapa') ?? ''), 
+      Actividad: nombreActividad, // Nivel 3 (Agrupador)
+      Proyecto: String(formData.get('proyecto') ?? ''), // Nivel 1 (Vínculo Raíz)
+      Area: 'Operaciones',
+      AsignadoPor: 'SANSCE OS (Gobernanza v4)'
+    });
+
+    revalidateTag('op-tareas-v1');
+    return { success: true };
+  } catch (error: any) {
+    console.error("❌ Error en saveActivityAction:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🚀 ACCIÓN: CREACIÓN DE TAREA OPERATIVA (NIVEL 4 - GOBERNANZA V4)
+ * Inserta una tarea individual vinculada a la jerarquía completa.
+ */
+export async function saveTaskV4Action(formData: FormData) {
+  try {
+    const { GoogleSpreadsheet } = await import('google-spreadsheet');
+    const { JWT } = await import('google-auth-library');
+
+    const auth = new JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/"/g, ''),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+    await doc.loadInfo();
+    const sheet = doc.sheetsByTitle['OPERACION_TAREAS'];
+    
+    const toSanceDate = (d: any) => {
+      const s = String(d);
+      if (!s || !s.includes('-')) return s;
+      const [y, m, day] = s.split('-');
+      return `${day}/${m}/${y}`;
+    };
+
+    // Buscamos la fase/etapa original de la actividad para que la tarea la herede automáticamente
+    const proyecto = String(formData.get('proyecto'));
+    const actividad = String(formData.get('actividad'));
+    const rows = await sheet.getRows();
+    const actividadPadre = rows.find(r => r.get('Proyecto') === proyecto && r.get('Actividad') === actividad);
+    const faseHeredada = actividadPadre ? actividadPadre.get('Fase') : 'Desarrollo de actividades y tareas';
+
+    await sheet.addRow({
+      ID_Tarea: generateTaskId(),
+      Descripcion: String(formData.get('descripcion')),
+      Prioridad: String(formData.get('prioridad') ?? 'Media'),
+      EmailAsignado: String(formData.get('responsable')),
+      FechaInicio: toSanceDate(formData.get('fecha_inicio')),
+      FechaEntrega: toSanceDate(formData.get('fecha_compromiso')),
+      Estado: 'Pendiente',
+      Fase: faseHeredada,           // Nivel 2 (Heredado)
+      Actividad: actividad,         // Nivel 3 (Vínculo Táctico)
+      Proyecto: proyecto,           // Nivel 1 (Vínculo Raíz)
+      Area: 'Operaciones',
+      AsignadoPor: 'SANSCE OS (Gobernanza v4)'
+    });
+
+    revalidateTag('op-tareas-v1');
+    return { success: true };
+  } catch (error: any) {
+    console.error("❌ Error en saveTaskV4Action:", error);
+    return { success: false, error: error.message };
+  }
+}
