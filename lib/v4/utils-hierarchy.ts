@@ -15,15 +15,17 @@ export const FASES_SANSCE = [
 export interface TaskV4 {
   id: string;
   descripcion: string;
-  responsable: string;
-  fechaInicio: string;    // 📅 NUEVO: Habilita el inicio de la barra en el Gantt
-  fechaEntrega: string;
+  responsable: string;    // Nombre corto/alias (v3)
+  emailCompleto: string;  // 🛡️ Identidad Única para Filtro de Seguridad (v4)
+  fechaInicio: string;    // 📅 Inicio de barra en Gantt
+  fechaEntrega: string;   // 📅 Fin de barra en Gantt
   estado: string;
-  fase: string;
-  actividad: string;
-  proyecto: string;
+  fase: string;           // Nivel 2: Fases fijas SANSCE
+  actividad: string;      // Nivel 3: Agrupador
+  proyecto: string;       // Nivel 1: Raíz del Proyecto
   prioridad: string;
   observaciones: string;
+  area: string;           // 🏢 Clasificación departamental
 }
 
 /**

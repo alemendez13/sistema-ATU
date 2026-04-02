@@ -18,6 +18,8 @@ interface HierarchicalContextType {
 
 const HierarchicalContext = createContext<HierarchicalContextType | undefined>(undefined);
 
+import { useAuth } from '@/hooks/useAuth';
+
 export function HierarchicalProvider({ 
   children, 
   initialTasks 
@@ -25,7 +27,33 @@ export function HierarchicalProvider({
   children: React.ReactNode; 
   initialTasks: TaskV4[];
 }) {
-  const [tasks, setTasks] = useState<TaskV4[]>(initialTasks);
+  const { user } = useAuth();
+  
+  // 🛡️ FILTRO DE SEGURIDAD SANSCE: Segmentación de Visibilidad por Rol/Email
+  // Si el usuario es 'admin_general', ve todo. Si no, solo lo asignado a su email.
+  const filteredTasks = React.useMemo(() => {
+    // 🛡️ PUENTE DE IDENTIDAD SANSCE: Resolvemos la inferencia 'never' del hook JS
+    const authUser = user as { email: string } | null;
+    if (!authUser) return [];
+    
+    // 🏛️ EXCEPCIÓN DE DIRECCIÓN: Acceso total para cuentas maestras
+    const isPowerUser = authUser.email === 'administracion@sansce.com' || authUser.email === 'alejandra.mendez@sansce.com';
+    
+    if (isPowerUser) return initialTasks;
+
+    // 🕵️ FILTRO QUIRÚRGICO DEFINITIVO: Validación tipada contra emailCompleto o responsable
+    return initialTasks.filter(t => {
+      const taskEmail = t.emailCompleto || t.responsable;
+      return taskEmail?.toLowerCase() === authUser.email?.toLowerCase();
+    });
+  }, [initialTasks, user]);
+
+  const [tasks, setTasks] = useState<TaskV4[]>(filteredTasks);
+
+  // Sincronizar estado si las tareas iniciales o el usuario cambian
+  React.useEffect(() => {
+    setTasks(filteredTasks);
+  }, [filteredTasks]);
   const [view, setView] = useState<'cronograma' | 'lista' | 'minuta'>('cronograma');
   const [expanded, setExpanded] = useState<string[]>([]); // 🧠 ESTADO MAESTRO DE APERTURA
   const [isPending, startTransition] = useTransition();
