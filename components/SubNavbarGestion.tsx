@@ -11,6 +11,7 @@ export default function SubNavbarGestion() {
         { name: '📖 Manuales y Procesos', href: '/configuracion/conocimiento' },
         { name: '🛡️ Auditoría de Integridad', href: '/configuracion/auditoria' },
         { name: '📊 Dashboard OKRs', href: '/configuracion/okrs' },
+        { name: '💳 Conciliación de Pagos', href: '/configuracion/conciliacion-pagos' },
     ];
 
     return (
