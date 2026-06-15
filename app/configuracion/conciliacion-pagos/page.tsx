@@ -11,11 +11,13 @@ import {
   orderBy,
   limit,
   startAfter,
-  QueryConstraint,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from "@/lib/firebase-guard";
 import { db } from "@/lib/firebase";
 import SubNavbarGestion from "@/components/SubNavbarGestion";
 import { toast } from "sonner";
+import { formatDate } from "@/lib/utils";
 
 interface OperacionItem {
   id: string;
@@ -30,19 +32,35 @@ interface OperacionItem {
 
 type ModoConsulta = "fechaCita" | "fechaPago";
 
-const BATCH_SIZE = 50;
+const BATCH_SIZE = 100;
 
-const formatearFechaCita = (fechaCita: unknown): string => {
-  if (!fechaCita) return "—";
-  if (typeof fechaCita === "string") return fechaCita;
-  const ts = fechaCita as { seconds?: number; toDate?: () => Date };
-  if (ts.seconds) {
-    return new Date(ts.seconds * 1000).toLocaleDateString("en-CA");
+/** Normaliza el rango: si "desde" > "hasta", los intercambia. */
+const normalizarRango = (inicio: string, fin: string): [string, string] => {
+  if (inicio > fin) return [fin, inicio];
+  return [inicio, fin];
+};
+
+/**
+ * Extrae fecha de cita en formato ISO (YYYY-MM-DD).
+ * Compatible con los 3 formatos usados en la colección operaciones:
+ * - string "YYYY-MM-DD" (registros actuales)
+ * - Timestamp en fechaCita (registros legacy)
+ * - fallback a `fecha` cuando no existe fechaCita (registros antiguos)
+ */
+const extraerFechaCitaISO = (data: Record<string, unknown>): string | null => {
+  if (data.fechaCita) {
+    const iso = formatDate(data.fechaCita, "iso");
+    if (iso && iso !== "S/F" && iso !== "Fecha inválida" && iso.length >= 10) {
+      return iso.slice(0, 10);
+    }
   }
-  if (ts.toDate) {
-    return ts.toDate().toLocaleDateString("en-CA");
+  if (data.fecha && !data.fechaCita) {
+    const iso = formatDate(data.fecha, "iso");
+    if (iso && iso !== "S/F" && iso !== "Fecha inválida" && iso.length >= 10) {
+      return iso.slice(0, 10);
+    }
   }
-  return String(fechaCita);
+  return null;
 };
 
 const formatearFechaPago = (fechaPago: unknown): string => {
@@ -57,32 +75,42 @@ const formatearFechaPago = (fechaPago: unknown): string => {
   return String(fechaPago);
 };
 
-const fechaPagoEnRango = (
-  fechaPago: unknown,
-  inicio: string,
-  fin: string
-): boolean => {
-  if (!fechaPago) return false;
+const extraerFechaPagoISO = (fechaPago: unknown): string | null => {
+  if (!fechaPago) return null;
   const ts = fechaPago as { seconds?: number; toDate?: () => Date };
-  let iso = "";
   if (ts.seconds) {
-    iso = new Date(ts.seconds * 1000).toISOString().split("T")[0];
-  } else if (ts.toDate) {
-    iso = ts.toDate().toISOString().split("T")[0];
-  } else {
-    return false;
+    return new Date(ts.seconds * 1000).toLocaleDateString("en-CA");
   }
-  return iso >= inicio && iso <= fin;
+  if (ts.toDate) {
+    return ts.toDate().toLocaleDateString("en-CA");
+  }
+  return null;
 };
 
 const fechaCitaEnRango = (
-  fechaCita: unknown,
+  data: Record<string, unknown>,
   inicio: string,
   fin: string
 ): boolean => {
-  const normalizada = formatearFechaCita(fechaCita);
-  if (normalizada === "—") return false;
-  return normalizada >= inicio && normalizada <= fin;
+  const iso = extraerFechaCitaISO(data);
+  if (!iso) return false;
+  return iso >= inicio && iso <= fin;
+};
+
+const fechaPagoEnRango = (
+  data: Record<string, unknown>,
+  inicio: string,
+  fin: string
+): boolean => {
+  const iso = extraerFechaPagoISO(data.fechaPago);
+  if (!iso) return false;
+  return iso >= inicio && iso <= fin;
+};
+
+const deduplicarDocs = (docs: QueryDocumentSnapshot<DocumentData>[]) => {
+  const map = new Map<string, QueryDocumentSnapshot<DocumentData>>();
+  docs.forEach((doc) => map.set(doc.id, doc));
+  return Array.from(map.values());
 };
 
 export default function ConciliacionPagosPage() {
@@ -90,9 +118,7 @@ export default function ConciliacionPagosPage() {
   const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
     .toISOString()
     .split("T")[0];
-  const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0)
-    .toISOString()
-    .split("T")[0];
+  const ultimoDia = hoy.toISOString().split("T")[0];
 
   const [citaInicio, setCitaInicio] = useState(primerDia);
   const [citaFin, setCitaFin] = useState(ultimoDia);
@@ -103,41 +129,140 @@ export default function ConciliacionPagosPage() {
 
   const [operaciones, setOperaciones] = useState<OperacionItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [lastVisible, setLastVisible] = useState<any>(null);
+  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(false);
 
-  const mapearDocumento = (docSnap: any): OperacionItem => {
+  const mapearDocumento = (docSnap: QueryDocumentSnapshot<DocumentData>): OperacionItem => {
     const data = docSnap.data();
+    const fechaCitaIso = extraerFechaCitaISO(data);
     return {
       id: docSnap.id,
-      fechaCita: formatearFechaCita(data.fechaCita),
+      fechaCita: fechaCitaIso || "—",
       fechaPago: formatearFechaPago(data.fechaPago),
-      pacienteNombre: data.pacienteNombre || "Sin nombre",
-      elaboradoPor: data.elaboradoPor || "—",
-      servicioNombre: data.servicioNombre || "—",
-      servicioSku: data.servicioSku || "—",
-      doctorNombre: data.doctorNombre || "—",
+      pacienteNombre: (data.pacienteNombre as string) || "Sin nombre",
+      elaboradoPor: (data.elaboradoPor as string) || "—",
+      servicioNombre: (data.servicioNombre as string) || "—",
+      servicioSku: (data.servicioSku as string) || "—",
+      doctorNombre: (data.doctorNombre as string) || "—",
     };
   };
 
-  const aplicarFiltroSecundario = (docs: any[], modo: ModoConsulta) => {
-    if (modo === "fechaCita" && filtrarPorPago) {
-      return docs.filter((doc) =>
-        fechaPagoEnRango(doc.data().fechaPago, pagoInicio, pagoFin)
-      );
+  const aplicarFiltrosCliente = (
+    docs: QueryDocumentSnapshot<DocumentData>[],
+    rangoCita: [string, string],
+    rangoPago: [string, string]
+  ) => {
+    return docs.filter((doc) => {
+      const data = doc.data();
+
+      if (filtrarPorCita && !fechaCitaEnRango(data, rangoCita[0], rangoCita[1])) {
+        return false;
+      }
+
+      if (filtrarPorPago) {
+        const tienePago = Boolean(data.fechaPago);
+        if (tienePago && !fechaPagoEnRango(data, rangoPago[0], rangoPago[1])) {
+          return false;
+        }
+        // Pendientes sin fechaPago se incluyen si coinciden por fecha de cita
+      }
+
+      return true;
+    });
+  };
+
+  const consultarPorFechaCita = async (
+    inicio: string,
+    fin: string,
+    isLoadMore: boolean
+  ): Promise<QueryDocumentSnapshot<DocumentData>[]> => {
+    const startDate = new Date(`${inicio}T00:00:00`);
+    const endDate = new Date(`${fin}T23:59:59.999`);
+    const resultados: QueryDocumentSnapshot<DocumentData>[] = [];
+
+    const ejecutarConsulta = async (
+      constraints: Parameters<typeof query>[1][]
+    ) => {
+      const base = [
+        ...constraints,
+        orderBy("fechaCita", "desc"),
+        limit(BATCH_SIZE),
+      ] as Parameters<typeof query>[1][];
+
+      if (isLoadMore && lastVisible) {
+        base.push(startAfter(lastVisible));
+      }
+
+      const snapshot = await getDocs(query(collection(db, "operaciones"), ...base));
+      return snapshot.docs;
+    };
+
+    // Consulta 1: fechaCita como string "YYYY-MM-DD" (formato actual en Firebase)
+    try {
+      const docsString = await ejecutarConsulta([
+        where("fechaCita", ">=", inicio),
+        where("fechaCita", "<=", fin),
+      ]);
+      resultados.push(...docsString);
+    } catch (error) {
+      console.warn("Consulta fechaCita (string) no disponible:", error);
     }
-    if (modo === "fechaPago" && filtrarPorCita) {
-      return docs.filter((doc) =>
-        fechaCitaEnRango(doc.data().fechaCita, citaInicio, citaFin)
-      );
+
+    // Consulta 2: fechaCita como Timestamp (registros legacy)
+    try {
+      const docsTimestamp = await ejecutarConsulta([
+        where("fechaCita", ">=", startDate),
+        where("fechaCita", "<=", endDate),
+      ]);
+      resultados.push(...docsTimestamp);
+    } catch (error) {
+      console.warn("Consulta fechaCita (timestamp) no disponible:", error);
     }
-    return docs;
+
+    return deduplicarDocs(resultados);
+  };
+
+  const consultarPorFechaPago = async (
+    inicio: string,
+    fin: string,
+    isLoadMore: boolean
+  ): Promise<QueryDocumentSnapshot<DocumentData>[]> => {
+    const startDate = new Date(`${inicio}T00:00:00`);
+    const endDate = new Date(`${fin}T23:59:59.999`);
+
+    const constraints: Parameters<typeof query>[1][] = [
+      where("fechaPago", ">=", startDate),
+      where("fechaPago", "<=", endDate),
+      orderBy("fechaPago", "desc"),
+      limit(BATCH_SIZE),
+    ];
+
+    if (isLoadMore && lastVisible) {
+      constraints.push(startAfter(lastVisible));
+    }
+
+    const snapshot = await getDocs(query(collection(db, "operaciones"), ...constraints));
+    return snapshot.docs;
   };
 
   const ejecutarConciliacion = async (isLoadMore = false) => {
     if (!filtrarPorCita && !filtrarPorPago) {
       toast.error("Activa al menos un filtro: Fecha de Cita o Fecha de Pago.");
       return;
+    }
+
+    const rangoCita = normalizarRango(citaInicio, citaFin);
+    const rangoPago = normalizarRango(pagoInicio, pagoFin);
+
+    if (rangoCita[0] !== citaInicio || rangoCita[1] !== citaFin) {
+      setCitaInicio(rangoCita[0]);
+      setCitaFin(rangoCita[1]);
+      toast.warning("El rango de fecha de cita estaba invertido y se corrigió automáticamente.");
+    }
+    if (rangoPago[0] !== pagoInicio || rangoPago[1] !== pagoFin) {
+      setPagoInicio(rangoPago[0]);
+      setPagoFin(rangoPago[1]);
+      toast.warning("El rango de fecha de pago estaba invertido y se corrigió automáticamente.");
     }
 
     const modo: ModoConsulta =
@@ -151,44 +276,30 @@ export default function ConciliacionPagosPage() {
     }
 
     try {
-      const constraints: QueryConstraint[] = [];
+      let docs: QueryDocumentSnapshot<DocumentData>[] = [];
 
       if (modo === "fechaCita") {
-        constraints.push(
-          where("fechaCita", ">=", citaInicio),
-          where("fechaCita", "<=", citaFin),
-          orderBy("fechaCita", "desc")
-        );
+        docs = await consultarPorFechaCita(rangoCita[0], rangoCita[1], isLoadMore);
       } else {
-        const inicio = new Date(`${pagoInicio}T00:00:00`);
-        const fin = new Date(`${pagoFin}T23:59:59.999`);
-        constraints.push(
-          where("fechaPago", ">=", inicio),
-          where("fechaPago", "<=", fin),
-          orderBy("fechaPago", "desc")
-        );
+        docs = await consultarPorFechaPago(rangoPago[0], rangoPago[1], isLoadMore);
       }
 
-      constraints.push(limit(BATCH_SIZE));
-
-      let q = query(collection(db, "operaciones"), ...constraints);
-
-      if (isLoadMore && lastVisible) {
-        q = query(q, startAfter(lastVisible));
-      }
-
-      const snapshot = await getDocs(q);
-      const docsFiltrados = aplicarFiltroSecundario(snapshot.docs, modo);
+      const docsFiltrados = aplicarFiltrosCliente(docs, rangoCita, rangoPago);
       const lista = docsFiltrados.map(mapearDocumento);
-      const lastDoc = snapshot.docs[snapshot.docs.length - 1];
 
-      setLastVisible(lastDoc);
-      setHasMore(snapshot.docs.length === BATCH_SIZE);
+      if (docs.length > 0) {
+        setLastVisible(docs[docs.length - 1]);
+      }
+      setHasMore(docs.length === BATCH_SIZE);
       setOperaciones((prev) => (isLoadMore ? [...prev, ...lista] : lista));
 
       if (!isLoadMore) {
         if (lista.length === 0) {
-          toast.info("No se encontraron operaciones con los criterios seleccionados.");
+          toast.info(
+            docs.length > 0
+              ? "Se encontraron registros en Firebase, pero ninguno coincide con los filtros activos."
+              : "No se encontraron operaciones con los criterios seleccionados."
+          );
         } else {
           toast.success(`Se encontraron ${lista.length} operaciones.`);
         }
@@ -196,7 +307,7 @@ export default function ConciliacionPagosPage() {
     } catch (error) {
       console.error(error);
       toast.error(
-        "Error al consultar operaciones. Verifica que exista el índice de Firestore para el rango seleccionado."
+        "Error al consultar operaciones. Si persiste, crea el índice compuesto en Firebase para fechaCita o fechaPago."
       );
     } finally {
       setLoading(false);
@@ -408,8 +519,8 @@ export default function ConciliacionPagosPage() {
       </div>
 
       <p className="mt-4 text-center text-xs text-slate-400">
-        * Consulta la colección <strong>operaciones</strong> de Firestore. Si activas ambos
-        filtros, se cruza el rango secundario sobre los resultados del rango principal.
+        * Campo <strong>fechaCita</strong> en formato texto (YYYY-MM-DD). Los registros pendientes
+        sin fecha de pago también se muestran al filtrar por cita.
       </p>
     </div>
   );
